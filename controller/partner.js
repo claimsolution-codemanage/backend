@@ -724,9 +724,9 @@ export const partnerAddCaseFile = async(req,res)=>{
      if(!req.body?.docURL) return res.status(400).json({success:false,message:"Please upload file first"})
      const {error} = validateAddCaseFile(req.body);
       req.body.docDate = new Date()
-      req.body.docName=Joi.string().allow('').optional(),
-      req.body.docType=Joi.string().allow('').optional(),
-      req.body.docFormat
+      req.body.docName=req?.body?.docType,
+      req.body.docType=req?.body?.docType,
+      req.body.docFormat= req?.body?.docType
      if(error) return res.status(400).json({success:false,message:error.details[0].message})
 
 
