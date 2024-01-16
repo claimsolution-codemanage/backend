@@ -17,26 +17,29 @@ mongoose
 	.catch((err) => console.log(`error in connecting: ${err}`));
 
 // app.use(express.static('public'));
-// app.use(cors());
-app.use((req, res, next) => {
-	const allowedOrigins = ['https://www.claimsolution.in', 'http://www.claimsolution.in'];
-	const origin = req.headers.origin;
+app.use(cors({
+	origin:['https://www.claimsolution.in', 'http://www.claimsolution.in'],
+	methods:['GET, POST, OPTIONS, PUT, PATCH, DELETE'],
+}));
+// app.use((req, res, next) => {
+// 	const allowedOrigins = ['https://www.claimsolution.in', 'http://www.claimsolution.in'];
+// 	const origin = req.headers.origin;
   
-	if (allowedOrigins.includes(origin)) {
-	  res.setHeader('Access-Control-Allow-Origin', origin);
-	}
+// 	if (allowedOrigins.includes(origin)) {
+// 	  res.setHeader('Access-Control-Allow-Origin', origin);
+// 	}
   
-	res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-	res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-auth-token');
-	res.setHeader('Access-Control-Allow-Credentials', 'true');
+// 	res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+// 	res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-auth-token');
+// 	res.setHeader('Access-Control-Allow-Credentials', 'true');
   
-	if (req.method === 'OPTIONS') {
-	  // Respond to CORS preflight requests
-	  res.sendStatus(204);
-	} else {
-	  next();
-	}
-  });
+// 	if (req.method === 'OPTIONS') {
+// 	  // Respond to CORS preflight requests
+// 	  res.sendStatus(204);
+// 	} else {
+// 	  next();
+// 	}
+//   });
 app.use(express.json());
 
 app.use("/api/upload",imageUpload)
