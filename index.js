@@ -17,10 +17,11 @@ mongoose
 	.catch((err) => console.log(`error in connecting: ${err}`));
 
 // app.use(express.static('public'));
-app.use(cors({
-	origin:['https://www.claimsolution.in', 'http://www.claimsolution.in'],
-	methods:['GET, POST, OPTIONS, PUT, PATCH, DELETE'],
-}));
+app.use(cors())
+// app.use(cors({
+// 	origin:['https://www.claimsolution.in', 'http://www.claimsolution.in'],
+// 	methods:['GET, POST, OPTIONS, PUT, PATCH, DELETE'],
+// }));
 // app.use((req, res, next) => {
 // 	const allowedOrigins = ['https://www.claimsolution.in', 'http://www.claimsolution.in'];
 // 	const origin = req.headers.origin;
