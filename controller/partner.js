@@ -354,6 +354,7 @@ export const signIn =async (req,res)=>{
     if (!partner[0]?.isActive || !partner[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Account is not active" })
     const validPassword = await bcrypt.compare(req.body.password,partner[0].password,)
     if(!validPassword) return res.status(401).json({success:false,message:"invaild email/password"})
+    const updateLoginHistory = await Partner.findByIdAndUpdate(partner[0]?._id,{$set:{recentLogin:new Date(),lastLogin:client[0]}})
     const token = partner[0]?.getAuth(true)
 
     return  res.status(200).header("x-auth-token", token)

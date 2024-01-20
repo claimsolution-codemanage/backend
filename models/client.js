@@ -42,6 +42,8 @@ const clientSchema = new mongoose.Schema({
          createAt:{type:Date,default:null}
       },
    },
+   recentLogin:{type:String,default:new Date()},
+   lastLogin:{type:String,default:new Date()},
    isProfileCompleted:{type:Boolean,default:false},
    isActive:{
     type:Boolean,

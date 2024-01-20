@@ -147,7 +147,8 @@ export const verifyClientEmailOtp = async (req, res) => {
             mobileVerify: true,
             acceptClientTls: true,
             isActive: true,
-            tlsUrl: `${process?.env?.FRONTEND_URL}/agreement/client.pdf`,
+            isProfileCompleted:true,
+            tlsUrl: "",
             "profile.profilePhoto": "",
             "profile.consultantName": client.fullName,
             "profile.consultantCode": `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfClients}`,
@@ -312,6 +313,7 @@ export const clientsignIn = async (req, res) => {
     // if(!client[0]?.acceptClientTls) return res.status(400).json({success:false,message:"Please accept our TLS first"})
     const validPassword = await bcrypt.compare(req.body.password, client[0].password,)
     if (!validPassword) return res.status(401).json({ success: false, message: "invaild email/password" })
+    const updateLoginHistory = await Client.findByIdAndUpdate(client[0]?._id,{$set:{recentLogin:new Date(),lastLogin:client[0]?.recentLogin ? client[0]?.recentLogin : new Date()}})
     const token = client[0]?.getAuth(true)
 
     return res.status(200).header("x-auth-token", token)
@@ -357,13 +359,13 @@ export const updateClientProfile = async (req, res, next) => {
         "profile.primaryMobileNo": req.body.mobileNo,
         "profile.whatsupNo": req.body.whatsupNo,
         "profile.alternateMobileNo": req.body.alternateMobileNo,
-        "profile.panNo": req.body.panNo,
-        "profile.aadhaarNo": req.body.aadhaarNo,
+        // "profile.panNo": req.body.panNo,
+        // "profile.aadhaarNo": req.body.aadhaarNo,
         "profile.dob": req.body.dob,
-        "profile.gender": req.body.gender,
+        // "profile.gender": req.body.gender,
         "profile.address": req.body.address,
         "profile.state": req.body.state,
-        "profile.district": req.body.district,
+        // "profile.district": req.body.district,
         "profile.city": req.body.city,
         "profile.pinCode": req.body.pinCode,
         "profile.about": req.body.about,
@@ -394,15 +396,6 @@ export const addNewClientCase = async (req, res) => {
     req.body.clientId = client?._id
     req.body.caseFrom = "client"
     req.body.acceptPayment = true
-    req.body.name = client?.profile?.consultantName
-    req.body.fatherName = client?.profile?.fatherName
-    req.body.email = client?.profile?.primaryEmail
-    req.body.mobileNo = client?.profile?.primaryMobileNo
-    req.body.address = client?.profile?.address
-    req.body.DOB = client?.profile?.dob
-    req.body.pinCode = client?.profile?.pinCode
-    req.body.city = client?.profile?.city
-    req.body.state = client?.profile?.state
     req.body.pendingPayment = true
     req.body.processSteps = [{
       date: Date.now(),
@@ -415,6 +408,14 @@ export const addNewClientCase = async (req, res) => {
         verify: "false",
         completed: false,
       }]
+
+    req.body.caseDocs = req?.body?.caseDocs?.map(caseFile=>{return{
+        docDate:new Date(),
+        docName:caseFile?.fileType,
+        docType:caseFile?.fileType,
+        docFormat:caseFile?.fileType,
+        docURL:caseFile?.url,
+        }})
 
 
     const newAddCase = new Case(req.body)

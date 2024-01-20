@@ -166,64 +166,146 @@ export const getSettingDetails = async (req,res)=>{
 
 }
 
-export const adminDashboard= async(req,res)=>{
-   try {
-      const verify =  await authAdmin(req,res)
-      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+// export const adminDashboard= async(req,res)=>{
+//    try {
+//       const verify =  await authAdmin(req,res)
+//       if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
 
+//       const admin = await Admin.findById(req?.user?._id)
+//       if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+
+//       const sevenMonthsAgo = new Date();
+//       sevenMonthsAgo.setMonth(sevenMonthsAgo.getMonth() - 7);
+
+//       const pieChartData = await Case.aggregate([
+//          {
+//            '$group': {
+//              '_id': '$currentStatus', 
+//              'totalCases': {
+//                '$sum': 1
+//              }
+//            }
+//          }, {
+//            '$group': {
+//              '_id': null, 
+//              'totalCase': {
+//                '$sum': '$totalCases'
+//              }, 
+//              'allCase': {
+//                '$push': '$$ROOT'
+//              }
+//            }
+//          }
+//        ])
+//    const graphData = await Case.aggregate([
+//       {
+//         $match: {
+//           createdAt: { $gte: sevenMonthsAgo } // Assuming 'createdAt' is your date field
+//         }
+//       },
+//       {
+//         $group: {
+//           _id: {
+//             year: { $year: '$createdAt' },
+//             month: { $month: '$createdAt' }
+//           },
+//           totalCases: { $sum: 1 }
+//         }
+//       },
+//       {
+//         $sort: { '_id.year': 1, '_id.month': 1 } // Optional: Sort by year and month
+//       },])
+
+//     return res.status(200).json({success:true,message:"get dashbaord data",graphData,pieChartData});
+     
+//    } catch (error) {
+//       console.log("updateAdminCase in error:",error);
+//       res.status(500).json({success:false,message:"Internal server error",error:error});
+      
+//    }
+// }
+
+export const adminDashboard = async (req, res) => {
+   try {
+     const verify = await authAdmin(req, res);
+     if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
       const admin = await Admin.findById(req?.user?._id)
       if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
-
-      const sevenMonthsAgo = new Date();
-      sevenMonthsAgo.setMonth(sevenMonthsAgo.getMonth() - 7);
-
-      const pieChartData = await Case.aggregate([
-         {
-           '$group': {
-             '_id': '$currentStatus', 
-             'totalCases': {
-               '$sum': 1
-             }
-           }
-         }, {
-           '$group': {
-             '_id': null, 
-             'totalCase': {
-               '$sum': '$totalCases'
-             }, 
-             'allCase': {
-               '$push': '$$ROOT'
-             }
+ 
+     const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
+     const currentMonth = new Date().getMonth() + 1;
+     console.log("start", currentMonth, currentYearStart);
+     const allMonths = [];
+     for (let i = 0; i < currentMonth; i++) {
+       allMonths.push({
+         _id: {
+           year: new Date().getFullYear(),
+           month: i + 1
+         },
+         totalCases: 0
+       });
+     }
+     const pieChartData = await Case.aggregate([
+       {
+         '$match': {
+           'createdAt': { $gte: currentYearStart },
+         }
+       },
+       {
+         '$group': {
+           '_id': '$currentStatus',
+           'totalCases': {
+             '$sum': 1
            }
          }
-       ])
-   const graphData = await Case.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: sevenMonthsAgo } // Assuming 'createdAt' is your date field
-        }
-      },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' }
-          },
-          totalCases: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { '_id.year': 1, '_id.month': 1 } // Optional: Sort by year and month
-      },])
-
-    return res.status(200).json({success:true,message:"get dashbaord data",graphData,pieChartData});
-     
+       },
+       {
+         '$group': {
+           '_id': null,
+           'totalCase': {
+             '$sum': '$totalCases'
+           },
+           'allCase': {
+             '$push': '$$ROOT'
+           }
+         }
+       }
+     ]);
+ 
+     const graphData = await Case.aggregate([
+       {
+         $match: {
+           'createdAt': { $gte: currentYearStart },
+         }
+       },
+       {
+         $group: {
+           _id: {
+             year: { $year: '$createdAt' },
+             month: { $month: '$createdAt' }
+           },
+           totalCases: { $sum: 1 }
+         }
+       },
+       {
+         $sort: { '_id.year': 1, '_id.month': 1 }
+       },])
+ 
+     // Merge aggregated data with the array representing all months
+     const mergedGraphData = allMonths.map((month) => {
+       const match = graphData.find((data) => {
+         return data._id.year === month._id.year && data._id.month === month._id.month;
+       });
+       return match || month;
+     });
+     return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData });
    } catch (error) {
-      console.log("updateAdminCase in error:",error);
-      res.status(500).json({success:false,message:"Internal server error",error:error});
-      
+     console.log("get dashbaord data error:", error);
+     res.status(500).json({ success: false, message: "Internal server error", error: error });
+ 
    }
-}
+ };
+
 
 
 export const adminSettingDetailsUpdate = async (req,res)=>{

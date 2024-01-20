@@ -26,6 +26,8 @@ const partnerSchema = new mongoose.Schema({
    type:String,
    default:""
    },
+   recentLogin:{type:String,default:new Date()},
+   lastLogin:{type:String,default:new Date()},
     mobileVerify:{
       type:Boolean,
       default:false
