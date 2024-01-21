@@ -96,6 +96,7 @@ export const sendAccountTerm_ConditonsMail = (email,as,fileURL) => {
 	const mailOptions = {
 		from: process.env.GMAIL_USER,
 		to: email,
+		cc:process.env.CC_MAIL_ID,
 		subject: "Service agreement",
 		html: sendCompanyTLS(as),
 		attachments: [{
@@ -413,7 +414,7 @@ const OTPMail_HTML_TEMPLATE = (email, otp,type) => {
                 You are getting this mail because you signup on claimsolution.in as a ${as}. We also attached our service agreement pdf file  with this mail.
                 <br>For your futher reference and guide regarding claimsolution.
             </p>
-  
+			<h4>The effective date of your service agreement is ${new Date().getDate()}/${new Date().getMonth()+1}/${new Date().getFullYear()}</h4>
            <p>For more info visit at <a href="https://www.claimsolution.in">claimsolution.in</a></p>
            </div>
            <div class="email-footer">

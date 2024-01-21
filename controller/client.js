@@ -429,6 +429,47 @@ export const addNewClientCase = async (req, res) => {
   }
 }
 
+
+export const clientUpdateCaseById = async(req,res)=>{
+  try {
+     const verify =  await authClient(req,res)
+     if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+     const client = await Client.findById(req?.user?._id)
+     if(!client) return res.status(401).json({success: false, message:"Client account not found"})
+
+     const {_id} = req.query
+     if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+
+     if(!client?.isActive) return res.status(401).json({success: false, message:"Account is not active"})
+     const mycase = await Case.find({_id:_id,clientId:client?._id})
+    if(mycase.length==0) return res.status(404).json({success: false, message:"Case not found"})
+
+    const {error} = validateAddClientCase(req.body);
+    if(error) return res.status(400).json({success:false,message:error.details[0].message})
+
+    req.body.caseDocs = req?.body?.caseDocs?.map(caseFile=>{return{
+      docDate: caseFile?.docDate ? caseFile?.docDate : new Date(),
+      docName:caseFile?.docFormat,
+      docType:caseFile?.docFormat,
+      docFormat:caseFile?.docFormat,
+      docURL:caseFile?.docURL,
+      }})
+
+    console.log("case_id",_id,req.body);
+
+    const updateCase =await Case.findByIdAndUpdate(_id,{$set:{...req.body}},{new:true})        
+     return res.status(200).json({success:true,message:"Successfully update case",data:updateCase});
+    
+  } catch (error) {
+     console.log("updatePartnerCase in error:",error);
+     res.status(500).json({success:false,message:"Internal server error",error:error});
+     
+  }
+}
+
+
+
 export const viewClientCaseById = async (req, res) => {
   try {
     const verify = await authClient(req, res)

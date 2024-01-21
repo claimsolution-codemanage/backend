@@ -4,7 +4,7 @@ const router = express.Router();
 import { signUp,verifyEmailOtp,signIn,partnerForgetPassword,partnerResetPassword,partnerSendMobileOtpCode,partnerMobileNoVerify,
     getProfileDetails,updateProfileDetails,getBankingDetails,updateBankingDetails,
     addNewCase,viewAllPartnerCase,partnerViewCaseById,partnerAuthenticate,partnerAddCaseFile,partnerTls,
-    acceptPartnerTerms_Conditions,getpartnerDashboard
+    acceptPartnerTerms_Conditions,getpartnerDashboard,partnerUpdateCaseById
 
 } from '../controller/partner.js';
 
@@ -33,6 +33,7 @@ router.post("/addNewCase",addNewCase)
 router.get("/viewAllPartnerCase",viewAllPartnerCase)
 router.get("/partnerViewCaseById",partnerViewCaseById)
 router.post("/addCaseFile",partnerAddCaseFile)
+router.post("/updateCaseById",partnerUpdateCaseById)
 router.get("/getTls",partnerTls)
 router.get("/getpartnerDashboard",getpartnerDashboard)
 router.put("/acceptPartnerTerms_Conditions",acceptPartnerTerms_Conditions)

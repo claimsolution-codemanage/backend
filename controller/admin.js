@@ -13,6 +13,7 @@ import Case from "../models/case.js";
 import { getAllPartnerSearchQuery,getAllClientSearchQuery,getAllCaseQuery,getAllEmployeeSearchQuery } from "../utils/helper.js";
 import Partner from "../models/partner.js";
 import Client from '../models/client.js'
+import { validateAddClientCase } from "../utils/validateClient.js";
 
 
 export const adminAuthenticate = async(req,res)=>{
@@ -624,6 +625,43 @@ export const adminViewClientById = async(req,res)=>{
       
    }
 }
+
+export const adminUpdateCaseById = async(req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+ 
+      const admin = await Admin.findById(req?.user?._id)
+      if(!admin) return res.status(401).json({success: false, message:"Client account not found"})
+ 
+      const {_id} = req.query
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+ 
+      const mycase = await Case.find({_id:_id})
+     if(mycase.length==0) return res.status(404).json({success: false, message:"Case not found"})
+ 
+     const {error} = validateAddClientCase(req.body);
+     if(error) return res.status(400).json({success:false,message:error.details[0].message})
+ 
+     req.body.caseDocs = req?.body?.caseDocs?.map(caseFile=>{return{
+       docDate: caseFile?.docDate ? caseFile?.docDate : new Date(),
+       docName:caseFile?.docFormat,
+       docType:caseFile?.docFormat,
+       docFormat:caseFile?.docFormat,
+       docURL:caseFile?.docURL,
+       }})
+ 
+     console.log("case_id",_id,req.body);
+ 
+     const updateCase =await Case.findByIdAndUpdate(_id,{$set:{...req.body}},{new:true})        
+      return res.status(200).json({success:true,message:"Successfully update case",data:updateCase});
+     
+   } catch (error) {
+      console.log("updateAdminCase in error:",error);
+      res.status(500).json({success:false,message:"Internal server error",error:error});
+      
+   }
+ }
 
 export const adminSetIsActiveClient = async (req,res)=>{
    try {
