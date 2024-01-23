@@ -14,6 +14,7 @@ import { getAllPartnerSearchQuery,getAllClientSearchQuery,getAllCaseQuery,getAll
 import Partner from "../models/partner.js";
 import Client from '../models/client.js'
 import { validateAddClientCase } from "../utils/validateClient.js";
+import { trusted } from "mongoose";
 
 
 export const adminAuthenticate = async(req,res)=>{
@@ -469,7 +470,7 @@ export const viewAllAdminCase = async(req,res)=>{
        console.log("query",query);
        if(!query.success) return res.status(400).json({success: false, message: query.message})
   
-   const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: 1 });
+   const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
    const noOfCase = await Case.find(query?.query).count()
     return res.status(200).json({success:true,message:"get case data",data:getAllCase,noOfCase:noOfCase});
      
@@ -811,4 +812,56 @@ export const adminAddCaseComment = async (req,res)=>{
    }
 }
 
+export const adminAddReferenceCaseAndMarge = async (req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
 
+      const admin = await Admin.findById(req?.user?._id)
+      if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+
+      const {partnerId,partnerCaseId,clientCaseId} = req?.query
+      if(!partnerId || !partnerCaseId || !clientCaseId)  return res.status(400).json({success: false, message:"For add reference partnerId,partnerCaseId and ClientId are required"})
+      if(!validMongooseId(partnerId)) return res.status(400).json({success: false, message:"Not a valid partnerId"})
+      if(!validMongooseId(partnerCaseId)) return res.status(400).json({success: false, message:"Not a valid partnerCaseId"})
+      if(!validMongooseId(clientCaseId)) return res.status(400).json({success: false, message:"Not a valid clientCaseId"})
+
+      const getPartner = await Partner.findById(partnerId)
+      if(!getPartner) return res.status(404).json({success: false, message:"Partner Not found"})
+
+      const getClientCase = await Case.findById(clientCaseId)
+      if(!getClientCase) return res.status(404).json({success: false, message:"Client case Not found"})
+
+      const getPartnerCase = await Case.findById(partnerCaseId)
+      if(!getPartnerCase) return res.status(404).json({success: false, message:"Partner case Not found"})
+
+
+      const referenceCaseAllDocs = [...getPartnerCase?.caseDocs,...getClientCase?.caseDocs]
+      const referenceCaseAllProcess = [...getPartnerCase?.processSteps,...getClientCase?.processSteps]
+
+
+      const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
+         {$set:{
+            partnerId:getPartner?._id,
+            partnerName:getPartner?.fullName,
+            isReferenceCase:true,
+            referenceCaseDetails:{
+               partnerId:getPartner?._id,
+               name:getPartner?.fullName,
+               referenceDate:new Date(),
+               by:admin?.fullName
+            },
+            processSteps:referenceCaseAllProcess,
+            caseDocs:referenceCaseAllDocs,
+         }},{new:true})
+
+
+         await Case.findByIdAndDelete(getPartnerCase?._id)
+
+
+      return  res.status(200).json({success: true, message: "Successfully add case reference ",data:updateAndMergeCase});
+   } catch (error) {
+      console.log("adminAddRefenceCaseAndMarge in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}

@@ -8,6 +8,12 @@ const caseSchema = new mongoose.Schema({
    caseFrom:{type:String,required:"true"},
    acceptPayment:{type:Boolean,default:false,required:"true"},
    pendingPayment:{type:Boolean,default:false,required:"true"},
+   isReferenceCase:{
+      type:Boolean,default:false
+   },
+   referenceCaseDetails:{
+      type:Object,default:{}
+   },
    paymentDetails:{
       type:[{
          typeFees:{type:String,default:"consultant"},
