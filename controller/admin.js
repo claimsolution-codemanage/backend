@@ -865,3 +865,25 @@ export const adminAddReferenceCaseAndMarge = async (req,res)=>{
       return res.status(500).json({success:false,message:"Internal server error",error:error});
    }
 }
+
+export const adminDeleteCaseById = async (req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const admin = await Admin.findById(req?.user?._id)
+      if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+
+      const {caseId} = req?.query
+      if(!caseId)  return res.status(400).json({success: false, message:"caseId id required"})
+      if(!validMongooseId(caseId)) return res.status(400).json({success: false, message:"Not a valid caseId"})
+
+      const deleteCaseById = await Case.findByIdAndDelete(caseId);
+      if(!deleteCaseById) return res.status(404).json({success: false, message:"Case not found"})
+
+      return  res.status(200).json({success: true, message: "Successfully case deleted"});
+   } catch (error) {
+      console.log("adminDeleteCaseById in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}

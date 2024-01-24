@@ -4,7 +4,7 @@ import { adminSignin,adminSignUp,createEmployeeAccount,adminResetPassword,adminS
 viewAllAdminCase,viewCaseByIdByAdmin,viewAllPartnerByAdmin,viewPartnerByIdByAdmin,adminSetIsActivePartner,adminViewAllEmployee,
 adminViewAllClient,adminViewClientById,adminSetIsActiveClient,adminSettingDetailsUpdate,adminAddCaseFeeClient,adminUpdateClientCaseFee,
 uploadCompanyClientTls,uploadCompanyPartnerTls,adminShareCaseToEmployee,adminAddCaseComment,
-adminAuthenticate,adminDashboard,adminUpdateCaseById,adminAddReferenceCaseAndMarge
+adminAuthenticate,adminDashboard,adminUpdateCaseById,adminAddReferenceCaseAndMarge,adminDeleteCaseById
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -40,6 +40,8 @@ router.get("/dashboard",adminDashboard)
 router.post("/addJob",adminAddJob)
 router.delete("/deleteJobById",adminDeleteJob)
 router.put("/addReferenceCaseAndMarge",adminAddReferenceCaseAndMarge)
+router.delete("/deleteCaseById",adminDeleteCaseById)
+
 
 
 
