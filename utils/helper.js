@@ -123,3 +123,17 @@ export const validateAddCaseFile =(body)=>{
   })
   return resetPassword.validate(body)
 }
+
+
+export const validateAddComplaint =(body)=>{
+  const bodySchema = Joi.object({
+    name: Joi.string().required(),
+    email: Joi.string().email().required(),
+    mobileNo: Joi.string().required(),
+    claim_type: Joi.string().allow('').optional(),
+    complaint_type: Joi.string().allow('').optional(),
+    complaint_brief: Joi.string().allow('').optional(),
+   })
+ 
+   return bodySchema.validate(body)
+}

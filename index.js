@@ -10,6 +10,7 @@ import employee from './routes/employee.js'
 import imageUpload from './routes/imageUpload.js' 
 import client from './routes/client.js'
 import job from './routes/job.js'
+import complaint from "./routes/complaint.js"
 
 mongoose
 	.connect(process.env.DB_URL)
@@ -49,6 +50,7 @@ app.use("/api/employee",employee)
 app.use("/api/partner",partner)
 app.use("/api/client",client)
 app.use("/api/job",job)
+app.use("/api/complaint",complaint)
 
 app.get("/",(req,res)=>{
 	res.status(200).json({success: true,message:"Welcome to server page!"});

@@ -510,7 +510,7 @@ export const viewClientAllCase = async (req, res) => {
     if (!query.success) return res.status(400).json({ success: false, message: query.message })
 
     //  console.log("query",query?.query);
-    const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: 1 });
+    const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
     const noOfCase = await Case.find(query?.query).count()
     return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase });
 
@@ -608,6 +608,11 @@ export const clientDashboard = async (req, res) => {
     const client = await Client.findById(req?.user?._id);
     if (!client) return res.status(401).json({ success: false, message: "User account not found" });
 
+    const clinicNeccessaryData ={
+      lastLogin:client?.lastLogin,
+      recentLogin:client?.recentLogin,
+    }
+
     const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
     const currentMonth = new Date().getMonth() + 1;
     console.log("start", currentMonth, currentYearStart);
@@ -677,7 +682,7 @@ export const clientDashboard = async (req, res) => {
       return match || month;
     });
 
-    return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData });
+    return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData,clinicNeccessaryData });
 
   } catch (error) {
     console.log("get dashbaord data error:", error);

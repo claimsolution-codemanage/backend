@@ -309,7 +309,6 @@ export const adminDashboard = async (req, res) => {
  };
 
 
-
 export const adminSettingDetailsUpdate = async (req,res)=>{
    try {
       const verify =  await authAdmin(req,res)
@@ -414,7 +413,7 @@ export const adminViewAllEmployee = async(req,res)=>{
       const searchQuery = req.query.search ? req.query.search : "";
 
    const query = getAllEmployeeSearchQuery(searchQuery)
-   const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: 1 });
+   const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
    const noOfEmployee = await Employee.find(query).count()
     return res.status(200).json({success:true,message:"get employee data",data:getAllEmployee,noOfEmployee:noOfEmployee});
      
@@ -518,7 +517,7 @@ export const viewAllPartnerByAdmin = async(req,res)=>{
       const searchQuery = req.query.search ? req.query.search : "";
 
    const query = getAllPartnerSearchQuery(searchQuery)
-   const getAllPartner = await Partner.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: 1 });
+   const getAllPartner = await Partner.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
    const noOfPartner = await Partner.find(query).count()
     return res.status(200).json({success:true,message:"get partner data",data:getAllPartner,noOfPartner:noOfPartner});
      
@@ -593,7 +592,7 @@ export const adminViewAllClient = async(req,res)=>{
       const searchQuery = req.query.search ? req.query.search : "";
 
    const query = getAllClientSearchQuery(searchQuery)
-   const getAllClient = await Client.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: 1 });
+   const getAllClient = await Client.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
    const noOfClient = await Client.find(query).count()
     return res.status(200).json({success:true,message:"get client data",data:getAllClient,noOfClient:noOfClient});
      
@@ -884,6 +883,50 @@ export const adminDeleteCaseById = async (req,res)=>{
       return  res.status(200).json({success: true, message: "Successfully case deleted"});
    } catch (error) {
       console.log("adminDeleteCaseById in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
+export const adminDeletePartnerById = async (req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const admin = await Admin.findById(req?.user?._id)
+      if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+
+      const {partnerId} = req?.query
+      if(!partnerId)  return res.status(400).json({success: false, message:"PartnerId id required"})
+      if(!validMongooseId(partnerId)) return res.status(400).json({success: false, message:"Not a valid PartnerId"})
+
+      const deleteParnterById = await Partner.findByIdAndDelete(partnerId);
+      if(!deleteParnterById) return res.status(404).json({success: false, message:"Parnter not found"})
+
+      return  res.status(200).json({success: true, message: "Successfully Parnter deleted"});
+   } catch (error) {
+      console.log("adminDeletePartnerById in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
+export const adminDeleteClientById = async (req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const admin = await Admin.findById(req?.user?._id)
+      if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+
+      const {clientId} = req?.query
+      if(!clientId)  return res.status(400).json({success: false, message:"ClientId id required"})
+      if(!validMongooseId(clientId)) return res.status(400).json({success: false, message:"Not a valid ClientId"})
+
+      const deleteClientById = await Client.findByIdAndDelete(clientId);
+      if(!deleteClientById) return res.status(404).json({success: false, message:"Client not found"})
+
+      return  res.status(200).json({success: true, message: "Successfully Client deleted"});
+   } catch (error) {
+      console.log("adminDeleteClientById in error:",error);
       return res.status(500).json({success:false,message:"Internal server error",error:error});
    }
 }
