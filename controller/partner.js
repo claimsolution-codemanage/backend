@@ -133,6 +133,34 @@ export const signUp = async function(req,res){
  }
 }
 
+
+export const partnerResendOtp = async (req, res) => {
+  try {
+    const verify = await authPartner(req, res)
+    if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+    const partner = await Partner.findById(req?.user?._id);
+    if (!partner) return res.status(401).json({ success: false, message: "Not SignUp with us" })
+
+    if (partner?.mobileVerify || partner?.isActive || partner?.emailVerify) return res.status(400).json({ success: false, message: "Already register with us" })
+
+    const otp = otp6Digit();
+    const updatepartner = await Partner.findByIdAndUpdate(req?.user?._id,{$set:{emailOTP: { otp: otp, createAt: Date.now()}}})
+    if(!updatepartner) return res.status(401).json({ success: false, message: "Not SignUp with us" })
+
+      try {
+        await sendOTPMail(partner?.email, otp, "partner");
+        res.status(200).json({ success: true, message: "Successfully resend OTP" });
+      } catch (err) {
+        console.log("send otp error", err);
+        return res.status(400).json({ success: false, message: "Failed to send OTP" });
+      }
+  } catch (error) {
+    console.log("resend otp error: ", error);
+    res.status(500).json({ success: false, message: "Internal server error", error: error });
+  }
+}
+
 //  for email verification check
 export const verifyEmailOtp = async (req,res,next)=>{
  try {

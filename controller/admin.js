@@ -1,6 +1,7 @@
 import Admin from "../models/admin.js";
 import { validateAdminSignUp,validateAdminSignIn,validateAdminResetPassword,validateUpdateAdminCase,
-   validateAdminSettingDetails,validateAdminAddCaseFee,validateAdminUpdateCasePayment,validateAdminAddEmployeeToCase
+   validateAdminSettingDetails,validateAdminAddCaseFee,validateAdminUpdateCasePayment,validateAdminAddEmployeeToCase,
+   validateEditAdminCaseStatus
 } from "../utils/validateAdmin.js";
 import bcrypt from 'bcrypt';
 import { generatePassword } from "../utils/helper.js";
@@ -450,6 +451,38 @@ export const changeStatusAdminCase = async(req,res)=>{
    }
 }
 
+
+export const adminEditCaseStatus = async(req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const admin = await Admin.findById(req?.user?._id)
+      if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+
+      const {error} = validateEditAdminCaseStatus(req.body)
+      if(error) return res.status(400).json({success:false,message:error.details[0].message})
+
+      if(!validMongooseId(req.body.caseId) || !validMongooseId(req.body.processId)) return res.status(400).json({success: false, message:"Not a valid processId or caseId"})
+
+      const updateCase = await Case.findByIdAndUpdate(req.body.caseId, {$set:{
+         'processSteps.$[elem].status': req.body.status,
+         'processSteps.$[elem].remark': req.body.remark,
+         ...(req.body.isCurrentStatus ? { currentStatus: req.body.status } : {}),
+         'processSteps.$[elem].consultant': admin?.fullName,}},
+         { 
+            "arrayFilters": [{ "elem._id": req.body?.processId }],
+            new:true
+         },)
+      if(!updateCase) return res.status(404).json({success:false,message:"Case not found"})
+      return res.status(200).json({success:true,message:"Successfully update case process"});     
+   } catch (error) {
+      console.log("updateAdminCaseProcess in error:",error);
+      res.status(500).json({success:false,message:"Internal server error",error:error});
+      
+   }
+}
+
 export const viewAllAdminCase = async(req,res)=>{
    try {
       const verify =  await authAdmin(req,res)
@@ -464,8 +497,9 @@ export const viewAllAdminCase = async(req,res)=>{
       const statusType = req.query.status ? req.query.status : "";
       const startDate = req.query.startDate ? req.query.startDate : "";
       const endDate = req.query.endDate ? req.query.endDate : "";
+      const type = req?.query?.type ? req.query.type: true
 
-       const query = getAllCaseQuery(statusType,searchQuery,startDate,endDate,false,false,false)
+       const query = getAllCaseQuery(statusType,searchQuery,startDate,endDate,false,false,false,type)
        console.log("query",query);
        if(!query.success) return res.status(400).json({success: false, message: query.message})
   
@@ -515,8 +549,9 @@ export const viewAllPartnerByAdmin = async(req,res)=>{
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo-1)*pageItemLimit :0;
       const searchQuery = req.query.search ? req.query.search : "";
+      const type = req?.query?.type ? req.query.type : true;
 
-   const query = getAllPartnerSearchQuery(searchQuery)
+   const query = getAllPartnerSearchQuery(searchQuery,type)
    const getAllPartner = await Partner.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
    const noOfPartner = await Partner.find(query).count()
     return res.status(200).json({success:true,message:"get partner data",data:getAllPartner,noOfPartner:noOfPartner});
@@ -578,6 +613,49 @@ export const adminSetIsActivePartner = async (req,res)=>{
 }
 
 
+export const adminSetPartnerTag = async (req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+   
+      const admin = await Admin.findById(req?.user?._id)
+      if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+
+      const {_id,profileTag} = req.body
+      if(!_id||!profileTag) return res.status(400).json({success: false, message:"required partner id and profileTag"})
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+      const updatePartner = await Partner.findByIdAndUpdate(_id,{$set:{profileTag:profileTag}},{new:true})
+      if(!updatePartner) return res.status(404).json({success: false, message:"Partner not found"})
+      return  res.status(200).json({success: true, message:"Successfully update partner tag"});
+   } catch (error) {
+      console.log("adminSetIsActiveEmployee in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+
+}
+
+export const adminSetClientTag = async (req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+   
+      const admin = await Admin.findById(req?.user?._id)
+      if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+
+      const {_id,profileTag} = req.body
+      if(!_id||!profileTag) return res.status(400).json({success: false, message:"required client id and profileTag"})
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+      const updateClient = await Client.findByIdAndUpdate(_id,{$set:{profileTag:profileTag}},{new:true})
+      if(!updateClient) return res.status(404).json({success: false, message:"Client not found"})
+      return  res.status(200).json({success: true, message:"Successfully update client tag"});
+   } catch (error) {
+      console.log("adminSetIsActiveEmployee in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+
+}
+
+
 // for client
 export const adminViewAllClient = async(req,res)=>{
    try {
@@ -590,8 +668,10 @@ export const adminViewAllClient = async(req,res)=>{
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo-1)*pageItemLimit :0;
       const searchQuery = req.query.search ? req.query.search : "";
+      const type = req.query.type ? req.query.type : true 
+      console.log("type",type);
 
-   const query = getAllClientSearchQuery(searchQuery)
+   const query = getAllClientSearchQuery(searchQuery,type)
    const getAllClient = await Client.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
    const noOfClient = await Client.find(query).count()
     return res.status(200).json({success:true,message:"get client data",data:getAllClient,noOfClient:noOfClient});
@@ -864,6 +944,33 @@ export const adminAddReferenceCaseAndMarge = async (req,res)=>{
       return res.status(500).json({success:false,message:"Internal server error",error:error});
    }
 }
+
+export const adminSetIsActiveCase = async (req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+   
+      const admin = await Admin.findById(req?.user?._id)
+      if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+
+      const {_id,status} = req.query
+      // console.log("emp",id,status);
+      if(!_id||!status) return res.status(400).json({success: false, message:"required case id and status"})
+
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+      // console.log("status",status);
+      const updateCase = await Case.findByIdAndUpdate(_id,{$set:{isActive:status}},{new:true})
+      if(!updateCase) return res.status(404).json({success: false, message:"Case not found"})
+      // console.log("update",updateCase);
+
+      return  res.status(200).json({success: true, message: `Now case ${updateCase?.isActive ?   "Active" : "Unactive"}`});
+   } catch (error) {
+      console.log("adminSetIsActiveEmployee in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+
+}
+
 
 export const adminDeleteCaseById = async (req,res)=>{
    try {

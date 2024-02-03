@@ -30,6 +30,10 @@ const clientSchema = new mongoose.Schema({
       type:Boolean,
       default:false
    },
+   profileTag: {
+      type: String,
+      default:""
+   },
    emailOTP: {
       type: {
          otp:{type:String,default:""},

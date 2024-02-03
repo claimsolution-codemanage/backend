@@ -30,7 +30,7 @@ export const getValidateDate =(date)=>{
 }
 
 
-export const getAllCaseQuery =(statusType,searchQuery,startDate,endDate,partnerId,clientId,employeeId)=>{
+export const getAllCaseQuery =(statusType,searchQuery,startDate,endDate,partnerId,clientId,employeeId,type)=>{
     if (startDate && endDate) {
         const validStartDate = getValidateDate(startDate)
         if(!validStartDate) return {success:false,message:"start date not formated"}
@@ -44,6 +44,7 @@ export const getAllCaseQuery =(statusType,searchQuery,startDate,endDate,partnerI
      clientId ?  {clientId:clientId} : {},
      employeeId ?  {addEmployee:{$in:employeeId}} : {},
       {currentStatus: { $regex: statusType, $options: "i" }},
+      {isActive:type},
       {$or: [
           { name: { $regex: searchQuery, $options: "i" }},
           { partnerName: { $regex: searchQuery, $options: "i" }},
@@ -64,32 +65,41 @@ export const getAllCaseQuery =(statusType,searchQuery,startDate,endDate,partnerI
 }
 
 
-export const getAllPartnerSearchQuery =(searchQuery)=>{
+export const getAllPartnerSearchQuery =(searchQuery,type)=>{
 let query = {
-$or: [
-        { "profile.consultantName": { $regex: searchQuery, $options: "i" }},
-        { "profile.workAssociation": { $regex: searchQuery, $options: "i" }},
-        { "profile.consultantCode": { $regex: searchQuery, $options: "i" }},
-        { "profile.primaryMobileNo": { $regex: searchQuery, $options: "i" }},
-        { "profile.primaryEmail": { $regex: searchQuery, $options: "i" }},
-        { "profile.aadhaarNo": { $regex: searchQuery, $options: "i" }},
-        { "profile.panNo": { $regex: searchQuery, $options: "i" }}
-    ]
+    $and:[
+      {isActive:type},
+      {
+      $or: [
+              { "profile.consultantName": { $regex: searchQuery, $options: "i" }},
+              { "profile.workAssociation": { $regex: searchQuery, $options: "i" }},
+              { "profile.consultantCode": { $regex: searchQuery, $options: "i" }},
+              { "profile.primaryMobileNo": { $regex: searchQuery, $options: "i" }},
+              { "profile.primaryEmail": { $regex: searchQuery, $options: "i" }},
+              { "profile.aadhaarNo": { $regex: searchQuery, $options: "i" }},
+              { "profile.panNo": { $regex: searchQuery, $options: "i" }},
+          ]
+    }]
 };
 return query
 }
 
-export const getAllClientSearchQuery =(searchQuery)=>{
+export const getAllClientSearchQuery =(searchQuery,type)=>{
   let query = {
-  $or: [
-          { "profile.consultantName": { $regex: searchQuery, $options: "i" }},
-          { "profile.fatherName": { $regex: searchQuery, $options: "i" }},
-          { "profile.consultantCode": { $regex: searchQuery, $options: "i" }},
-          { "profile.primaryMobileNo": { $regex: searchQuery, $options: "i" }},
-          { "profile.primaryEmail": { $regex: searchQuery, $options: "i" }},
-          { "profile.aadhaarNo": { $regex: searchQuery, $options: "i" }},
-          { "profile.panNo": { $regex: searchQuery, $options: "i" }}
-      ]
+    $and:[
+      {isActive:type},
+      {
+        $or: [
+                { "profile.consultantName": { $regex: searchQuery, $options: "i" }},
+                { "profile.fatherName": { $regex: searchQuery, $options: "i" }},
+                { "profile.consultantCode": { $regex: searchQuery, $options: "i" }},
+                { "profile.primaryMobileNo": { $regex: searchQuery, $options: "i" }},
+                { "profile.primaryEmail": { $regex: searchQuery, $options: "i" }},
+                { "profile.aadhaarNo": { $regex: searchQuery, $options: "i" }},
+                { "profile.panNo": { $regex: searchQuery, $options: "i" }},
+              ]
+        },
+    ]
   };
   return query
   }

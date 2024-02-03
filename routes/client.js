@@ -3,7 +3,7 @@ const router = express.Router();
 import {clientSignUp,clientsignIn,verifyClientEmailOtp,updateClientProfile,getClientProfile,
     addNewClientCase,viewClientCaseById,viewClientAllCase,clientForgetPassword,clientResetPassword,
     clientMobileNoVerify,clientSendMobileOtpCode,clientAuthenticate,clientAddCaseFile,clientTls,
-    acceptClientTerms_Conditions,clientDashboard,clientUpdateCaseById
+    acceptClientTerms_Conditions,clientDashboard,clientUpdateCaseById,clientResendOtp
 } from '../controller/client.js';
 
 
@@ -24,6 +24,7 @@ router.put("/clientForgetPassword",clientForgetPassword)
 router.put("/clientResetPassword",clientResetPassword)
 router.get("/getTls",clientTls)
 router.put("/acceptClientTerms_Conditions",acceptClientTerms_Conditions)
+router.post("/clientResendOtp",clientResendOtp)
 router.get("/getClientDashboardData",clientDashboard)
 
 

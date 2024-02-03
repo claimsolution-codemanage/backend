@@ -120,6 +120,33 @@ export const clientSignUp = async (req, res) => {
   }
 }
 
+export const clientResendOtp = async (req, res) => {
+  try {
+    const verify = await authClient(req, res)
+    if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+    const client = await Client.findById(req?.user?._id);
+    if (!client) return res.status(401).json({ success: false, message: "Not SignUp with us" })
+
+    if (client?.mobileVerify || client?.isActive || client?.emailVerify) return res.status(400).json({ success: false, message: "Already register with us" })
+
+    const otp = otp6Digit();
+    const updateClient = await Client.findByIdAndUpdate(req?.user?._id,{$set:{emailOTP: { otp: otp, createAt: Date.now()}}})
+    if(!updateClient) return res.status(401).json({ success: false, message: "Not SignUp with us" })
+
+      try {
+        await sendOTPMail(client?.email, otp, "client");
+        res.status(200).json({ success: true, message: "Successfully resend OTP" });
+      } catch (err) {
+        console.log("send otp error", err);
+        return res.status(400).json({ success: false, message: "Failed to send OTP" });
+      }
+  } catch (error) {
+    console.log("resend otp error: ", error);
+    res.status(500).json({ success: false, message: "Internal server error", error: error });
+  }
+}
+
 //  for email verification check
 export const verifyClientEmailOtp = async (req, res) => {
   try {

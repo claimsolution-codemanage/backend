@@ -63,6 +63,10 @@ const partnerSchema = new mongoose.Schema({
     type:Boolean,
     default: false
    },
+   profileTag: {
+      type: String,
+      default:""
+   },
    profile: {
       profilePhoto: {
          type: String,

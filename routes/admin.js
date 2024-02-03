@@ -5,7 +5,8 @@ viewAllAdminCase,viewCaseByIdByAdmin,viewAllPartnerByAdmin,viewPartnerByIdByAdmi
 adminViewAllClient,adminViewClientById,adminSetIsActiveClient,adminSettingDetailsUpdate,adminAddCaseFeeClient,adminUpdateClientCaseFee,
 uploadCompanyClientTls,uploadCompanyPartnerTls,adminShareCaseToEmployee,adminAddCaseComment,
 adminAuthenticate,adminDashboard,adminUpdateCaseById,adminAddReferenceCaseAndMarge,adminDeleteCaseById,
-adminDeletePartnerById,adminDeleteClientById,
+adminDeletePartnerById,adminDeleteClientById,adminSetIsActiveCase,
+adminEditCaseStatus,adminSetClientTag,adminSetPartnerTag
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -25,6 +26,9 @@ router.put("/changeCaseStatus",changeStatusAdminCase)
 router.get("/viewAllCase",viewAllAdminCase)
 router.get("/viewCaseById",viewCaseByIdByAdmin)
 router.post("/updateCaseById",adminUpdateCaseById)
+router.put("/editCaseProcessById",adminEditCaseStatus)
+router.put("/setClientTag",adminSetClientTag)
+router.put("/setPartnerTag",adminSetPartnerTag)
 router.get("/viewAllPartner",viewAllPartnerByAdmin)
 router.get("/viewPartnerById",viewPartnerByIdByAdmin)
 router.put("/changePartnerStatus",adminSetIsActivePartner)
@@ -37,6 +41,7 @@ router.put("/uploadCompanyClientTls",uploadCompanyClientTls)
 router.put("/uploadCompanyPartnerTls",uploadCompanyPartnerTls)
 router.put("/addEmployeeToCase",adminShareCaseToEmployee)
 router.put("/addCaseCommit",adminAddCaseComment)
+router.put("/changeCaseIsActive",adminSetIsActiveCase)
 router.get("/dashboard",adminDashboard)
 
 router.post("/addJob",adminAddJob)

@@ -40,6 +40,18 @@ export const validateUpdateAdminCase =(body)=>{
    return bodySchema.validate(body)
 }
 
+export const validateEditAdminCaseStatus =(body)=>{
+  const bodySchema = Joi.object({
+    caseId: Joi.string().required(),
+    status: Joi.string().required(),
+    remark: Joi.string().required(),
+    processId:Joi.string().required(),
+    isCurrentStatus:Joi.bool().required(),
+   })
+ 
+   return bodySchema.validate(body)
+}
+
 export const validateAdminSettingDetails =(body)=>{
   const bodySchema = Joi.object({
     fullName:Joi.string().required(),
