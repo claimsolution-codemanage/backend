@@ -35,13 +35,13 @@ export const sendOTPMail = (email, otp,type) => {
 	});
 };
 
-export const sendAdminSigninMail = (password) => {
+export const sendAdminSigninMail = (password,email) => {
 	const mailOptions = {
 
 		from: process.env.GMAIL_USER,      // system mail
 		to:process.env.ADMIN_MAIL_ID,      // admin mail
 		subject: "Admin Account credentials",
-		html: admin_signin_body(password),
+		html: admin_signin_body(password,email),
 	};
 	return new Promise((resolve, reject) => {
 		transport.sendMail(mailOptions, (error, info) => {
@@ -175,7 +175,7 @@ const OTPMail_HTML_TEMPLATE = (email, otp,type) => {
  }
 
 
- const admin_signin_body = (password) => {
+ const admin_signin_body = (password,email) => {
 	return `
 	  <!DOCTYPE html>
 	  <html>
@@ -219,11 +219,13 @@ const OTPMail_HTML_TEMPLATE = (email, otp,type) => {
 					<h1>Account credentials</h1>
 				 </div>
 				 <div class="email-body">
-				 <h4>Account credentials password: ${password}</h4>
+				 <h4>Account credentials</h4>
+				 <p>Email: ${email}</p>
+				 <p>Password: ${password}</p>
 				 <p>This mail for admin account credentails.</p>
 				 </div>
 				 <div class="email-footer">
-					<p>EMAIL FOOTER</p>
+				 <a href="www.claimsolution.in">claimsolution.in</a>
 				 </div>
 			  </div>
 			</div>
@@ -281,7 +283,7 @@ const OTPMail_HTML_TEMPLATE = (email, otp,type) => {
 				 <p>This mail for employee account credentails.</p>
 				 </div>
 				 <div class="email-footer">
-					<p>claimsolution.in</p>
+					<a href="www.claimsolution.in">claimsolution.in</a>
 				 </div>
 			  </div>
 			</div>
@@ -335,12 +337,12 @@ const OTPMail_HTML_TEMPLATE = (email, otp,type) => {
 				 </div>
 				 <div class="email-body">
 				 <p>Forget password email ${email}</p>
-				 <p>for forget password of your account <a href=${process.env.FRONTEND_URL+link}>Click here.</a></p>
+				 <p>To reset password of your account <a href=${process.env.FRONTEND_URL+link}>Click here.</a></p>
 				 <p> Don't share this mail with anyone. It content sensitive information of your account</p>
 				 <p>For more information  <a href="${process.env.FRONTEND_URL}">${process.env.FRONTEND_URL_Base}</a></p>
 				 </div>
 				 <div class="email-footer">
-					<p>EMAIL FOOTER</p>
+					<a href="www.claimsolution.in">www.claimsolution.in</a>
 				 </div>
 			  </div>
 			</div>
@@ -418,6 +420,7 @@ const OTPMail_HTML_TEMPLATE = (email, otp,type) => {
            <p>For more info visit at <a href="https://www.claimsolution.in">claimsolution.in</a></p>
            </div>
            <div class="email-footer">
+		   <a href="www.claimsolution.in">claimsolution</a>
            </div>
         </div>
       </div>

@@ -30,7 +30,8 @@ export const getValidateDate =(date)=>{
 }
 
 
-export const getAllCaseQuery =(statusType,searchQuery,startDate,endDate,partnerId,clientId,employeeId,type)=>{
+export const getAllCaseQuery =(statusType,searchQuery,startDate,endDate,partnerId,clientId,employeeId,type=true)=>{
+  console.log("parameter",statusType,searchQuery,startDate,endDate,partnerId,clientId,employeeId,type);
     if (startDate && endDate) {
         const validStartDate = getValidateDate(startDate)
         if(!validStartDate) return {success:false,message:"start date not formated"}
@@ -61,6 +62,7 @@ export const getAllCaseQuery =(statusType,searchQuery,startDate,endDate,partnerI
      ]
   };
 
+  // console.log("my-query",query);
   return {success:true,query:query}
 }
 

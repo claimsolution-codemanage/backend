@@ -2,7 +2,7 @@ import express from 'express';
 const router = express.Router();
 import { employeeResetPassword,employeeSignin,changeStatusEmployeeCase,viewAllEmployeeCase, employeeViewCaseByIdBy,
 employeeViewAllClient,employeeViewClientById,employeeViewAllPartner,employeeViewPartnerById,employeeForgetPassword,
-employeeAuthenticate,employeeAddCaseComment
+employeeAuthenticate,employeeAddCaseComment,employeeResetForgetPassword
 } from '../controller/employee.js';
 
 
@@ -17,5 +17,6 @@ router.get("/viewClientById",employeeViewClientById)
 router.get("/viewAllPartner",employeeViewAllPartner)
 router.get("/viewPartnerById",employeeViewPartnerById)
 router.put("/employeeForgetPassword",employeeForgetPassword)
+router.put("/resetForgetPassword",employeeResetForgetPassword)
 router.put("/addCaseComment",employeeAddCaseComment)
 export default router

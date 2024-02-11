@@ -533,7 +533,8 @@ export const viewClientAllCase = async (req, res) => {
     const startDate = req.query.startDate ? req.query.startDate : "";
     const endDate = req.query.endDate ? req.query.endDate : "";
 
-    const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, req?.user?._id, false)
+    const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, req?.user?._id, false,true)
+    console.log("query",query);
     if (!query.success) return res.status(400).json({ success: false, message: query.message })
 
     //  console.log("query",query?.query);

@@ -6,7 +6,8 @@ adminViewAllClient,adminViewClientById,adminSetIsActiveClient,adminSettingDetail
 uploadCompanyClientTls,uploadCompanyPartnerTls,adminShareCaseToEmployee,adminAddCaseComment,
 adminAuthenticate,adminDashboard,adminUpdateCaseById,adminAddReferenceCaseAndMarge,adminDeleteCaseById,
 adminDeletePartnerById,adminDeleteClientById,adminSetIsActiveCase,
-adminEditCaseStatus,adminSetClientTag,adminSetPartnerTag
+adminEditCaseStatus,adminSetClientTag,adminSetPartnerTag,adminForgetPassword,adminResetForgetPassword,
+getAllAdmin,superAdminSetIsActiveAdmin,superAdminDeleteAdminById
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -18,6 +19,12 @@ router.post("/signup", adminSignUp)
 router.get("/authenticate",adminAuthenticate)
 router.post("/resetPassword", adminResetPassword)
 router.get("/getSettingDetails",getSettingDetails)
+router.put("/forgetPassword",adminForgetPassword)
+router.put("/resetForgetPassword",adminResetForgetPassword)
+router.get("/superAdmin/allAdmin",getAllAdmin)
+router.put("/superAdmin/setIsActiveAdmin",superAdminSetIsActiveAdmin)
+router.delete("/superAdmin/deleteAdminById",superAdminDeleteAdminById)
+
 router.put("/settingDetailsUpdate",adminSettingDetailsUpdate)
 router.post("/createEmployeeAccount", createEmployeeAccount)
 router.put("/setIsActiveEmployee",adminSetIsActiveEmployee)
