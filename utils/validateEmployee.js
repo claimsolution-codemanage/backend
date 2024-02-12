@@ -38,3 +38,18 @@ export const validateUpdateEmployeeCase =(body)=>{
  
    return bodySchema.validate(body)
 }
+
+export const validateInvoice =(body)=>{
+  const bodySchema = Joi.object({
+    sender:Joi.object().required(),
+      receiver:Joi.object().required(),
+      invoiceItems:Joi.array().required(),
+      subAmt: Joi.number().required(),
+      gstAmt:Joi.number().required(),
+      totalAmt:Joi.number().required(),
+      invoiceDate:Joi.string().required(),
+   
+   })
+ 
+   return bodySchema.validate(body)
+}

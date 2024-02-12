@@ -11,6 +11,7 @@ import imageUpload from './routes/imageUpload.js'
 import client from './routes/client.js'
 import job from './routes/job.js'
 import complaint from "./routes/complaint.js"
+import ejs from 'ejs'
 
 mongoose
 	.connect(process.env.DB_URL)
@@ -18,6 +19,7 @@ mongoose
 	.catch((err) => console.log(`error in connecting: ${err}`));
 
 // app.use(express.static('public'));
+app.set('view engine', 'ejs');
 app.use(cors())
 // app.use(cors({
 // 	origin:['https://www.claimsolution.in', 'http://www.claimsolution.in'],

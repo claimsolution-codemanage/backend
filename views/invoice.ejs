@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta content="Resolves unjustified insurance claim & policy cancellation" name="keywords">
+    <meta
+        content="Your trusted partner for authorized and timely resolution of unfair insurance claim rejections and policy cancellations. Support for justice!"
+        name="description">
+    <title>Invoice</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Nunito&display=swap');
+* {
+  padding: 0%;
+  margin: 0%;
+  font-family: 'Nunito', sans-serif;
+  text-decoration: none !important;
+}
+
+body {
+  background-color: #ffffff;
+  color: #000000;
+}
+</style>
+</head>
+
+<body>
+    <div className="container m-5 my-5 w-100">
+        <div className="row">
+            <div className="col-lg-12">
+                <div className="card">
+                    <div className="card-body">
+                        <div class="invoice-title">
+                            <div class="float-end font-size-15">
+                                <h4 class='fs-4'>Invoice <%= params?.invoiceNo %>
+                                </h4>
+                                <div class="mt-4">
+                                    <h5 class="font-size-15 mb-1">Invoice Date</h5>
+                                    <p>
+                                        <%= params.invoiceDate %>
+                                    </p>
+                                </div>
+                            </div>
+                            <div class='sender w-50'>
+                                <div class="mb-4">
+                                    <h4 class="mb-1 text-muted text-capitalize">
+                                        <%= params?.sender?.name %>
+                                    </h4>
+                                </div>
+                                <div class="text-muted">
+                                    <p class="mb-1 w-75">
+                                        <%= params?.sender?.address %>
+                                    </p>
+                                    <p class='p-0 m-0'>
+                                        GSTIN: <%= params?.sender?.gstNo %>
+                                    </p>
+                                    <p class='p-0 m-0'>
+                                        PAN NO: <%= params?.sender?.panNo %>
+                                    </p>
+                                    <p class='p-0 m-0'>
+                                        State Name: <%= params?.sender?.state %>
+                                    </p>
+                                    <p class='p-0 m-0'>
+                                        PH NO: <%= params?.sender?.mobileNo %>
+                                    </p>
+                                    <p class='p-0 m-0'>
+                                        E-mail: <%= params?.sender?.email %>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr className="my-4" />
+                        <div className="row">
+                            <div className="col-sm-6">
+                                <div class="text-muted">
+                                    <h5 class="font-size-16 mb-3 d-flex align-items-center gap-2"> Billed To: </h5>
+                                    <h5 class="font-size-15 mb-2 w-75 text-capitalize">
+                                        <%= params?.receiver?.name %>
+                                    </h5>
+                                    <div class="text-muted">
+                                        <p class="mb-1 w-75">
+                                            <%= params?.receiver?.address %>-<%= params?.receiver?.pinCode %>
+                                        </p>
+                                        <p class='p-0 m-0'>
+                                            GSTIN: <%= params?.receiver?.gstNo %>
+                                        </p>
+                                        <p class='p-0 m-0'>
+                                            PAN NO: <%= params?.receiver?.panNo %>
+                                        </p>
+                                        <p class='p-0 m-0'>
+                                            State Name: <%= params?.receiver?.state %>
+                                        </p>
+                                        <p class='p-0 m-0'>
+                                            PH NO: <%= params?.receiver?.mobileNo %>
+                                        </p>
+                                        <p class='p-0 m-0'>
+                                            E-mail: <%= params?.receiver?.email %>
+                                        </p>
+                                    </div>
+                                    <p></p>
+                                </div>
+
+                            </div>
+
+                            <div className="col-sm-6">
+                                <div className="text-muted text-sm-end">
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div className="py-2">
+                            <h5 className="font-size-15 d-flex align-items-center gap-2">Summary</h5>
+                            <div className="table-responsive">
+                                <table className="table align-middle table-nowrap table-centered mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>S.No</th>
+                                            <th colSpan={6}>Particulars(Description & Specification) and HSN</th>
+                                            <th colSpan={1}>Quantity</th>
+                                            <th colSpan={1}>Gst Rate</th>
+                                            <th colSpan={1}>Rate</th>
+                                            <th colSpan={1}>Gst Amt</th>
+                                            <th colSpan={1} className="text-end col-1">
+                                                Total
+                                            </th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+
+                                        <% params?.invoiceItems?.forEach((item, ind)=> { %>
+                                            <tr>
+                                                <th scope="row">
+                                                    <%= ind + 1 %>
+                                                </th>
+                                                <td colspan="6">
+                                                    <div>
+                                                        <h5 class="text-truncate font-size-14 mb-1">
+                                                            <%= item?.name %>
+                                                        </h5>
+                                                        <p class="text-muted mb-0">
+                                                            <%= item?.description %>
+                                                        </p>
+                                                    </div>
+                                                </td>
+                                                <td colspan="1">
+                                                    <%= item?.quantity ? item?.quantity : "-" %>
+                                                </td>
+                                                <td colspan="1">
+                                                    <%= item?.gstRate %>%
+                                                </td>
+                                                <td colspan="1">
+                                                    <%= item.rate %>
+                                                </td>
+                                                <td colspan="1">
+                                                    <%= item.gstAmt %>
+                                                </td>
+                                                <td colspan="1" class="text-end">
+                                                    <%= item?.quantity && item.quantity !==0 ? item?.amt * item.quantity
+                                                        : item?.amt %>
+                                                </td>
+                                            </tr>
+                                            <% }); %>
+
+
+                                                <tr>
+                                                    <td colSpan={10}>
+                                                <tr>
+                                                    <td className="border-0">
+                                                        <strong>Terms & conditions: </strong>
+                                                        <p>1. Goods once sold shall not be taken back.</p>
+                                                        <p>2. Delayed payments shall carry an interest @24% p.a</p>
+                                                        <p>3. No claim for refund or otherwise shall be entertained
+                                                            after delivery of goods</p>
+                                                        <p>4. All disputes shubject to exclusive judriction of High
+                                                            Court of Delhi or Courts subordinate to it</p>
+
+                                                    </td>
+                                                </tr>
+                                                </td>
+                                                <td colSpan={2}>
+                                                    <tr class='text-end'>
+                                                        <th scope="row" colspan="11" class="border-0 text-end px-2">
+                                                            Sub Total
+                                                        </th>
+                                                        <td class="border-0 text-end">
+                                                            <%= params?.subAmt?.toFixed(2) %>
+                                                        </td>
+                                                    </tr>
+
+                                                    <% if
+                                                        (params?.sender?.state?.toLowerCase()==params?.receiver?.state?.toLowerCase())
+                                                        { %>
+                                                        <tr>
+                                                            <th scope="row" colspan="11" class="border-0 text-end px-2">
+                                                                CGST
+                                                            </th>
+                                                            <td class="border-0 text-end">
+                                                                <%= (params?.gstAmt / 2)?.toFixed(2) %>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th scope="row" colspan="11" class="border-0 text-end px-2">
+                                                                SGST
+                                                            </th>
+                                                            <td class="border-0 text-end">
+                                                                <%= (params?.gstAmt / 2)?.toFixed(2) %>
+                                                            </td>
+                                                        </tr>
+                                                        <% } else { %>
+                                                            <tr>
+                                                                <th scope="row" colspan="11"
+                                                                    class="border-0 text-end px-2">
+                                                                    IGST
+                                                                </th>
+                                                                <td class="border-0 text-end">
+                                                                    <%= (params?.gstAmt)?.toFixed(2) %>
+                                                                </td>
+                                                            </tr>
+                                                            <% } %>
+
+                                                                <tr>
+                                                                    <th scope="row" colspan="11"
+                                                                        class="border-0 text-end px-2">
+                                                                        Grand Total
+                                                                    </th>
+                                                                    <td class="border-0 text-end">
+                                                                        <h4 class="m-0 fw-semibold fs-5">
+                                                                            <%= params?.totalAmt %>
+                                                                        </h4>
+                                                                    </td>
+                                                                </tr>
+
+                                                </td>
+                                                </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

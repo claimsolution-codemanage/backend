@@ -11,6 +11,10 @@ import Case from "../models/case.js";
 import { sendEmployeeSigninMail } from "../utils/sendMail.js";
 import { validateResetPassword } from "../utils/helper.js";
 import jwtDecode from "jwt-decode";
+import { validateInvoice } from "../utils/validateEmployee.js";
+import Bill from "../models/bill.js";
+import { getAllInvoiceQuery } from "../utils/helper.js";
+import { invoiceHtmlToPdfBuffer } from "../utils/createPdf/invoice.js";
 // import { getValidateDate } from "../utils/helper.js";
 
 export const employeeAuthenticate = async(req,res)=>{
@@ -350,5 +354,123 @@ export const employeeAddCaseComment = async (req,res)=>{
    } catch (error) {
       console.log("employeeAddCaseCommit in error:",error);
       return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
+
+export const employeeCreateInvoice = async (req,res)=>{
+   try {
+      const verify =  await authEmployee(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const employee = await Employee.findById(req?.user?._id)
+      if(!employee) return res.status(401).json({success: false, message:"Employee account not found"})
+      if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
+      if(employee?.type?.toLowerCase()!="finance") return res.status(400).json({success: false, message:"Access Denied"})
+
+      const { error } = validateInvoice(req.body)
+      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+      const billCount = await Bill.find({}).count()
+
+      const newInvoice = new Bill({...req.body,invoiceNo:`CS-${billCount+1}`})
+      newInvoice.save()
+      return  res.status(200).json({success: true, message: "Successfully create invoice",_id:newInvoice?._id});
+   } catch (error) {
+      console.log("employee-create invoice in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
+export const employeeViewAllInvoice = async (req,res)=>{
+   try {
+      const verify =  await authEmployee(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const employee = await Employee.findById(req?.user?._id)
+      if(!employee) return res.status(401).json({success: false, message:"Employee account not found"})
+      if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
+      if(employee?.type?.toLowerCase()!="finance") return res.status(400).json({success: false, message:"Access Denied"})
+
+      const pageItemLimit = req.query.limit ? req.query.limit : 10;
+      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const searchQuery = req.query.search ? req.query.search : "";
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+
+      const query = getAllInvoiceQuery(searchQuery, startDate, endDate)
+      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+      const aggregationPipeline = [
+         { $match: query.query }, // Match the documents based on the query
+         {
+           $group: {
+             _id: null,
+             totalAmtSum: { $sum: "$totalAmt" } // Calculate the sum of totalAmt
+           }
+         }
+       ];
+
+      const getAllBill = await Bill.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const noOfBill = await Bill.find(query?.query).count()
+      const aggregateResult = await Bill.aggregate(aggregationPipeline);
+      return res.status(200).json({ success: true, message: "get case data", data: getAllBill, noOf: noOfBill,totalAmt:aggregateResult});
+
+   } catch (error) {
+      console.log("employee-get invoice in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
+export const employeeViewInvoiceById = async(req,res)=>{
+   try {
+      const verify =  await authEmployee(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const employee = await Employee.findById(req?.user?._id)
+      if(!employee) return res.status(401).json({success: false, message:"Admin account not found"})
+      if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
+      if(employee?.type?.toLowerCase()!="finance") return res.status(400).json({success: false, message:"Access Denied"})
+
+
+      
+      const {_id} = req.query;
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+  
+      const getInvoice = await Bill.findById(_id)
+      if(!getInvoice) return res.status(404).json({success: false, message:"Invoice not found"})
+    return res.status(200).json({success:true,message:"get invoice by id data",data:getInvoice});
+     
+   } catch (error) {
+      console.log("employeeViewPartnerById in error:",error);
+      res.status(500).json({success:false,message:"Internal server error",error:error});
+      
+   }
+}
+
+export const employeeDownloadInvoiceById = async(req,res)=>{
+   try {
+      const verify =  await authEmployee(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const employee = await Employee.findById(req?.user?._id)
+      if(!employee) return res.status(401).json({success: false, message:"Admin account not found"})
+      if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
+      if(employee?.type?.toLowerCase()!="finance") return res.status(400).json({success: false, message:"Access Denied"})
+
+
+      
+      const {_id} = req.query;
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+  
+      const getInvoice = await Bill.findById(_id)
+      if(!getInvoice) return res.status(404).json({success: false, message:"Invoice not found"})
+      const pdfResult = await invoiceHtmlToPdfBuffer('./views/invoice.ejs',getInvoice)
+     
+    return res.status(200).json({success:true,message:"download invoice by id data",data:pdfResult});
+     
+   } catch (error) {
+      console.log("employeeDownloadInvoiceById in error:",error);
+      res.status(500).json({success:false,message:"Internal server error",error:error});
+      
    }
 }

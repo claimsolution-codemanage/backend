@@ -149,3 +149,39 @@ export const validateAddComplaint =(body)=>{
  
    return bodySchema.validate(body)
 }
+
+
+export const getAllInvoiceQuery =(searchQuery,startDate,endDate)=>{
+  console.log(searchQuery,startDate,endDate);
+    if (startDate && endDate) {
+        const validStartDate = getValidateDate(startDate)
+        if(!validStartDate) return {success:false,message:"start date not formated"}
+        const validEndDate = getValidateDate(endDate)
+        if(!validEndDate) return {success:false,message:"end date not formated"}
+      }
+ 
+   let query = {
+     $and:[
+      {},
+      {$or: [
+        {"receiver.name": { $regex: searchQuery, $options: "i" }},
+        {"receiver.address": { $regex: searchQuery, $options: "i" }},
+        {"receiver.state": { $regex: searchQuery, $options: "i" }},
+        {"receiver.country": { $regex: searchQuery, $options: "i" }},
+        {"receiver.pinCode": { $regex: searchQuery, $options: "i" }},
+        {"receiver.gstNo": { $regex: searchQuery, $options: "i" }},
+        {"receiver.panNo": { $regex: searchQuery, $options: "i" }},
+        {"receiver.email": { $regex: searchQuery, $options: "i" }},
+        {"receiver.mobileNo":{ $regex: searchQuery, $options: "i" }},
+        {invoiceNo:{ $regex: searchQuery, $options: "i" }},
+      ]},
+      startDate && endDate ? {
+       createdAt: { $gte: new Date(startDate).setHours(0, 0, 0, 0), 
+         $lte: new Date(endDate).setHours(23, 59, 59, 999) }
+   } : {}
+     ]
+  };
+
+  // console.log("my-query",query);
+  return {success:true,query:query}
+}
