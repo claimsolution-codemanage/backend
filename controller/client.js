@@ -416,7 +416,7 @@ export const addNewClientCase = async (req, res) => {
     if (!client?.isActive) return res.status(400).json({ success: false, message: "Account is not active" })
     const { error } = validateAddClientCase(req.body);
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-    const { admin } = await Admin.find({})
+    const { admin } = await Admin.find({email:process.env.ADMIN_MAIL_ID})
     // console.log("admin",admin);
     const caseFees = admin?.length > 0 ? (admin[0]?.consultantFee ? admin[0].consultantFee : 2000) : 2000
     req.body.consultantCode = client?.profile?.consultantCode

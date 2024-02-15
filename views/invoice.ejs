@@ -3,36 +3,43 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta content="Resolves unjustified insurance claim & policy cancellation" name="keywords">
-    <meta
-        content="Your trusted partner for authorized and timely resolution of unfair insurance claim rejections and policy cancellations. Support for justice!"
-        name="description">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Invoice</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Nunito&display=swap');
-* {
-  padding: 0%;
-  margin: 0%;
-  font-family: 'Nunito', sans-serif;
-  text-decoration: none !important;
-}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito&display=swap');
 
-body {
-  background-color: #ffffff;
-  color: #000000;
-}
-</style>
+        body {
+            margin-top: 20px;
+            background-color: #eee;
+        }
+
+        .card {
+            box-shadow: 0 20px 27px 0 rgb(0 0 0 / 5%);
+        }
+
+        .card {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            word-wrap: break-word;
+            background-color: #fff;
+            background-clip: border-box;
+            border: 0 solid rgba(0, 0, 0, .125);
+            border-radius: 1rem;
+        }
+    </style>
 </head>
 
 <body>
-    <div className="container m-5 my-5 w-100">
-        <div className="row">
-            <div className="col-lg-12">
-                <div className="card">
-                    <div className="card-body">
+    <div class="container w-100">
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card">
+                    <div class="card-body">
                         <div class="invoice-title">
                             <div class="float-end font-size-15">
                                 <h4 class='fs-4'>Invoice <%= params?.invoiceNo %>
@@ -73,9 +80,9 @@ body {
                             </div>
                         </div>
 
-                        <hr className="my-4" />
-                        <div className="row">
-                            <div className="col-sm-6">
+                        <hr class="my-4" />
+                        <div class="row">
+                            <div class="col-12">
                                 <div class="text-muted">
                                     <h5 class="font-size-16 mb-3 d-flex align-items-center gap-2"> Billed To: </h5>
                                     <h5 class="font-size-15 mb-2 w-75 text-capitalize">
@@ -106,26 +113,26 @@ body {
 
                             </div>
 
-                            <div className="col-sm-6">
-                                <div className="text-muted text-sm-end">
+                            <div class="col-12">
+                                <div class="text-muted text-sm-end">
                                 </div>
                             </div>
 
                         </div>
 
-                        <div className="py-2">
-                            <h5 className="font-size-15 d-flex align-items-center gap-2">Summary</h5>
-                            <div className="table-responsive">
-                                <table className="table align-middle table-nowrap table-centered mb-0">
+                        <div class="py-2">
+                            <h5 class="font-size-15 d-flex align-items-center gap-2">Summary</h5>
+                            <div class="table-responsive">
+                                <table class="table align-middle table-nowrap table-centered mb-0">
                                     <thead>
                                         <tr>
                                             <th>S.No</th>
-                                            <th colSpan={6}>Particulars(Description & Specification) and HSN</th>
-                                            <th colSpan={1}>Quantity</th>
-                                            <th colSpan={1}>Gst Rate</th>
-                                            <th colSpan={1}>Rate</th>
-                                            <th colSpan={1}>Gst Amt</th>
-                                            <th colSpan={1} className="text-end col-1">
+                                            <th colspan="6">Particulars(Description & Specification) and HSN</th>
+                                            <th colspan="1">Quantity</th>
+                                            <th colspan="1">Gst Rate</th>
+                                            <th colspan="1">Rate</th>
+                                            <th colspan="1">Gst Amt</th>
+                                            <th colspan="1" class="text-end col-1">
                                                 Total
                                             </th>
                                         </tr>
@@ -166,78 +173,64 @@ body {
                                                 </td>
                                             </tr>
                                             <% }); %>
+                                    </tbody>
+                                </table>
 
-
-                                                <tr>
-                                                    <td colSpan={10}>
-                                                <tr>
-                                                    <td className="border-0">
-                                                        <strong>Terms & conditions: </strong>
-                                                        <p>1. Goods once sold shall not be taken back.</p>
-                                                        <p>2. Delayed payments shall carry an interest @24% p.a</p>
-                                                        <p>3. No claim for refund or otherwise shall be entertained
-                                                            after delivery of goods</p>
-                                                        <p>4. All disputes shubject to exclusive judriction of High
-                                                            Court of Delhi or Courts subordinate to it</p>
-
-                                                    </td>
-                                                </tr>
-                                                </td>
-                                                <td colSpan={2}>
-                                                    <tr class='text-end'>
-                                                        <th scope="row" colspan="11" class="border-0 text-end px-2">
-                                                            Sub Total
-                                                        </th>
-                                                        <td class="border-0 text-end">
-                                                            <%= params?.subAmt?.toFixed(2) %>
-                                                        </td>
-                                                    </tr>
-
-                                                    <% if
-                                                        (params?.sender?.state?.toLowerCase()==params?.receiver?.state?.toLowerCase())
-                                                        { %>
-                                                        <tr>
-                                                            <th scope="row" colspan="11" class="border-0 text-end px-2">
-                                                                CGST
-                                                            </th>
-                                                            <td class="border-0 text-end">
-                                                                <%= (params?.gstAmt / 2)?.toFixed(2) %>
-                                                            </td>
-                                                        </tr>
-                                                        <tr>
-                                                            <th scope="row" colspan="11" class="border-0 text-end px-2">
-                                                                SGST
-                                                            </th>
-                                                            <td class="border-0 text-end">
-                                                                <%= (params?.gstAmt / 2)?.toFixed(2) %>
-                                                            </td>
-                                                        </tr>
-                                                        <% } else { %>
-                                                            <tr>
-                                                                <th scope="row" colspan="11"
-                                                                    class="border-0 text-end px-2">
-                                                                    IGST
-                                                                </th>
-                                                                <td class="border-0 text-end">
-                                                                    <%= (params?.gstAmt)?.toFixed(2) %>
-                                                                </td>
-                                                            </tr>
-                                                            <% } %>
-
-                                                                <tr>
-                                                                    <th scope="row" colspan="11"
-                                                                        class="border-0 text-end px-2">
-                                                                        Grand Total
-                                                                    </th>
-                                                                    <td class="border-0 text-end">
-                                                                        <h4 class="m-0 fw-semibold fs-5">
-                                                                            <%= params?.totalAmt %>
-                                                                        </h4>
-                                                                    </td>
-                                                                </tr>
-
-                                                </td>
-                                                </tr>
+                                <!-- for bottom section -->
+                                <table>
+                                    <thead></thead>
+                                    <tbody>
+                                        <tr>
+                                            <td colspan="7">
+                                                <strong>Terms & conditions: </strong>
+                                                <p>1. Goods once sold shall not be taken back.</p>
+                                                <p>2. Delayed payments shall carry an interest @24% p.a</p>
+                                                <p>3. No claim for refund or otherwise shall be entertained
+                                                    after delivery of goods</p>
+                                                <p>4. All disputes shubject to exclusive judriction of High
+                                                    Court of Delhi or Courts subordinate to it</p>
+                                            </td>
+                                            <td colspan="3">
+                                                <div class='text-end'>
+                                                    <div class="border-0 text-end px-2">
+                                                        Sub Total:  <%= params?.subAmt?.toFixed(2) %>
+                                                    </div>
+                                                </div>
+                                                <% if
+                                                    (params?.sender?.state?.toLowerCase()==params?.receiver?.state?.toLowerCase())
+                                                    { %>
+                                                    <p>
+                                                    <div class="border-0 text-end px-2">
+                                                        CGST:  <%= (params?.gstAmt / 2)?.toFixed(2) %>
+                                                    </div>
+                                                 </p>
+                                                    <p>
+                                                    <div class="border-0 text-end px-2">
+                                                        SGST:  <%= (params?.gstAmt / 2)?.toFixed(2) %>
+                                                    </div>
+                                                    </p>
+                                                    <% } else { %>
+                                                        <p>
+                                                        <div class="border-0 text-end px-2">
+                                                            IGST: 
+                                                                <%= (params?.gstAmt)?.toFixed(2) %>
+                                                        </div>
+                                                        </p>
+                                                        <% } %>
+                                                            <p>
+                                                            <div class="border-0 text-end px-2">
+                                                                <h6>
+                                                                    Grand Total: 
+                                                                    <strong class="m-0 fw-semibold fs-5">
+                                                                        <%= params?.totalAmt %>
+                                                                    </strong>
+                                                                </h6>
+                                                            </div>
+                                                            <div class="border-0 text-end">
+                                                            </div>
+                                                            </p>
+                                            </td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -248,6 +241,9 @@ body {
             </div>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4"
+        crossorigin="anonymous"></script>
 </body>
 
 </html>

@@ -131,12 +131,13 @@ export const viewAllEmployeeCase = async(req,res)=>{
       const statusType = req.query.status ? req.query.status : "";
       const startDate = req.query.startDate ? req.query.startDate : "";
       const endDate = req.query.endDate ? req.query.endDate : "";
+      const caseAccess = ["assistant","operation","finance"]
 
-      const empId = req?.user?.empType!="assistant" ?  req?.user?._id : false
+      const empId = !caseAccess?.includes(req?.user?.empType?.toLowerCase()) ?  req?.user?._id : false
       const query = getAllCaseQuery(statusType,searchQuery,startDate,endDate,false,false,empId,true)
       if(!query.success) return res.status(400).json({success: false, message: query.message})
 
-      const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: 1 });
+      const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
       const noOfCase = await Case.find(query?.query).count()
       return res.status(200).json({success:true,message:"get case data",data:getAllCase,noOfCase:noOfCase});
      
@@ -465,8 +466,12 @@ export const employeeDownloadInvoiceById = async(req,res)=>{
       const getInvoice = await Bill.findById(_id)
       if(!getInvoice) return res.status(404).json({success: false, message:"Invoice not found"})
       const pdfResult = await invoiceHtmlToPdfBuffer('./views/invoice.ejs',getInvoice)
+      res.setHeader('Content-Disposition','attachment;filename="invoice.pdf"')
+      res.setHeader('Content-Type','application/pdf');
+      res.status(200)
+      res.send(pdfResult)
      
-    return res.status(200).json({success:true,message:"download invoice by id data",data:pdfResult});
+   //  return res.status(200).json({success:true,message:"download invoice by id data",data:pdfResult});
      
    } catch (error) {
       console.log("employeeDownloadInvoiceById in error:",error);
@@ -474,3 +479,84 @@ export const employeeDownloadInvoiceById = async(req,res)=>{
       
    }
 }
+
+export const allEmployeeDashboard = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res);
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+
+      const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
+      const currentMonth = new Date().getMonth() + 1;
+      console.log("start", currentMonth, currentYearStart);
+      const allMonths = [];
+      for (let i = 0; i < currentMonth; i++) {
+         allMonths.push({
+            _id: {
+               year: new Date().getFullYear(),
+               month: i + 1
+            },
+            totalCases: 0
+         });
+      }
+      const pieChartData = await Case.aggregate([
+         {
+            '$match': {
+               'createdAt': { $gte: currentYearStart },
+            }
+         },
+         {
+            '$group': {
+               '_id': '$currentStatus',
+               'totalCases': {
+                  '$sum': 1
+               }
+            }
+         },
+         {
+            '$group': {
+               '_id': null,
+               'totalCase': {
+                  '$sum': '$totalCases'
+               },
+               'allCase': {
+                  '$push': '$$ROOT'
+               }
+            }
+         }
+      ]);
+
+      const graphData = await Case.aggregate([
+         {
+            $match: {
+               'createdAt': { $gte: currentYearStart },
+            }
+         },
+         {
+            $group: {
+               _id: {
+                  year: { $year: '$createdAt' },
+                  month: { $month: '$createdAt' }
+               },
+               totalCases: { $sum: 1 }
+            }
+         },
+         {
+            $sort: { '_id.year': 1, '_id.month': 1 }
+         },])
+
+      // Merge aggregated data with the array representing all months
+      const mergedGraphData = allMonths.map((month) => {
+         const match = graphData.find((data) => {
+            return data._id.year === month._id.year && data._id.month === month._id.month;
+         });
+         return match || month;
+      });
+      return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData });
+   } catch (error) {
+      console.log("get dashbaord data error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+};

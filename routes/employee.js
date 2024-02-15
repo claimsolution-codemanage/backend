@@ -3,7 +3,8 @@ const router = express.Router();
 import { employeeResetPassword,employeeSignin,changeStatusEmployeeCase,viewAllEmployeeCase, employeeViewCaseByIdBy,
 employeeViewAllClient,employeeViewClientById,employeeViewAllPartner,employeeViewPartnerById,employeeForgetPassword,
 employeeAuthenticate,employeeAddCaseComment,employeeResetForgetPassword,
-employeeCreateInvoice,employeeViewAllInvoice,employeeViewInvoiceById,employeeDownloadInvoiceById
+employeeCreateInvoice,employeeViewAllInvoice,employeeViewInvoiceById,employeeDownloadInvoiceById,
+allEmployeeDashboard
 } from '../controller/employee.js';
 
 
@@ -24,6 +25,8 @@ router.post("/finance/createInvoice",employeeCreateInvoice)
 router.get("/finance/viewAllInvoice",employeeViewAllInvoice)
 router.get("/finance/viewInvoiceById",employeeViewInvoiceById)
 router.get("/finance/downloadInvoiceById",employeeDownloadInvoiceById)
+router.get("/all/dashboard",allEmployeeDashboard)
+
 
 
 export default router

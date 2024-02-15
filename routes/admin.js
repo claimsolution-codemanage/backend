@@ -7,7 +7,7 @@ uploadCompanyClientTls,uploadCompanyPartnerTls,adminShareCaseToEmployee,adminAdd
 adminAuthenticate,adminDashboard,adminUpdateCaseById,adminAddReferenceCaseAndMarge,adminDeleteCaseById,
 adminDeletePartnerById,adminDeleteClientById,adminSetIsActiveCase,
 adminEditCaseStatus,adminSetClientTag,adminSetPartnerTag,adminForgetPassword,adminResetForgetPassword,
-getAllAdmin,superAdminSetIsActiveAdmin,superAdminDeleteAdminById
+getAllAdmin,superAdminSetIsActiveAdmin,superAdminDeleteAdminById,adminViewPartnerReport
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -59,6 +59,7 @@ router.delete("/deletePartnerById",adminDeletePartnerById)
 router.delete("/deleteClientById",adminDeleteClientById)
 
 router.get("/viewAllComplaint",viewAllAdminComplaint)
+router.get("/adminViewPartnerReport",adminViewPartnerReport)
 
 
 
