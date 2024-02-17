@@ -2,6 +2,7 @@ import Complaint from "../models/complaint.js";
 import { validateAddComplaint } from "../utils/helper.js";
 import { authAdmin } from "../middleware/authentication.js";
 import Admin from "../models/admin.js";
+import { validMongooseId } from "../utils/helper.js";
 
 export const addComplaint = async (req,res)=>{
     try {
@@ -26,6 +27,8 @@ export const addComplaint = async (req,res)=>{
  
        const admin = await Admin.findById(req?.user?._id)
        if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
        const pageItemLimit = req.query.limit ? req.query.limit : 10;
        const pageNo = req.query.pageNo ? (req.query.pageNo-1)*pageItemLimit :0;
@@ -68,3 +71,28 @@ export const addComplaint = async (req,res)=>{
        
     }
  }
+
+ export const adminRemoveComplaintById = async(req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const admin = await Admin.findById(req?.user?._id)
+      if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+
+      const {_id} = req.query;
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+
+      const complaint = await Complaint.findByIdAndRemove(_id) 
+      if(!complaint) return res.status(404).json({success:false,message:"Complaint not found"})
+
+    return res.status(200).json({success:true,message:"Successfully remove complaint"});
+     
+   } catch (error) {
+      console.log("remove complaints in error:",error);
+      res.status(500).json({success:false,message:"Internal server error",error:error});
+      
+   }
+}

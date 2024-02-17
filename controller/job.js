@@ -12,6 +12,8 @@ export const adminAddJob = async (req,res)=>{
  
        const admin = await Admin.findById(req?.user?._id)
        if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
        const {error} = validateAdminAddJob(req.body)
        if(error) return res.status(400).json({success:false,message:error.details[0].message})
@@ -44,6 +46,8 @@ export const adminAddJob = async (req,res)=>{
   
         const admin = await Admin.findById(req?.user?._id)
         if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
   
         if(!validMongooseId(req.query._id)) return res.status(400).json({success: false, message:"Not a valid id"})
         const deleteJob = await Job.findByIdAndDelete(req.query._id)

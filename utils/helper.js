@@ -162,7 +162,7 @@ export const getAllInvoiceQuery =(searchQuery,startDate,endDate)=>{
  
    let query = {
      $and:[
-      {},
+      {isActive:true},
       {$or: [
         {"receiver.name": { $regex: searchQuery, $options: "i" }},
         {"receiver.address": { $regex: searchQuery, $options: "i" }},
@@ -182,6 +182,6 @@ export const getAllInvoiceQuery =(searchQuery,startDate,endDate)=>{
      ]
   };
 
-  // console.log("my-query",query);
+  console.log("my-query",query);
   return {success:true,query:query}
 }

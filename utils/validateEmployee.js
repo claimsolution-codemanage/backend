@@ -48,8 +48,6 @@ export const validateInvoice =(body)=>{
       gstAmt:Joi.number().required(),
       totalAmt:Joi.number().required(),
       invoiceDate:Joi.string().required(),
-   
    })
- 
    return bodySchema.validate(body)
 }

@@ -464,6 +464,8 @@ export const clientUpdateCaseById = async(req,res)=>{
 
      const client = await Client.findById(req?.user?._id)
      if(!client) return res.status(401).json({success: false, message:"Client account not found"})
+    if (!client?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
+
 
      const {_id} = req.query
      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
@@ -504,6 +506,7 @@ export const viewClientCaseById = async (req, res) => {
 
     const client = await Client.findById(req?.user?._id)
     if (!client) return res.status(401).json({ success: false, message: "Client account not found" })
+    if (!client?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
 
     //  console.log("query",query?.query);
     const { _id } = req.query;
@@ -525,6 +528,7 @@ export const viewClientAllCase = async (req, res) => {
 
     const client = await Client.findById(req?.user?._id)
     if (!client) return res.status(401).json({ success: false, message: "Client account not found" })
+    if (!client?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
     // query = ?statusType=&search=&limit=&pageNo
     const pageItemLimit = req.query.limit ? req.query.limit : 10;
     const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
@@ -635,6 +639,7 @@ export const clientDashboard = async (req, res) => {
 
     const client = await Client.findById(req?.user?._id);
     if (!client) return res.status(401).json({ success: false, message: "User account not found" });
+    if (!client?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
 
     const clinicNeccessaryData ={
       lastLogin:client?.lastLogin,

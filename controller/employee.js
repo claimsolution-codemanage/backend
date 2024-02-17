@@ -480,12 +480,61 @@ export const employeeDownloadInvoiceById = async(req,res)=>{
    }
 }
 
+export const employeeEditInvoice = async (req,res)=>{
+   try {
+      const verify =  await authEmployee(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const employee = await Employee.findById(req?.user?._id)
+      if(!employee) return res.status(401).json({success: false, message:"Employee account not found"})
+      if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
+      if(employee?.type?.toLowerCase()!="finance") return res.status(400).json({success: false, message:"Access Denied"})
+
+      const {_id} = req.query;
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+
+      const { error } = validateInvoice(req.body)
+      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+      const invoice = await Bill.findByIdAndUpdate(_id,{$set:req?.body}) 
+
+      return  res.status(200).json({success: true, message: "Successfully update invoice"});
+   } catch (error) {
+      console.log("employee-create invoice in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
+export const employeeUnActiveInvoice = async (req,res)=>{
+   try {
+      const verify =  await authEmployee(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const employee = await Employee.findById(req?.user?._id)
+      if(!employee) return res.status(401).json({success: false, message:"Employee account not found"})
+      if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
+      if(employee?.type?.toLowerCase()!="finance") return res.status(400).json({success: false, message:"Access Denied"})
+
+      const {_id} = req.query;
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+
+      const invoice = await Bill.findByIdAndUpdate(_id,{$set:{isActive:false}}) 
+
+      return  res.status(200).json({success: true, message: "Successfully remove invoice"});
+   } catch (error) {
+      console.log("employee-remove invoice in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
 export const allEmployeeDashboard = async (req, res) => {
    try {
       const verify = await authEmployee(req, res);
       if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
       const employee = await Employee.findById(req?.user?._id)
       if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
+
 
       const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
       const currentMonth = new Date().getMonth() + 1;

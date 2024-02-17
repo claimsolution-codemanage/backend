@@ -16,6 +16,7 @@ const billSchema = new mongoose.Schema({
         type:[],
         require:true
     },
+    isActive:{type:Boolean,default:true},
     subAmt: {type:Number,require:true},
     gstAmt:{type:Number,require:true},
     totalAmt:{type:Number,require:true},

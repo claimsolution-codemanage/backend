@@ -720,6 +720,8 @@ export const partnerViewCaseById = async(req,res)=>{
 
      const partner = await Partner.findById(req?.user?._id)
      if(!partner) return res.status(401).json({success: false, message:"Partner account not found"})
+    if (!partner?.isActive) return res.status(400).json({ success: false, message: "Account is not active" })
+
 
      const {_id} = req.query
      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
@@ -744,6 +746,8 @@ export const partnerUpdateCaseById = async(req,res)=>{
 
      const partner = await Partner.findById(req?.user?._id)
      if(!partner) return res.status(401).json({success: false, message:"Partner account not found"})
+    if (!partner?.isActive) return res.status(400).json({ success: false, message: "Account is not active" })
+
 
      const {_id} = req.query
      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
@@ -818,6 +822,8 @@ export const getpartnerDashboard = async (req, res) => {
 
     const partner = await Partner.findById(req?.user?._id).select("-password");
     if (!partner) return res.status(401).json({ success: false, message: "User account not found" });
+    if (!partner?.isActive) return res.status(400).json({ success: false, message: "Account is not active" })
+
 
     const partnerNecessaryData ={
       lastLogin:partner?.lastLogin,

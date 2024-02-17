@@ -85,7 +85,7 @@ export const adminSignin = async (req, res) => {
       const admin = await Admin.find({ email: req.body.email })
       if (admin.length == 0) return res.status(404).json({ success: false, message: "Admin account not exists" })
 
-      if(!admin[0]?.isActive) return res.status(404).json({ success: false, message: "Admin account not active" })
+      if(!admin[0]?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       const checkAuthAdmin = await bcrypt.compare(req.body.password, admin?.[0]?.password)
       if (!checkAuthAdmin) return res.status(401).json({ success: false, message: "invaild email/password" })
@@ -113,6 +113,8 @@ export const adminResetPassword = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { password, confirmPassword } = req.body
       if (password !== confirmPassword) return res.status(403).json({ success: false, message: "confirm password must be same" })
@@ -167,6 +169,8 @@ export const getSettingDetails = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id).select("-password")
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
 
       return res.status(200).json({ success: true, message: 'get admin profile', data: admin });
@@ -242,6 +246,8 @@ export const adminDashboard = async (req, res) => {
       if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
       const currentMonth = new Date().getMonth() + 1;
@@ -353,6 +359,8 @@ export const adminSetIsActiveEmployee = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { _id, status } = req.query
       // console.log("emp",_id,status);
@@ -380,6 +388,8 @@ export const createEmployeeAccount = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { error } = validateEmployeeSignUp(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
@@ -420,6 +430,8 @@ export const adminViewAllEmployee = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
       // query = ?statusType=&search=&limit=&pageNo
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
@@ -444,6 +456,8 @@ export const changeStatusAdminCase = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { error } = validateUpdateAdminCase(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
@@ -471,6 +485,8 @@ export const adminEditCaseStatus = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { error } = validateEditAdminCaseStatus(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
@@ -505,6 +521,8 @@ export const viewAllAdminCase = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
       // query = ?statusType=&search=&limit=&pageNo
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
@@ -547,6 +565,7 @@ export const adminViewPartnerReport = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
       if (!validMongooseId(req.query.partnerId)) return res.status(400).json({ success: false, message: "Not a valid partnerId" })
       const partner = await Partner.findById(req.query.partnerId).select("-password")
       if(!partner) return res.status(404).json({ success: false, message: "Parnter not found" })
@@ -592,6 +611,8 @@ export const viewCaseByIdByAdmin = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
 
       const { _id } = req.query;
@@ -615,6 +636,8 @@ export const viewAllPartnerByAdmin = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
       // query = ?statusType=&search=&limit=&pageNo
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
@@ -640,6 +663,8 @@ export const viewPartnerByIdByAdmin = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
 
       const { _id } = req.query;
@@ -663,6 +688,8 @@ export const adminSetIsActivePartner = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { _id, status } = req.query
       // console.log("emp",id,status);
@@ -690,6 +717,8 @@ export const adminSetPartnerTag = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { _id, profileTag } = req.body
       if (!_id || !profileTag) return res.status(400).json({ success: false, message: "required partner id and profileTag" })
@@ -711,6 +740,8 @@ export const adminSetClientTag = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { _id, profileTag } = req.body
       if (!_id || !profileTag) return res.status(400).json({ success: false, message: "required client id and profileTag" })
@@ -734,6 +765,8 @@ export const adminViewAllClient = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
       // query = ?statusType=&search=&limit=&pageNo
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
@@ -760,6 +793,8 @@ export const adminViewClientById = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
 
       const { _id } = req.query;
@@ -783,6 +818,8 @@ export const adminUpdateCaseById = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Client account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { _id } = req.query
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
@@ -822,6 +859,8 @@ export const adminSetIsActiveClient = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { _id, status } = req.query
       // console.log("emp",id,status);
@@ -854,6 +893,8 @@ export const adminAddCaseFeeClient = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { _id } = req.query
       if (!_id) return res.status(400).json({ success: false, message: "required case id" })
@@ -888,6 +929,8 @@ export const adminUpdateClientCaseFee = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { error } = validateAdminUpdateCasePayment(req.query)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
@@ -923,6 +966,8 @@ export const adminShareCaseToEmployee = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { error } = validateAdminAddEmployeeToCase(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
@@ -944,6 +989,8 @@ export const adminAddCaseComment = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       if (!req?.body?.Comment) return res.status(400).json({ success: false, message: "Case Comment required" })
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
@@ -973,6 +1020,8 @@ export const adminAddReferenceCaseAndMarge = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { partnerId, partnerCaseId, clientCaseId } = req?.query
       if (!partnerId || !partnerCaseId || !clientCaseId) return res.status(400).json({ success: false, message: "For add reference partnerId,partnerCaseId and ClientId are required" })
@@ -1029,6 +1078,8 @@ export const adminSetIsActiveCase = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { _id, status } = req.query
       // console.log("emp",id,status);
@@ -1056,6 +1107,8 @@ export const adminDeleteCaseById = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { caseId } = req?.query
       if (!caseId) return res.status(400).json({ success: false, message: "caseId id required" })
@@ -1078,6 +1131,8 @@ export const adminDeletePartnerById = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { partnerId } = req?.query
       if (!partnerId) return res.status(400).json({ success: false, message: "PartnerId id required" })
@@ -1100,6 +1155,8 @@ export const adminDeleteClientById = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
 
       const { clientId } = req?.query
       if (!clientId) return res.status(400).json({ success: false, message: "ClientId id required" })
@@ -1121,6 +1178,7 @@ export const adminForgetPassword = async (req, res) => {
       const admin = await Admin.find({ email: req.body.email, })
       if (admin.length == 0) return res.status(404).json({ success: false, message: "Account not exist" })
       if (!admin[0]?.isActive) return res.status(404).json({ success: false, message: "Account not active" })
+      
 
 
       const jwtToken = await Jwt.sign({ _id: admin[0]?._id, email: admin[0]?.email }, process.env.ADMIN_SECRET_KEY, { expiresIn: '5m' })

@@ -4,7 +4,7 @@ import { employeeResetPassword,employeeSignin,changeStatusEmployeeCase,viewAllEm
 employeeViewAllClient,employeeViewClientById,employeeViewAllPartner,employeeViewPartnerById,employeeForgetPassword,
 employeeAuthenticate,employeeAddCaseComment,employeeResetForgetPassword,
 employeeCreateInvoice,employeeViewAllInvoice,employeeViewInvoiceById,employeeDownloadInvoiceById,
-allEmployeeDashboard
+employeeEditInvoice,allEmployeeDashboard,employeeUnActiveInvoice,
 } from '../controller/employee.js';
 
 
@@ -24,6 +24,8 @@ router.put("/addCaseComment",employeeAddCaseComment)
 router.post("/finance/createInvoice",employeeCreateInvoice)
 router.get("/finance/viewAllInvoice",employeeViewAllInvoice)
 router.get("/finance/viewInvoiceById",employeeViewInvoiceById)
+router.put("/finance/editInvoiceById",employeeEditInvoice)
+router.put("/finance/removeInvoiceById",employeeUnActiveInvoice)
 router.get("/finance/downloadInvoiceById",employeeDownloadInvoiceById)
 router.get("/all/dashboard",allEmployeeDashboard)
 
