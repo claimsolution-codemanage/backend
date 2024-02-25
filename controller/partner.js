@@ -848,6 +848,7 @@ export const getpartnerDashboard = async (req, res) => {
       {
         '$match': {
           'createdAt': { $gte: currentYearStart },
+          'isActive':true,
           'partnerId': req?.user?._id // Assuming 'partnerId' is the field to match
         }
       },
@@ -856,6 +857,9 @@ export const getpartnerDashboard = async (req, res) => {
           '_id': '$currentStatus',
           'totalCases': {
             '$sum': 1
+          },
+          'totalCaseAmount': {
+            '$sum': '$claimAmount' // Assuming 'amount' is the field to sum
           }
         }
       },
@@ -864,6 +868,9 @@ export const getpartnerDashboard = async (req, res) => {
           '_id': null,
           'totalCase': {
             '$sum': '$totalCases'
+          },
+          'totalCaseAmount': {
+            '$sum': '$totalCaseAmount'
           },
           'allCase': {
             '$push': '$$ROOT'
@@ -876,7 +883,8 @@ export const getpartnerDashboard = async (req, res) => {
       {
         $match: {
           'createdAt': { $gte: currentYearStart },
-          'partnerId': req?.user?._id
+          'partnerId': req?.user?._id,
+          'isActive':true
         }
       },
       {

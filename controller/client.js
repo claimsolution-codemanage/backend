@@ -641,7 +641,7 @@ export const clientDashboard = async (req, res) => {
     if (!client) return res.status(401).json({ success: false, message: "User account not found" });
     if (!client?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
 
-    const clinicNeccessaryData ={
+    const clientNeccessaryData ={
       lastLogin:client?.lastLogin,
       recentLogin:client?.recentLogin,
     }
@@ -663,7 +663,8 @@ export const clientDashboard = async (req, res) => {
       {
         '$match': {
           'createdAt': { $gte: currentYearStart },
-          'clientId': req?.user?._id // Assuming 'clientId' is the field to match
+          'clientId': req?.user?._id, // Assuming 'clientId' is the field to match
+          'isActive':true
         }
       },
       {
@@ -671,6 +672,9 @@ export const clientDashboard = async (req, res) => {
           '_id': '$currentStatus',
           'totalCases': {
             '$sum': 1
+          },
+          'totalCaseAmount': {
+            '$sum': '$claimAmount' // Assuming 'amount' is the field to sum
           }
         }
       },
@@ -679,6 +683,9 @@ export const clientDashboard = async (req, res) => {
           '_id': null,
           'totalCase': {
             '$sum': '$totalCases'
+          },
+          'totalCaseAmount': {
+            '$sum': '$totalCaseAmount'
           },
           'allCase': {
             '$push': '$$ROOT'
@@ -691,7 +698,8 @@ export const clientDashboard = async (req, res) => {
       {
         $match: {
           'createdAt': { $gte: currentYearStart },
-          'clientId': req?.user?._id
+          'clientId': req?.user?._id,
+          'isActive':true
         }
       },
       {
@@ -715,7 +723,7 @@ export const clientDashboard = async (req, res) => {
       return match || month;
     });
 
-    return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData,clinicNeccessaryData });
+    return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData,clientNeccessaryData });
 
   } catch (error) {
     console.log("get dashbaord data error:", error);

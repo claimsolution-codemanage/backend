@@ -248,7 +248,9 @@ export const adminDashboard = async (req, res) => {
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
       if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
-
+      const noOfClient = await Client.find({isActive:true}).count()
+      const noOfPartner = await Partner.find({isActive:true}).count()
+      const noOfEmployee = await Employee.find({isActive:true}).count()
       const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
       const currentMonth = new Date().getMonth() + 1;
       console.log("start", currentMonth, currentYearStart);
@@ -266,6 +268,7 @@ export const adminDashboard = async (req, res) => {
          {
             '$match': {
                'createdAt': { $gte: currentYearStart },
+               'isActive':true
             }
          },
          {
@@ -273,6 +276,9 @@ export const adminDashboard = async (req, res) => {
                '_id': '$currentStatus',
                'totalCases': {
                   '$sum': 1
+               },
+               'totalCaseAmount': {
+                 '$sum': '$claimAmount' // Assuming 'amount' is the field to sum
                }
             }
          },
@@ -282,6 +288,9 @@ export const adminDashboard = async (req, res) => {
                'totalCase': {
                   '$sum': '$totalCases'
                },
+               'totalCaseAmount': {
+                  '$sum': '$totalCaseAmount'
+                },
                'allCase': {
                   '$push': '$$ROOT'
                }
@@ -293,6 +302,7 @@ export const adminDashboard = async (req, res) => {
          {
             $match: {
                'createdAt': { $gte: currentYearStart },
+               'isActive':true
             }
          },
          {
@@ -315,7 +325,7 @@ export const adminDashboard = async (req, res) => {
          });
          return match || month;
       });
-      return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData });
+      return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData,noOfClient,noOfPartner,noOfEmployee });
    } catch (error) {
       console.log("get dashbaord data error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -409,7 +419,7 @@ export const createEmployeeAccount = async (req, res) => {
       try {
          await sendEmployeeSigninMail(req.body.email, systemPassword);
          await newEmployee.save()
-         return res.status(200).json({ success: true, message: "Successfully create new Employee", systemPassword: systemPassword });
+         return res.status(200).json({ success: true, message: "Successfully create new Employee", });
       } catch (err) {
          console.log("send otp error", err);
          return res.status(400).json({ success: false, message: "Failed to send OTP" });
@@ -418,6 +428,64 @@ export const createEmployeeAccount = async (req, res) => {
 
    } catch (error) {
       console.log("createEmployeeAccount in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+export const adminUpdateEmployeeAccount = async (req, res) => {
+   try {
+      const {_id} = req.query
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const { error } = validateEmployeeSignUp(req.body)
+      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+
+      const updateEmployee = await Employee.findByIdAndUpdate(_id, {
+         $set:{
+            fullName:req.body.fullName,
+             type:req.body.type,
+            designation:req.body.designation,
+         }
+      })
+      if (!updateEmployee) return res.status(401).json({ success: false, message: "Employee not found" })
+      return res.status(200).json({ success: true, message: "Successfully update Employee"});
+
+
+
+   } catch (error) {
+      console.log("updateEmployeeAccount in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+export const adminDeleteEmployeeAccount = async (req, res) => {
+   try {
+      const {_id} = req.query
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+
+      const employee = await Employee.findById(_id)
+      if (!employee) return res.status(401).json({ success: false, message: "Employee not found" })
+      const deletedEmployee = await Employee.findByIdAndDelete(_id)
+      return res.status(200).json({ success: true, message: "Successfully remove Employee"});
+
+   } catch (error) {
+      console.log("updateEmployeeAccount in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
 
    }
@@ -772,11 +840,12 @@ export const adminViewAllClient = async (req, res) => {
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = req.query.search ? req.query.search : "";
       const type = req.query.type ? req.query.type : true
-      console.log("type", type);
+      console.log("type", type,pageItemLimit,pageNo,searchQuery);
 
       const query = getAllClientSearchQuery(searchQuery, type)
       const getAllClient = await Client.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
       const noOfClient = await Client.find(query).count()
+      
       return res.status(200).json({ success: true, message: "get client data", data: getAllClient, noOfClient: noOfClient });
 
    } catch (error) {

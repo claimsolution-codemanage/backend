@@ -1,6 +1,6 @@
 import express from 'express';
 const router = express.Router();
-import { adminSignin,adminSignUp,createEmployeeAccount,adminResetPassword,adminSetIsActiveEmployee,changeStatusAdminCase,getSettingDetails,
+import { adminSignin,adminSignUp,createEmployeeAccount,adminUpdateEmployeeAccount,adminDeleteEmployeeAccount,adminResetPassword,adminSetIsActiveEmployee,changeStatusAdminCase,getSettingDetails,
 viewAllAdminCase,viewCaseByIdByAdmin,viewAllPartnerByAdmin,viewPartnerByIdByAdmin,adminSetIsActivePartner,adminViewAllEmployee,
 adminViewAllClient,adminViewClientById,adminSetIsActiveClient,adminSettingDetailsUpdate,adminAddCaseFeeClient,adminUpdateClientCaseFee,
 uploadCompanyClientTls,uploadCompanyPartnerTls,adminShareCaseToEmployee,adminAddCaseComment,
@@ -27,6 +27,8 @@ router.delete("/superAdmin/deleteAdminById",superAdminDeleteAdminById)
 
 router.put("/settingDetailsUpdate",adminSettingDetailsUpdate)
 router.post("/createEmployeeAccount", createEmployeeAccount)
+router.put("/updateEmployeeAccount", adminUpdateEmployeeAccount)
+router.delete("/deleteEmployeeAccount", adminDeleteEmployeeAccount)
 router.put("/setIsActiveEmployee",adminSetIsActiveEmployee)
 router.get("/adminViewAllEmployee",adminViewAllEmployee)
 router.put("/changeCaseStatus",changeStatusAdminCase)

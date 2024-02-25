@@ -5,7 +5,8 @@ export const validateEmployeeSignUp =(body)=>{
    fullName: Joi.string().required(),
    email: Joi.string().email().required(),
    mobileNo: Joi.string().required(),
-   type:Joi.string().required("type of employee required"),
+   type:Joi.string().required("Employee department required"),
+   designation:Joi.string().required("Employee designation required"),
   })
 
   return bodySchema.validate(body)

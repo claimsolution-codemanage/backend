@@ -99,6 +99,7 @@ export const getAllClientSearchQuery =(searchQuery,type)=>{
                 { "profile.primaryEmail": { $regex: searchQuery, $options: "i" }},
                 { "profile.aadhaarNo": { $regex: searchQuery, $options: "i" }},
                 { "profile.panNo": { $regex: searchQuery, $options: "i" }},
+                {}
               ]
         },
     ]
@@ -112,6 +113,9 @@ export const getAllClientSearchQuery =(searchQuery,type)=>{
             { fullName: { $regex: searchQuery, $options: "i" }},
             { email: { $regex: searchQuery, $options: "i" }},
             { mobileNo: { $regex: searchQuery, $options: "i" }},
+            { type: { $regex: searchQuery, $options: "i" }},
+            { designation: { $regex: searchQuery, $options: "i" }},
+
         ]
     };
     return query

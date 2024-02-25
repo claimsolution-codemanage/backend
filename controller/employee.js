@@ -187,7 +187,8 @@ export const employeeViewAllPartner = async(req,res)=>{
       const pageNo = req.query.pageNo ? (req.query.pageNo-1)*pageItemLimit :0;
       const searchQuery = req.query.search ? req.query.search : "";
 
-   const query = getAllPartnerSearchQuery(searchQuery)
+
+   const query = getAllPartnerSearchQuery(searchQuery,true)
    const getAllPartner = await Partner.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: 1 });
    const noOfPartner = await Partner.find(query).count()
     return res.status(200).json({success:true,message:"get partner data",data:getAllPartner,noOfPartner:noOfPartner});
@@ -238,7 +239,7 @@ export const employeeViewAllClient = async(req,res)=>{
       const pageNo = req.query.pageNo ? (req.query.pageNo-1)*pageItemLimit :0;
       const searchQuery = req.query.search ? req.query.search : "";
 
-   const query = getAllClientSearchQuery(searchQuery)
+   const query = getAllClientSearchQuery(searchQuery,true)
    const getAllClient = await Client.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: 1 });
    const noOfClient = await Client.find(query).count()
     return res.status(200).json({success:true,message:"get client data",data:getAllClient,noOfClient:noOfClient});
@@ -531,7 +532,7 @@ export const allEmployeeDashboard = async (req, res) => {
    try {
       const verify = await authEmployee(req, res);
       if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
-      const employee = await Employee.findById(req?.user?._id)
+      const employee = await Employee.findById(req?.user?._id).select("-password")
       if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
       if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
 
@@ -553,6 +554,7 @@ export const allEmployeeDashboard = async (req, res) => {
          {
             '$match': {
                'createdAt': { $gte: currentYearStart },
+               'isActive':true,
             }
          },
          {
@@ -580,6 +582,7 @@ export const allEmployeeDashboard = async (req, res) => {
          {
             $match: {
                'createdAt': { $gte: currentYearStart },
+               'isActive':true,
             }
          },
          {
@@ -602,7 +605,7 @@ export const allEmployeeDashboard = async (req, res) => {
          });
          return match || month;
       });
-      return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData });
+      return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData,employee });
    } catch (error) {
       console.log("get dashbaord data error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
