@@ -11,6 +11,7 @@ import imageUpload from './routes/imageUpload.js'
 import client from './routes/client.js'
 import job from './routes/job.js'
 import complaint from "./routes/complaint.js"
+import payment from './routes/payment.js'
 import ejs from 'ejs'
 
 mongoose
@@ -53,12 +54,12 @@ app.use("/api/partner",partner)
 app.use("/api/client",client)
 app.use("/api/job",job)
 app.use("/api/complaint",complaint)
+app.use("/api/payment",payment)
 
 app.get("/",(req,res)=>{
 	res.status(200).json({success: true,message:"Welcome to server page!"});
 })
 
-// app.use("/api/payment",paymentRoutes)
 
 const port = process.env.PORT;
 app.listen(port, () => console.log("app is listening on port", port));
