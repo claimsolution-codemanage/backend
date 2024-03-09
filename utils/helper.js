@@ -44,6 +44,9 @@ export const getAllCaseQuery =(statusType,searchQuery,startDate,endDate,partnerI
      partnerId ?  {partnerId:partnerId} : {},
      clientId ?  {clientId:clientId} : {},
      employeeId ?  {addEmployee:{$in:employeeId}} : {},
+     { isPartnerReferenceCase: false},
+     { isEmpSaleReferenceCase: false},
+
       {currentStatus: { $regex: statusType, $options: "i" }},
       {isActive:type},
       {$or: [
@@ -53,7 +56,10 @@ export const getAllCaseQuery =(statusType,searchQuery,startDate,endDate,partnerI
           { fileNo: { $regex: searchQuery, $options: "i" }},
           { email: { $regex: searchQuery, $options: "i" }},
           { mobileNo: { $regex: searchQuery, $options: "i" }},
-          { policyType: { $regex: searchQuery, $options: "i" }}
+          { policyType: { $regex: searchQuery, $options: "i" }},
+          { caseFrom: { $regex: searchQuery, $options: "i" }},
+       
+
       ]},
       startDate && endDate ? {
        createdAt: { $gte: new Date(startDate).setHours(0, 0, 0, 0), 
@@ -87,6 +93,7 @@ return query
 }
 
 export const getAllClientSearchQuery =(searchQuery,type)=>{
+  console.log("query",searchQuery,type);
   let query = {
     $and:[
       {isActive:type},
@@ -99,7 +106,6 @@ export const getAllClientSearchQuery =(searchQuery,type)=>{
                 { "profile.primaryEmail": { $regex: searchQuery, $options: "i" }},
                 { "profile.aadhaarNo": { $regex: searchQuery, $options: "i" }},
                 { "profile.panNo": { $regex: searchQuery, $options: "i" }},
-                {}
               ]
         },
     ]
@@ -155,7 +161,7 @@ export const validateAddComplaint =(body)=>{
 }
 
 
-export const getAllInvoiceQuery =(searchQuery,startDate,endDate)=>{
+export const getAllInvoiceQuery =(searchQuery,startDate,endDate,clientId=false)=>{
   console.log(searchQuery,startDate,endDate);
     if (startDate && endDate) {
         const validStartDate = getValidateDate(startDate)
@@ -167,6 +173,7 @@ export const getAllInvoiceQuery =(searchQuery,startDate,endDate)=>{
    let query = {
      $and:[
       {isActive:true},
+      clientId ? {clientId:clientId} :{},
       {$or: [
         {"receiver.name": { $regex: searchQuery, $options: "i" }},
         {"receiver.address": { $regex: searchQuery, $options: "i" }},

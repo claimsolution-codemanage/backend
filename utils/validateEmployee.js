@@ -12,6 +12,17 @@ export const validateEmployeeSignUp =(body)=>{
   return bodySchema.validate(body)
 }
 
+export const validateEmployeeUpdate=(body)=>{
+  const bodySchema = Joi.object({
+   fullName: Joi.string().required(),
+   mobileNo: Joi.string().required(),
+   type:Joi.string().required("Employee department required"),
+   designation:Joi.string().required("Employee designation required"),
+  })
+
+  return bodySchema.validate(body)
+}
+
 export const validateEmployeeSignIn =(body)=>{
   const bodySchema = Joi.object({
     email: Joi.string().email().required(),

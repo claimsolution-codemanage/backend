@@ -369,13 +369,21 @@ export const employeeCreateInvoice = async (req,res)=>{
       if(!employee) return res.status(401).json({success: false, message:"Employee account not found"})
       if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
       if(employee?.type?.toLowerCase()!="finance") return res.status(400).json({success: false, message:"Access Denied"})
+   
+      const {clientId,caseId} = req.query
+      console.log(clientId,caseId);
+      if(!validMongooseId(clientId) || !validMongooseId(caseId)) return res.status(400).json({ success: false, message: "caseId and clientId must be valid" })
+
+      const getClient = await Client.findById(clientId)
+      if(!getClient) return res.status(400).json({ success: false, message: "Client not found" })
+      const getCase = await Case.findById(caseId)
+      if(!getCase) return res.status(400).json({ success: false, message: "Case not found" })
 
       const { error } = validateInvoice(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
       const billCount = await Bill.find({}).count()
-
-      const newInvoice = new Bill({...req.body,invoiceNo:`CS-${billCount+1}`})
+      const newInvoice = new Bill({...req.body,caseId,clientId,invoiceNo:`CS-${billCount+1}`})
       newInvoice.save()
       return  res.status(200).json({success: true, message: "Successfully create invoice",_id:newInvoice?._id});
    } catch (error) {
@@ -400,7 +408,7 @@ export const employeeViewAllInvoice = async (req,res)=>{
       const startDate = req.query.startDate ? req.query.startDate : "";
       const endDate = req.query.endDate ? req.query.endDate : "";
 
-      const query = getAllInvoiceQuery(searchQuery, startDate, endDate)
+      const query = getAllInvoiceQuery(searchQuery, startDate, endDate,false)
       if (!query.success) return res.status(400).json({ success: false, message: query.message })
       const aggregationPipeline = [
          { $match: query.query }, // Match the documents based on the query

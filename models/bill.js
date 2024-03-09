@@ -4,6 +4,22 @@ import Jwt from 'jsonwebtoken'
 
 const billSchema = new mongoose.Schema({
     invoiceNo:{type:String,require:true},
+    caseId:{
+        type:mongoose.Schema.ObjectId,
+        ref:"Case"
+    },
+    clientId:{
+        type:mongoose.Schema.ObjectId,
+        ref:"Client"
+    },
+    isPaid:{
+        type:Boolean,
+        default:false
+    },
+    transactionId:{
+        type:mongoose.Schema.ObjectId,
+        ref:"tranaction"
+    },
     sender:{
     type:{},
     require:true

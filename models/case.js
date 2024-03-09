@@ -1,32 +1,41 @@
 import mongoose from "mongoose";
 
 const caseSchema = new mongoose.Schema({
+   consultantCode:{type:String},
    partnerId:{type:String},
    partnerName:{type:String},
-   consultantCode:{type:String,required:true},
    clientId:{type:String},
+   empSaleId:{type:String},
+   empSaleName:{type:String},
    caseFrom:{type:String,required:"true"},
    acceptPayment:{type:Boolean,default:false,required:"true"},
    pendingPayment:{type:Boolean,default:false,required:"true"},
-   isReferenceCase:{
+   isPartnerReferenceCase:{
       type:Boolean,default:false
    },
-   referenceCaseDetails:{
+   partnerReferenceCaseDetails:{
       type:Object,default:{}
    },
-   paymentDetails:{
-      type:[{
-         typeFees:{type:String,default:"consultant"},
-         caseFees:{type:Number,default:2000,required:true},
-         mode:{type:String,default:""},
-         collectBy:{type:String,default:""},
-         onDate:{type:String,default:""},
-         orderId:{type:String,default:""},
-         referenceId:{type:String,default:""},
-         verify:{type:String,default:""},
-         completed:{type:Boolean,default:false,required:true},
-      }]
+   isEmpSaleReferenceCase:{
+      type:Boolean,default:false
    },
+   empSaleReferenceCaseDetails:{
+      type:Object,default:{}
+   },
+
+   // paymentDetails:{
+   //    type:[{
+   //       typeFees:{type:String,default:"consultant"},
+   //       caseFees:{type:Number,default:2000,required:true},
+   //       mode:{type:String,default:""},
+   //       collectBy:{type:String,default:""},
+   //       onDate:{type:String,default:""},
+   //       orderId:{type:String,default:""},
+   //       referenceId:{type:String,default:""},
+   //       verify:{type:String,default:""},
+   //       completed:{type:Boolean,default:false,required:true},
+   //    }]
+   // },
    name:{type:String,required:"true"},
    fatherName:{type:String},
    email:{type:String},

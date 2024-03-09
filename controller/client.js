@@ -9,9 +9,11 @@ import { getAllCaseQuery } from "../utils/helper.js";
 import { validMongooseId } from "../utils/helper.js";
 import jwt from 'jsonwebtoken'
 import { sendForgetPasswordMail, sendAccountTerm_ConditonsMail } from "../utils/sendMail.js";
-import { validateResetPassword, validateAddCaseFile } from "../utils/helper.js";
+import { validateResetPassword, validateAddCaseFile,getAllInvoiceQuery } from "../utils/helper.js";
 import jwtDecode from 'jwt-decode'
 import Admin from "../models/admin.js";
+import Bill from "../models/bill.js"
+import Tranaction from "../models/transaction.js";
 
 export const clientAuthenticate = async (req, res) => {
   try {
@@ -429,12 +431,12 @@ export const addNewClientCase = async (req, res) => {
       remark: "pending stage.",
       consultant: "",
     }]
-    req.body.paymentDetails =
-      [{
-        caseFees: caseFees,
-        verify: "false",
-        completed: false,
-      }]
+    // req.body.paymentDetails =
+    //   [{
+    //     caseFees: caseFees,
+    //     verify: "false",
+    //     completed: false,
+    //   }]
 
     req.body.caseDocs = req?.body?.caseDocs?.map(caseFile=>{return{
         docDate:new Date(),
@@ -732,7 +734,96 @@ export const clientDashboard = async (req, res) => {
   }
 };
 
+export const clientViewAllInvoice = async (req,res)=>{
+  try {
+     const verify =  await authClient(req,res)
+     if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+     const client = await Client.findById(req?.user?._id)
+     if(!client) return res.status(401).json({success: false, message:"Account not found"})
+     if(!client?.isActive) return res.status(401).json({success: false, message:"Account not active"})
 
 
+     const pageItemLimit = req.query.limit ? req.query.limit : 10;
+     const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+     const searchQuery = req.query.search ? req.query.search : "";
+     const startDate = req.query.startDate ? req.query.startDate : "";
+     const endDate = req.query.endDate ? req.query.endDate : "";
+
+     const query = getAllInvoiceQuery(searchQuery, startDate, endDate,req?.user?._id)
+     if (!query.success) return res.status(400).json({ success: false, message: query.message })
+     const aggregationPipeline = [
+        { $match: query.query }, // Match the documents based on the query
+        {
+          $group: {
+            _id: null,
+            totalAmtSum: { $sum: "$totalAmt" } // Calculate the sum of totalAmt
+          }
+        }
+      ];
+
+     const getAllBill = await Bill.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+     const noOfBill = await Bill.find(query?.query).count()
+     const aggregateResult = await Bill.aggregate(aggregationPipeline);
+     return res.status(200).json({ success: true, message: "get case data", data: getAllBill, noOf: noOfBill,totalAmt:aggregateResult});
+
+  } catch (error) {
+     console.log("employee-get invoice in error:",error);
+     return res.status(500).json({success:false,message:"Internal server error",error:error});
+  }
+}
+
+export const clientViewInvoiceById = async(req,res)=>{
+  try {
+     const verify =  await authClient(req,res)
+     if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+     const client = await Client.findById(req?.user?._id)
+     if(!client) return res.status(401).json({success: false, message:"Account not found"})
+     if(!client?.isActive) return res.status(401).json({success: false, message:"Account not active"})
+ 
+     const {_id} = req.query;
+     if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+ 
+     const getInvoice = await Bill.findById(_id)
+     if(!getInvoice) return res.status(404).json({success: false, message:"Invoice not found"})
+   return res.status(200).json({success:true,message:"get invoice by id data",data:getInvoice});
+    
+  } catch (error) {
+     console.log("employeeViewPartnerById in error:",error);
+     res.status(500).json({success:false,message:"Internal server error",error:error});
+     
+  }
+}
+
+export const clientPayInvoiceById = async(req,res)=>{
+  try {
+     const verify =  await authClient(req,res)
+     if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+     const client = await Client.findById(req?.user?._id)
+     if(!client) return res.status(401).json({success: false, message:"Account not found"})
+     if(!client?.isActive) return res.status(401).json({success: false, message:"Account not active"})
+ 
+     const {invoiceId,caseId} = req.query;
+     if(!validMongooseId(invoiceId) && !validMongooseId(caseId)) return res.status(400).json({success: false, message:"Case or invoice id is not valid"})
+ 
+     const getInvoice = await Bill.findById(invoiceId)
+      if(!getInvoice) return res.status(404).json({success: false, message:"Invoice not found"})
+
+      const getCase = await Case.findById(caseId)
+      if(!getCase) return res.status(404).json({success: false, message:"Case not found"})
+      const newTransaction = new Tranaction({clientId:req?.user?._id,invoiceId:invoiceId,caseId:caseId})
+     await newTransaction.save()
+      return res.status(200).json({success:true,message:"transaction create",tranactionId:newTransaction?._id});
+
+
+    
+  } catch (error) {
+     console.log("employeeViewPartnerById in error:",error);
+     res.status(500).json({success:false,message:"Internal server error",error:error});
+     
+  }
+}
 
 

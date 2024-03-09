@@ -9,7 +9,7 @@ import { generatePassword } from "../utils/helper.js";
 import { sendAdminSigninMail, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import { authAdmin } from "../middleware/authentication.js";
 import Employee from "../models/employee.js";
-import { validateEmployeeSignUp } from "../utils/validateEmployee.js";
+import { validateEmployeeSignUp,validateEmployeeUpdate } from "../utils/validateEmployee.js";
 import { validMongooseId } from "../utils/helper.js";
 import Case from "../models/case.js";
 import { getAllPartnerSearchQuery, getAllClientSearchQuery, getAllCaseQuery, getAllEmployeeSearchQuery } from "../utils/helper.js";
@@ -268,7 +268,10 @@ export const adminDashboard = async (req, res) => {
          {
             '$match': {
                'createdAt': { $gte: currentYearStart },
-               'isActive':true
+               'isActive':true,
+               'isPartnerReferenceCase': false,
+               'isEmpSaleReferenceCase': false,
+          
             }
          },
          {
@@ -302,7 +305,9 @@ export const adminDashboard = async (req, res) => {
          {
             $match: {
                'createdAt': { $gte: currentYearStart },
-               'isActive':true
+               'isActive':true,
+               'isPartnerReferenceCase': false,
+               'isEmpSaleReferenceCase': false,
             }
          },
          {
@@ -443,7 +448,7 @@ export const adminUpdateEmployeeAccount = async (req, res) => {
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
       if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
-      const { error } = validateEmployeeSignUp(req.body)
+      const { error } = validateEmployeeUpdate(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
@@ -1092,50 +1097,152 @@ export const adminAddReferenceCaseAndMarge = async (req, res) => {
       if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
-      const { partnerId, partnerCaseId, clientCaseId } = req?.query
-      if (!partnerId || !partnerCaseId || !clientCaseId) return res.status(400).json({ success: false, message: "For add reference partnerId,partnerCaseId and ClientId are required" })
-      if (!validMongooseId(partnerId)) return res.status(400).json({ success: false, message: "Not a valid partnerId" })
-      if (!validMongooseId(partnerCaseId)) return res.status(400).json({ success: false, message: "Not a valid partnerCaseId" })
+      const { partnerId, partnerCaseId,empSaleId, empSaleCaseId,clientCaseId } = req?.query
       if (!validMongooseId(clientCaseId)) return res.status(400).json({ success: false, message: "Not a valid clientCaseId" })
 
-      const getPartner = await Partner.findById(partnerId)
-      if (!getPartner) return res.status(404).json({ success: false, message: "Partner Not found" })
+      if (!partnerId && !empSaleId) return res.status(400).json({ success: false, message: "For add case refernce must provide partnerId or employeeId" })
+      if(partnerId){
+         if (!partnerId || !partnerCaseId) return res.status(400).json({ success: false, message: "For add partner reference partnerId,partnerCaseId are required" })
+         if (!validMongooseId(partnerId)) return res.status(400).json({ success: false, message: "Not a valid partnerId" })
+         if (!validMongooseId(partnerCaseId)) return res.status(400).json({ success: false, message: "Not a valid partnerCaseId" })
 
-      const getClientCase = await Case.findById(clientCaseId)
-      if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
+         const getPartner = await Partner.findById(partnerId)
+         if (!getPartner) return res.status(404).json({ success: false, message: "Partner Not found" })
+         
+         const getPartnerCase = await Case.findById(partnerCaseId)
+         if (!getPartnerCase) return res.status(404).json({ success: false, message: "Partner case Not found" })
+      
+      
+         const getClientCase = await Case.findById(clientCaseId)
+         if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
+         console.log(getPartnerCase?.policyNo?.toLowerCase(),getClientCase?.policyNo?.toLowerCase(),getPartnerCase?.email?.toLowerCase(),getClientCase?.email?.toLowerCase() );
 
-      const getPartnerCase = await Case.findById(partnerCaseId)
-      if (!getPartnerCase) return res.status(404).json({ success: false, message: "Partner case Not found" })
+         if(getPartnerCase?.policyNo?.toLowerCase()!=getClientCase?.policyNo?.toLowerCase() || getPartnerCase?.email?.toLowerCase()!=getClientCase?.email?.toLowerCase() ){
+            return res.status(404).json({ success: false, message: "Partner and client must have same policyNo and emailId" })
+         }
 
+         if(getClientCase?.partnerReferenceCaseDetails?._id){
+            return res.status(404).json({ success: false, message: "Case already have the partner case reference" })
+         }
+      
+         const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
+            {
+               $set: {
+                  partnerId: getPartner?._id?.toString(),
+                  partnerName: getPartner?.fullName,
+                  partnerReferenceCaseDetails: {
+                     referenceId: getPartnerCase?._id?.toString(),
+                     name: getPartner?.fullName,
+                     referenceDate: new Date(),
+                     by: admin?.fullName
+                  },
+               }
+            }, { new: true })
+         await Case.findByIdAndUpdate(getPartnerCase?._id,{$set:{ isPartnerReferenceCase:true,}})
+         return res.status(200).json({ success: true, message: "Successfully add case reference ", data: updateAndMergeCase });
+      }
+      if(empSaleId){
+         if (!empSaleId || !empSaleCaseId) return res.status(400).json({ success: false, message: "For add sale reference empSaleId,empSaleCaseId are required" })
+         if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid empSaleId" })
+         if (!validMongooseId(empSaleCaseId)) return res.status(400).json({ success: false, message: "Not a valid empSaleCaseId" })
 
-      const referenceCaseAllDocs = [...getPartnerCase?.caseDocs, ...getClientCase?.caseDocs]
-      const referenceCaseAllProcess = [...getPartnerCase?.processSteps, ...getClientCase?.processSteps]
+         const getEmployee = await Employee.findById(empSaleId)
+         if (!getEmployee) return res.status(404).json({ success: false, message: "Employee Not found" })
+         
+         const getEmployeeCase = await Case.findById(empSaleCaseId)
+         if (!getEmployeeCase) return res.status(404).json({ success: false, message: "Employee case Not found" })
+      
+      
+         const getClientCase = await Case.findById(clientCaseId)
+         if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
+      
+         if(getEmployeeCase?.policyNo?.toLowerCase()!=getClientCase?.policyNo?.toLowerCase() || getEmployeeCase?.email?.toLowerCase()!=getClientCase?.email?.toLowerCase() ){
+            return res.status(404).json({ success: false, message: "sale-employee and client must have same policyNo and emailId" })
+         }
 
+         const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
+            {
+               $set: {
+                  empSaleId: getEmployee?._id?.toString(),
+                  empSaleName:getEmployee?.fullName,
+                  empSaleReferenceCaseDetails: {
+                     referenceId: getEmployeeCase?._id?.toString(),
+                     name: getEmployee?.fullName,
+                     referenceDate: new Date(),
+                     by: admin?.fullName
+                  },
+               }
+            }, { new: true })
+         await Case.findByIdAndUpdate(getEmployeeCase?._id,{$set:{ isEmpSaleReferenceCase:true,}})
+         return res.status(200).json({ success: true, message: "Successfully add case reference ", data: updateAndMergeCase });
+      }
 
-      const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
-         {
-            $set: {
-               partnerId: getPartner?._id,
-               partnerName: getPartner?.fullName,
-               isReferenceCase: true,
-               referenceCaseDetails: {
-                  partnerId: getPartner?._id,
-                  name: getPartner?.fullName,
-                  referenceDate: new Date(),
-                  by: admin?.fullName
-               },
-               processSteps: referenceCaseAllProcess,
-               caseDocs: referenceCaseAllDocs,
-            }
-         }, { new: true })
-
-
-      await Case.findByIdAndDelete(getPartnerCase?._id)
-
-
-      return res.status(200).json({ success: true, message: "Successfully add case reference ", data: updateAndMergeCase });
+      return res.status(400).json({ success: true, message: "Failded to add case reference"});
    } catch (error) {
       console.log("adminAddRefenceCaseAndMarge in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
+
+export const adminRemoveReferenceCase = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+
+      const { type,_id} = req?.query
+
+      if(!type)  return res.status(400).json({ success: false, message: "Please select the type of reference to remove" })
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid CaseId" })
+
+      if(type?.toLowerCase()=="partner"){
+         const getClientCase = await Case.findById(_id)
+         if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
+          if (!validMongooseId(getClientCase?.partnerReferenceCaseDetails?.referenceId)) return res.status(400).json({ success: false, message: "Not a valid partner CaseId" })
+         
+          console.log(getClientCase?.partnerReferenceCaseDetails?.referenceId);
+        const updatedPartnerCase = await Case.findByIdAndUpdate(getClientCase?.partnerReferenceCaseDetails?.referenceId,{$set:{ isPartnerReferenceCase:false,}},{ new: true })
+         if(!updatedPartnerCase) return res.status(404).json({ success: false, message: "Partner case is not found of the added reference case" })
+
+         const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
+            {
+               $set: {
+                  partnerId: "",
+                  partnerName: "",
+                  partnerReferenceCaseDetails: {},
+               }
+            }, { new: true })
+      
+      return res.status(200).json({ success: true, message: "Successfully remove partner reference case" })
+      }
+      if(type?.toLowerCase()=="sale-emp"){
+         const getClientCase = await Case.findById(_id)
+         if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
+          if (!validMongooseId(getClientCase?.empSaleReferenceCaseDetails?.referenceId)) return res.status(400).json({ success: false, message: "Not a valid employee CaseId" })
+         
+        const updatedPartnerCase = await Case.findByIdAndUpdate(getClientCase?.empSaleReferenceCaseDetails?.referenceId,{$set:{ isEmpSaleReferenceCase:false,}},{ new: true })
+         if(!updatedPartnerCase) return res.status(404).json({ success: false, message: "Employee  case is not found of the added reference case" })
+
+         const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
+            {
+               $set: {
+                  empSaleId: "",
+                  empSaleName: "",
+                  empSaleReferenceCaseDetails: {},
+               }
+            }, { new: true })
+
+          return res.status(200).json({ success: true, message: "Successfully remove employee reference case" })
+      }
+
+      return res.status(400).json({ success: false, message: "Not a valid type" })
+   } catch (error) {
+      console.log("adminRemoveRefenceCase in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }
@@ -1374,3 +1481,17 @@ export const adminResetForgetPassword = async (req, res) => {
       res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }
+
+
+export const adminUpdateModalSchema = async (req, res) => {
+   try {
+     const updateSchema = await Case.updateMany({ $or: [{ isEmpSaleReferenceCase: { $exists: false } }, { isPartnerReferenceCase: { $exists: false } }] },
+      { $set: { isEmpSaleReferenceCase: false, isPartnerReferenceCase: false } },)
+
+      res.status(200).json({ success: true, message: "Schema modal updated",});
+   } catch (error) {
+      console.log("adminUpdateModalSchema in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+

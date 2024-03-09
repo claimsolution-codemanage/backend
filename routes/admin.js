@@ -8,6 +8,7 @@ adminAuthenticate,adminDashboard,adminUpdateCaseById,adminAddReferenceCaseAndMar
 adminDeletePartnerById,adminDeleteClientById,adminSetIsActiveCase,
 adminEditCaseStatus,adminSetClientTag,adminSetPartnerTag,adminForgetPassword,adminResetForgetPassword,
 getAllAdmin,superAdminSetIsActiveAdmin,superAdminDeleteAdminById,adminViewPartnerReport,
+adminRemoveReferenceCase,adminUpdateModalSchema
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -56,6 +57,7 @@ router.get("/dashboard",adminDashboard)
 router.post("/addJob",adminAddJob)
 router.delete("/deleteJobById",adminDeleteJob)
 router.put("/addReferenceCaseAndMarge",adminAddReferenceCaseAndMarge)
+router.put("/removeReferenceCase",adminRemoveReferenceCase)
 router.delete("/deleteCaseById",adminDeleteCaseById)
 router.delete("/deletePartnerById",adminDeletePartnerById)
 router.delete("/deleteClientById",adminDeleteClientById)
@@ -63,6 +65,9 @@ router.delete("/deleteClientById",adminDeleteClientById)
 router.get("/viewAllComplaint",viewAllAdminComplaint)
 router.delete("/adminRemoveComplaintById",adminRemoveComplaintById)
 router.get("/adminViewPartnerReport",adminViewPartnerReport)
+
+
+router.put("/updateModalSchema",adminUpdateModalSchema)
 
 
 

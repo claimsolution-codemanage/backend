@@ -3,7 +3,8 @@ const router = express.Router();
 import {clientSignUp,clientsignIn,verifyClientEmailOtp,updateClientProfile,getClientProfile,
     addNewClientCase,viewClientCaseById,viewClientAllCase,clientForgetPassword,clientResetPassword,
     clientMobileNoVerify,clientSendMobileOtpCode,clientAuthenticate,clientAddCaseFile,clientTls,
-    acceptClientTerms_Conditions,clientDashboard,clientUpdateCaseById,clientResendOtp
+    acceptClientTerms_Conditions,clientDashboard,clientUpdateCaseById,clientResendOtp,clientViewAllInvoice,clientViewInvoiceById,
+    clientPayInvoiceById
 } from '../controller/client.js';
 
 
@@ -26,6 +27,10 @@ router.get("/getTls",clientTls)
 router.put("/acceptClientTerms_Conditions",acceptClientTerms_Conditions)
 router.post("/clientResendOtp",clientResendOtp)
 router.get("/getClientDashboardData",clientDashboard)
+router.get("/getClientViewAllInvoice",clientViewAllInvoice)
+router.get("/getClientViewInvoiceById",clientViewInvoiceById)
+router.post("/clientPayInvoiceById",clientPayInvoiceById)
+
 
 
 export default router
