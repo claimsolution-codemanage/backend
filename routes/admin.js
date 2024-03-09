@@ -67,7 +67,7 @@ router.delete("/adminRemoveComplaintById",adminRemoveComplaintById)
 router.get("/adminViewPartnerReport",adminViewPartnerReport)
 
 
-router.put("/updateModalSchema",adminUpdateModalSchema)
+// router.put("/updateModalSchema",adminUpdateModalSchema)
 
 
 
