@@ -4,18 +4,18 @@ import { validMongooseId } from "../utils/helper.js";
 import crypto from 'crypto'
 
 const algo = 'aes-128-cbc';
-const iv = process.env.AUTHIV;
-const key = process.env.AUTHKEY;
+const key = Buffer.from(process.env.AUTHKEY, 'utf-8');
+const iv = Buffer.from(process.env.AUTHIV, 'utf-8');
 
 function encrypt(data) {
-   const cipher = crypto.createCipheriv(algo, Buffer.from(key), Buffer.from(iv));
+   const cipher = crypto.createCipheriv(algo,key,iv);
    let encrypted = cipher.update(data, 'utf-8', 'base64');
    encrypted += cipher.final('base64');
    return encrypted
 }
 
 function decrypt(encryptedData){
-   let decipher = crypto.createDecipheriv(algo, Buffer.from(key), Buffer.from(iv));
+   let decipher = crypto.createDecipheriv(algo,key,iv);
    let decrypted = decipher.update(encryptedData, 'base64', 'utf-8');
    decrypted += decipher.final('utf-8');
    return decrypted;
