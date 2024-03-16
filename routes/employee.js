@@ -4,7 +4,8 @@ import { employeeResetPassword,employeeSignin,changeStatusEmployeeCase,viewAllEm
 employeeViewAllClient,employeeViewClientById,employeeViewAllPartner,employeeViewPartnerById,employeeForgetPassword,
 employeeAuthenticate,employeeAddCaseComment,employeeResetForgetPassword,
 employeeCreateInvoice,employeeViewAllInvoice,employeeViewInvoiceById,employeeDownloadInvoiceById,
-employeeEditInvoice,allEmployeeDashboard,employeeUnActiveInvoice,
+employeeEditInvoice,allEmployeeDashboard,employeeUnActiveInvoice,employeeUpdateCaseById,
+employeeEditClient,employeeupdateParnterProfile,employeeUpdatePartnerBankingDetails
 } from '../controller/employee.js';
 
 
@@ -18,9 +19,16 @@ router.get("/viewAllClient",employeeViewAllClient)
 router.get("/viewClientById",employeeViewClientById)
 router.get("/viewAllPartner",employeeViewAllPartner)
 router.get("/viewPartnerById",employeeViewPartnerById)
+
 router.put("/employeeForgetPassword",employeeForgetPassword)
 router.put("/resetForgetPassword",employeeResetForgetPassword)
 router.put("/addCaseComment",employeeAddCaseComment)
+
+router.put("/updateCaseById",employeeUpdateCaseById)
+router.put("/updateClient",employeeEditClient)
+router.put("/updatePartnerProfile",employeeupdateParnterProfile)
+router.put("/updatePartnerBankingDetails",employeeUpdatePartnerBankingDetails)
+
 router.post("/finance/createInvoice",employeeCreateInvoice)
 router.get("/finance/viewAllInvoice",employeeViewAllInvoice)
 router.get("/finance/viewInvoiceById",employeeViewInvoiceById)

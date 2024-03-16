@@ -649,10 +649,10 @@ export const addNewCase = async(req,res)=>{
        }]
        req.body.caseDocs = req?.body?.caseDocs?.map(caseFile=>{return{
         docDate:new Date(),
-        docName:caseFile?.fileType,
-        docType:caseFile?.fileType,
-        docFormat:caseFile?.fileType,
-        docURL:caseFile?.url,
+        docName:caseFile?.docName,
+        docType:caseFile?.docFormat,
+        docFormat:caseFile?.docFormat,
+        docURL:caseFile?.docURL,
         }})
 
         const newAddCase = new Case(req.body)
@@ -761,7 +761,7 @@ export const partnerUpdateCaseById = async(req,res)=>{
 
     req.body.caseDocs = req?.body?.caseDocs?.map(caseFile=>{return{
       docDate: caseFile?.docDate ? caseFile?.docDate : new Date(),
-      docName:caseFile?.docFormat,
+      docName:caseFile?.docName,
       docType:caseFile?.docFormat,
       docFormat:caseFile?.docFormat,
       docURL:caseFile?.docURL,
@@ -795,7 +795,7 @@ export const partnerAddCaseFile = async(req,res)=>{
      if(!req.body?.docURL) return res.status(400).json({success:false,message:"Please upload file first"})
      const {error} = validateAddCaseFile(req.body);
       req.body.docDate = new Date()
-      req.body.docName=req?.body?.docType,
+      req.body.docName=req?.body?.docName,
       req.body.docType=req?.body?.docType,
       req.body.docFormat= req?.body?.docType
      if(error) return res.status(400).json({success:false,message:error.details[0].message})

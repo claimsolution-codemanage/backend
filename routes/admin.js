@@ -8,13 +8,14 @@ adminAuthenticate,adminDashboard,adminUpdateCaseById,adminAddReferenceCaseAndMar
 adminDeletePartnerById,adminDeleteClientById,adminSetIsActiveCase,
 adminEditCaseStatus,adminSetClientTag,adminSetPartnerTag,adminForgetPassword,adminResetForgetPassword,
 getAllAdmin,superAdminSetIsActiveAdmin,superAdminDeleteAdminById,adminViewPartnerReport,
-adminRemoveReferenceCase,adminUpdateModalSchema
+adminRemoveReferenceCase,adminEditClient,adminUpdateParnterProfile,adminUpdatePartnerBankingDetails,adminUpdateModalSchema
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
 import { viewAllAdminComplaint,adminRemoveComplaintById } from '../controller/complaint.js';
 
-
+//  for admin 
+router.get("/dashboard",adminDashboard)
 router.post("/signin", adminSignin)
 router.post("/signup", adminSignUp)
 router.get("/authenticate",adminAuthenticate)
@@ -22,48 +23,68 @@ router.post("/resetPassword", adminResetPassword)
 router.get("/getSettingDetails",getSettingDetails)
 router.put("/forgetPassword",adminForgetPassword)
 router.put("/resetForgetPassword",adminResetForgetPassword)
+
+// for super-admin
 router.get("/superAdmin/allAdmin",getAllAdmin)
 router.put("/superAdmin/setIsActiveAdmin",superAdminSetIsActiveAdmin)
 router.delete("/superAdmin/deleteAdminById",superAdminDeleteAdminById)
-
 router.put("/settingDetailsUpdate",adminSettingDetailsUpdate)
+
+// for employee
 router.post("/createEmployeeAccount", createEmployeeAccount)
 router.put("/updateEmployeeAccount", adminUpdateEmployeeAccount)
 router.delete("/deleteEmployeeAccount", adminDeleteEmployeeAccount)
 router.put("/setIsActiveEmployee",adminSetIsActiveEmployee)
 router.get("/adminViewAllEmployee",adminViewAllEmployee)
-router.put("/changeCaseStatus",changeStatusAdminCase)
-router.get("/viewAllCase",viewAllAdminCase)
-router.get("/viewCaseById",viewCaseByIdByAdmin)
-router.post("/updateCaseById",adminUpdateCaseById)
-router.put("/editCaseProcessById",adminEditCaseStatus)
-router.put("/setClientTag",adminSetClientTag)
-router.put("/setPartnerTag",adminSetPartnerTag)
+
+// for partner
 router.get("/viewAllPartner",viewAllPartnerByAdmin)
 router.get("/viewPartnerById",viewPartnerByIdByAdmin)
+router.put("/updateParnterProfile",adminUpdateParnterProfile)
+router.put("/setPartnerTag",adminSetPartnerTag)
+router.put("/updatePartnerBankingDetails",adminUpdatePartnerBankingDetails)
 router.put("/changePartnerStatus",adminSetIsActivePartner)
+router.delete("/deletePartnerById",adminDeletePartnerById)
+
+// for client
 router.get("/ViewAllClient",adminViewAllClient)
 router.get("/ViewClientById",adminViewClientById)
 router.put("/setIsActiveClient",adminSetIsActiveClient)
+router.put("/setClientTag",adminSetClientTag)
+router.put("/editClient",adminEditClient)
+
+// for case
+router.get("/viewAllCase",viewAllAdminCase)
+router.put("/changeCaseStatus",changeStatusAdminCase)
+router.get("/viewCaseById",viewCaseByIdByAdmin)
+router.post("/updateCaseById",adminUpdateCaseById)
+router.put("/editCaseProcessById",adminEditCaseStatus)
 router.put("/addCaseFeeClient",adminAddCaseFeeClient)
 router.put("/updateClientCaseFee",adminUpdateClientCaseFee)
-router.put("/uploadCompanyClientTls",uploadCompanyClientTls)
-router.put("/uploadCompanyPartnerTls",uploadCompanyPartnerTls)
-router.put("/addEmployeeToCase",adminShareCaseToEmployee)
-router.put("/addCaseCommit",adminAddCaseComment)
 router.put("/changeCaseIsActive",adminSetIsActiveCase)
-router.get("/dashboard",adminDashboard)
-
-router.post("/addJob",adminAddJob)
-router.delete("/deleteJobById",adminDeleteJob)
 router.put("/addReferenceCaseAndMarge",adminAddReferenceCaseAndMarge)
-router.put("/removeReferenceCase",adminRemoveReferenceCase)
 router.delete("/deleteCaseById",adminDeleteCaseById)
-router.delete("/deletePartnerById",adminDeletePartnerById)
 router.delete("/deleteClientById",adminDeleteClientById)
 
+
+// share case
+router.put("/addEmployeeToCase",adminShareCaseToEmployee)
+router.put("/addCaseCommit",adminAddCaseComment)
+
+//  for tnc
+router.put("/uploadCompanyClientTls",uploadCompanyClientTls)
+router.put("/uploadCompanyPartnerTls",uploadCompanyPartnerTls)
+
+// for job
+router.post("/addJob",adminAddJob)
+router.delete("/deleteJobById",adminDeleteJob)
+router.put("/removeReferenceCase",adminRemoveReferenceCase)
+
+// for complaint
 router.get("/viewAllComplaint",viewAllAdminComplaint)
 router.delete("/adminRemoveComplaintById",adminRemoveComplaintById)
+
+// for report
 router.get("/adminViewPartnerReport",adminViewPartnerReport)
 
 

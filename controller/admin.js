@@ -15,11 +15,12 @@ import Case from "../models/case.js";
 import { getAllPartnerSearchQuery, getAllClientSearchQuery, getAllCaseQuery, getAllEmployeeSearchQuery } from "../utils/helper.js";
 import Partner from "../models/partner.js";
 import Client from '../models/client.js'
-import { validateAddClientCase } from "../utils/validateClient.js";
+import { validateAddClientCase, validateClientProfileBody } from "../utils/validateClient.js";
 import { trusted } from "mongoose";
 import Jwt from 'jsonwebtoken'
 import { validateResetPassword } from "../utils/helper.js";
 import jwtDecode from "jwt-decode";
+import { validateBankingDetailsBody, validateProfileBody } from "../utils/validatePatner.js";
 
 
 export const adminAuthenticate = async (req, res) => {
@@ -754,6 +755,134 @@ export const viewPartnerByIdByAdmin = async (req, res) => {
    }
 }
 
+
+export const adminEditClient = async (req, res, next) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+
+
+      const { _id } = req.query;
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+
+     const { error } = validateClientProfileBody(req.body);
+     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+     const updateClientDetails = await Client.findByIdAndUpdate(_id, {
+       $set: {
+         isProfileCompleted: true,
+         "profile.profilePhoto": req.body.profilePhoto,
+         "profile.consultantName": req.body.consultantName,
+         "profile.fatherName": req.body.fatherName,
+         "profile.alternateEmail": req.body.alternateEmail,
+         "profile.primaryMobileNo": req.body.mobileNo,
+         "profile.whatsupNo": req.body.whatsupNo,
+         "profile.alternateMobileNo": req.body.alternateMobileNo,
+         "profile.dob": req.body.dob,
+         "profile.address": req.body.address,
+         "profile.state": req.body.state,
+         "profile.city": req.body.city,
+         "profile.pinCode": req.body.pinCode,
+         "profile.about": req.body.about,
+       }
+     }, { new: true })
+    
+     if(!updateClientDetails){
+      return res.status(400).json({ success: true, message: "Client not found"})
+     }
+     return res.status(200).json({ success: true, message: "Successfully Update Client",_id:updateClientDetails?._id})
+   } catch (error) {
+     console.log("updateClientDetails: ", error);
+     return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+ }
+
+ export const adminUpdateParnterProfile =async (req,res)=>{
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const { _id } = req.query;
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+
+     const {error} = validateProfileBody(req.body);
+     if(error) return res.status(400).json({success:false,message:error.details[0].message})
+     const updatePatnerDetails = await Partner.findByIdAndUpdate(_id,{
+       $set:{
+         "profile.profilePhoto":req.body.profilePhoto,
+         "profile.consultantName":req.body.consultantName,
+         "profile.alternateEmail": req.body.alternateEmail,
+         "profile.alternateMobileNo":req.body.alternateMobileNo,
+         "profile.whatsupNo":req.body.whatsupNo,
+         "profile.panNo":req.body.panNo,
+         "profile.aadhaarNo":req.body.aadhaarNo ,
+         "profile.dob":req.body.dob,
+         "profile.designation":req.body.designation,
+         "profile.areaOfOperation":req.body.areaOfOperation ,
+         "profile.workAssociation": req.body.workAssociation,
+         "profile.state":req.body.state,
+         "profile.gender":req.body.gender ,
+         "profile.district":req.body.district ,
+         "profile.city":req.body.city ,
+         "profile.pinCode":req.body.pinCode ,
+         "profile.about":req.body.about,
+       }},{new: true})
+
+       if(!updatePatnerDetails) return res.status(400).json({success: true, message: "Partner not found"})
+     return  res.status(200).json({success: true, message: "Successfully update partner profile"})
+   } catch (error) {
+     console.log("updatePatnerDetails: ",error);
+     return res.status(500).json({success: false,message:"Internal server error",error: error});
+   }
+   }  
+
+   export const adminUpdatePartnerBankingDetails =async (req,res)=>{
+      try {
+         const verify = await authAdmin(req, res)
+         if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+   
+         const admin = await Admin.findById(req?.user?._id)
+         if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+         if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+   
+         const { _id } = req.query;
+         if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+   
+        const {error} = validateBankingDetailsBody(req.body);
+        if(error) return res.status(400).json({success:false,message:error.details[0].message})
+
+        const updatePatnerDetails = await Partner.findByIdAndUpdate(_id,{
+          $set:{
+           "bankingDetails.bankName": req.body.bankName,
+           "bankingDetails.bankAccountNo": req.body.bankAccountNo,
+           "bankingDetails.bankBranchName": req.body.bankBranchName,
+           "bankingDetails.gstNo": req.body.gstNo,
+           "bankingDetails.panNo":req.body.panNo,
+           "bankingDetails.cancelledChequeImg": req.body.cancelledChequeImg,
+           "bankingDetails.gstCopyImg":req.body.gstCopyImg,
+           "bankingDetails.ifscCode":req.body.ifscCode,
+           "bankingDetails.upiId":req.body.upiId,
+    
+          }},{new: true})
+          if(!updatePatnerDetails) return res.status(400).json({success: true, message: "Partner not found"})
+        return  res.status(200).json({success: true, message: "Successfully update banking details"})
+      } catch (error) {
+        console.log("updatePatnerDetails: ",error);
+        return res.status(500).json({success: false,message:"Internal server error",error: error});
+      }
+      }
+
+
+
+
 export const adminSetIsActivePartner = async (req, res) => {
    try {
       const verify = await authAdmin(req, res)
@@ -907,7 +1036,7 @@ export const adminUpdateCaseById = async (req, res) => {
       req.body.caseDocs = req?.body?.caseDocs?.map(caseFile => {
          return {
             docDate: caseFile?.docDate ? caseFile?.docDate : new Date(),
-            docName: caseFile?.docFormat,
+            docName: caseFile?.docName,
             docType: caseFile?.docFormat,
             docFormat: caseFile?.docFormat,
             docURL: caseFile?.docURL,

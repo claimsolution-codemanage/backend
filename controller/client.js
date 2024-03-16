@@ -438,13 +438,13 @@ export const addNewClientCase = async (req, res) => {
     //     completed: false,
     //   }]
 
-    req.body.caseDocs = req?.body?.caseDocs?.map(caseFile=>{return{
-        docDate:new Date(),
-        docName:caseFile?.fileType,
-        docType:caseFile?.fileType,
-        docFormat:caseFile?.fileType,
-        docURL:caseFile?.url,
-        }})
+    // req.body.caseDocs = req?.body?.caseDocs?.map(caseFile=>{return{
+    //     docDate:new Date(),
+    //     docName:caseFile?.fileType,
+    //     docType:caseFile?.fileType,
+    //     docFormat:caseFile?.fileType,
+    //     docURL:caseFile?.url,
+    //     }})
 
 
     const newAddCase = new Case(req.body)
@@ -481,7 +481,7 @@ export const clientUpdateCaseById = async(req,res)=>{
 
     req.body.caseDocs = req?.body?.caseDocs?.map(caseFile=>{return{
       docDate: caseFile?.docDate ? caseFile?.docDate : new Date(),
-      docName:caseFile?.docFormat,
+      docName:caseFile?.docName,
       docType:caseFile?.docFormat,
       docFormat:caseFile?.docFormat,
       docURL:caseFile?.docURL,

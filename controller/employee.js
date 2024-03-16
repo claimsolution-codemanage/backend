@@ -8,13 +8,14 @@ import { validMongooseId,getAllCaseQuery,getAllPartnerSearchQuery,getAllClientSe
 import { sendForgetPasswordMail } from "../utils/sendMail.js";
 import Jwt from "jsonwebtoken";
 import Case from "../models/case.js";
-import { sendEmployeeSigninMail } from "../utils/sendMail.js";
+import { validateAddClientCase, validateClientProfileBody } from "../utils/validateClient.js";
 import { validateResetPassword } from "../utils/helper.js";
 import jwtDecode from "jwt-decode";
 import { validateInvoice } from "../utils/validateEmployee.js";
 import Bill from "../models/bill.js";
 import { getAllInvoiceQuery } from "../utils/helper.js";
 import { invoiceHtmlToPdfBuffer } from "../utils/createPdf/invoice.js";
+import { validateBankingDetailsBody, validateProfileBody } from "../utils/validatePatner.js";
 // import { getValidateDate } from "../utils/helper.js";
 
 export const employeeAuthenticate = async(req,res)=>{
@@ -92,8 +93,10 @@ export const changeStatusEmployeeCase = async(req,res)=>{
 
       const employee = await Employee.findById(req?.user?._id)
       if(!employee) return res.status(401).json({success: false, message:"Employee account not found"})
-      if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
-
+      if(!employee?.isActive) return res.status(400).json({success: false, message:"Employee account not active"})
+      if(employee?.type?.toLowerCase()!="operation"){
+         return res.status(400).json({success: false, message:"Access denied"})
+      }
 
       const {error} = validateUpdateEmployeeCase(req.body)
       if(error) return res.status(400).json({success:false,message:error.details[0].message})
@@ -114,6 +117,182 @@ export const changeStatusEmployeeCase = async(req,res)=>{
       
    }
 }
+
+export const employeeUpdateCaseById = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      if(!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      if(employee?.type?.toLowerCase()!="operation"){
+         return res.status(400).json({success: false, message:"Access denied"})
+      }
+
+      const { _id } = req.query
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+
+      const mycase = await Case.findById(_id)
+      if (!mycase) return res.status(404).json({ success: false, message: "Case not found" })
+
+      const { error } = validateAddClientCase(req.body);
+      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+      req.body.caseDocs = req?.body?.caseDocs?.map(caseFile => {
+         return {
+            docDate: caseFile?.docDate ? caseFile?.docDate : new Date(),
+            docName: caseFile?.docName,
+            docType: caseFile?.docFormat,
+            docFormat: caseFile?.docFormat,
+            docURL: caseFile?.docURL,
+         }
+      })
+
+      console.log("case_id", _id, req.body);
+
+      const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body } }, { new: true })
+      return res.status(200).json({ success: true, message: "Successfully update case", data: updateCase });
+
+   } catch (error) {
+      console.log("updateAdminCase in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+export const employeeEditClient = async (req, res, next) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      if(!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      if(employee?.type?.toLowerCase()!="operation"){
+         return res.status(400).json({success: false, message:"Access denied"})
+      }
+
+      const { _id } = req.query
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+
+     const { error } = validateClientProfileBody(req.body);
+     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+     const updateClientDetails = await Client.findByIdAndUpdate(_id, {
+       $set: {
+         isProfileCompleted: true,
+         "profile.profilePhoto": req.body.profilePhoto,
+         "profile.consultantName": req.body.consultantName,
+         "profile.fatherName": req.body.fatherName,
+         "profile.alternateEmail": req.body.alternateEmail,
+         "profile.primaryMobileNo": req.body.mobileNo,
+         "profile.whatsupNo": req.body.whatsupNo,
+         "profile.alternateMobileNo": req.body.alternateMobileNo,
+         "profile.dob": req.body.dob,
+         "profile.address": req.body.address,
+         "profile.state": req.body.state,
+         "profile.city": req.body.city,
+         "profile.pinCode": req.body.pinCode,
+         "profile.about": req.body.about,
+       }
+     }, { new: true })
+    
+     if(!updateClientDetails){
+      return res.status(400).json({ success: true, message: "Client not found"})
+     }
+     return res.status(200).json({ success: true, message: "Successfully Update Client",_id:updateClientDetails?._id})
+   } catch (error) {
+     console.log("updateClientDetails: ", error);
+     return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+ }
+
+ export const employeeupdateParnterProfile =async (req,res)=>{
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      if(!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      if(employee?.type?.toLowerCase()!="operation"){
+         return res.status(400).json({success: false, message:"Access denied"})
+      }
+
+      const { _id } = req.query
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+
+     const {error} = validateProfileBody(req.body);
+     if(error) return res.status(400).json({success:false,message:error.details[0].message})
+     const updatePatnerDetails = await Partner.findByIdAndUpdate(_id,{
+       $set:{
+         "profile.profilePhoto":req.body.profilePhoto,
+         "profile.consultantName":req.body.consultantName,
+         "profile.alternateEmail": req.body.alternateEmail,
+         "profile.alternateMobileNo":req.body.alternateMobileNo,
+         "profile.whatsupNo":req.body.whatsupNo,
+         "profile.panNo":req.body.panNo,
+         "profile.aadhaarNo":req.body.aadhaarNo ,
+         "profile.dob":req.body.dob,
+         "profile.designation":req.body.designation,
+         "profile.areaOfOperation":req.body.areaOfOperation ,
+         "profile.workAssociation": req.body.workAssociation,
+         "profile.state":req.body.state,
+         "profile.gender":req.body.gender ,
+         "profile.district":req.body.district ,
+         "profile.city":req.body.city ,
+         "profile.pinCode":req.body.pinCode ,
+         "profile.about":req.body.about,
+       }},{new: true})
+
+       if(!updatePatnerDetails) return res.status(400).json({success: true, message: "Partner not found"})
+     return  res.status(200).json({success: true, message: "Successfully update partner profile"})
+   } catch (error) {
+     console.log("updatePatnerDetails: ",error);
+     return res.status(500).json({success: false,message:"Internal server error",error: error});
+   }
+   }  
+
+   export const employeeUpdatePartnerBankingDetails =async (req,res)=>{
+      try {
+         const verify = await authEmployee(req, res)
+         if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+   
+         const employee = await Employee.findById(req?.user?._id)
+         if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+         if(!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+         if(employee?.type?.toLowerCase()!="operation"){
+            return res.status(400).json({success: false, message:"Access denied"})
+         }
+   
+         const { _id } = req.query
+         if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+   
+        const {error} = validateBankingDetailsBody(req.body);
+        if(error) return res.status(400).json({success:false,message:error.details[0].message})
+
+        const updatePatnerDetails = await Partner.findByIdAndUpdate(_id,{
+          $set:{
+           "bankingDetails.bankName": req.body.bankName,
+           "bankingDetails.bankAccountNo": req.body.bankAccountNo,
+           "bankingDetails.bankBranchName": req.body.bankBranchName,
+           "bankingDetails.gstNo": req.body.gstNo,
+           "bankingDetails.panNo":req.body.panNo,
+           "bankingDetails.cancelledChequeImg": req.body.cancelledChequeImg,
+           "bankingDetails.gstCopyImg":req.body.gstCopyImg,
+           "bankingDetails.ifscCode":req.body.ifscCode,
+           "bankingDetails.upiId":req.body.upiId,
+    
+          }},{new: true})
+          if(!updatePatnerDetails) return res.status(400).json({success: true, message: "Partner not found"})
+        return  res.status(200).json({success: true, message: "Successfully update banking details"})
+      } catch (error) {
+        console.log("updatePatnerDetails: ",error);
+        return res.status(500).json({success: false,message:"Internal server error",error: error});
+      }
+      }
+
+
 
 export const viewAllEmployeeCase = async(req,res)=>{
    try {

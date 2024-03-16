@@ -38,7 +38,7 @@
           window.location.href = "<%= process.env?.FRONTEND_URL %>/client/all-invoices";
         }
       </script> -->
-      <script>
+      <!-- <script>
         const createPgSession =async()=>{
             console.log("calling createPgSession");
             try {
@@ -61,7 +61,7 @@
         document.addEventListener('DOMContentLoaded', function() {
         createPgSession();
     });
-      </script>
+      </script> -->
 </head>
 
 <body>
@@ -76,14 +76,11 @@
                                 </h4>
                                 <div class="mt-4 d-flex flex-column align-items-center justify-content-center">
                                     <h5 class="font-size-15 mb-1">Invoice Payment Checkout</h5>
-                                    <p class="fs-6 text-danger">
-                                        <form th:action="@{ https://securepay.sabpaisa.in/SabPaisa/sabPaisaInit?v=1}" th:method="post">
-                                            <input type="hidden" name="encData" th:value='<%= encData %>' id="frm1">
-                                            <input type="hidden" name="clientCode" th:value='<%= clientCode %>' id="frm2">
-                                            <input type="submit" id="submitButton" name="submit">
-                                            <form>
-                                            
-                                    </p>
+                                    <form action="https://securepay.sabpaisa.in/SabPaisa/sabPaisaInit?v=1" method="post">
+                                        <input type="hidden" name="encData" value="<%= encData %>" id="frm1">
+                                        <input type="hidden" name="clientCode" value="<%= clientCode %>" id="frm2">
+                                        <input type="submit" id="submitButton" name="submit">
+                                    </form>
                                 </div>
                             </div>
                 </div>
