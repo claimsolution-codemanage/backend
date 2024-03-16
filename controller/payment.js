@@ -63,10 +63,10 @@ export const paymentCheckoutPage =async (req, res) => {
 
 export const paymentWebHook = async (req, res) => {
     try {
-        console.log("paymentWebHook",req);
-        console.log("payment body",req.body)
-        console.log("payment response",req?.encResponse)
         console.log("payment body response",req.body?.encResponse)
+        console.log("payment body clientCode",req.body?.clientCode)
+
+        console.log("decrypt",decrypt(req.body?.encResponse))
 
        return res.status(200).json({ success: true, message: "payment"});
     } catch (error) {
