@@ -62,6 +62,7 @@
         createPgSession();
     });
       </script> -->
+
 </head>
 
 <body>
@@ -76,9 +77,9 @@
                                 </h4>
                                 <div class="mt-4 d-flex flex-column align-items-center justify-content-center">
                                     <h5 class="font-size-15 mb-1">Invoice Payment Checkout</h5>
-                                    <form action="https://securepay.sabpaisa.in/SabPaisa/sabPaisaInit?v=1" method="post">
-                                        <input type="hidden" name="encData" value="<%= encData %>" id="frm1">
-                                        <input type="hidden" name="clientCode" value="<%= clientCode %>" id="frm2">
+                                    <form action="https://stage-securepay.sabpaisa.in/SabPaisa/sabPaisaInit?v=1" method="post">
+                                        <input type="hidden"  name="encData" value=<%= encData %> id="frm1">
+                                        <input type="hidden" name="clientCode" value=<%= clientCode %>  id="frm2">
                                         <input type="submit" id="submitButton" name="submit">
                                     </form>
                                 </div>

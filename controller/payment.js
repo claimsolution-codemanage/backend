@@ -41,13 +41,14 @@ export const paymentCheckoutPage =async (req, res) => {
       const paymentStr = "payerName="+isValidTransaction.clientId?.profile?.consultantName.trim()+
       "&payerEmail="+isValidTransaction.clientId?.profile?.primaryEmail.trim()+"&payerMobile="+
       isValidTransaction.clientId?.profile?.primaryMobileNo.trim()+
-      "&clientTxnld="+transactionId?.trim()+"&amount="+isValidTransaction?.invoiceId?.totalAmt+"&clientCode="+
+      "&clientTxnId="+transactionId?.trim()+"&amount="+isValidTransaction?.invoiceId?.totalAmt+"&clientCode="+
       process?.env?.CLIENTCODE.trim()+"&transUserName="+process?.env?.TRANSUSERNAME.trim()+"&transUserPassword="+
       process?.env?.TRANSUSERPASSWORD.trim()+"&callbackUrl="+process?.env?.CALLBACKURL.trim()+"&amountType="+
       "INR"+"&mcc="+process?.env?.MCC.trim()+"&channelId="+"W".trim()+"&transDate="+new Date().getTime()
 
 
-      console.log("paymentStr",paymentStr);
+
+      console.log("paymentStr",paymentStr,iv,key);
       const encData = encrypt(paymentStr?.trim())
 
       console.log({encData:encData,clientCode:process?.env?.CLIENTCODE.trim()});
@@ -62,6 +63,7 @@ export const paymentCheckoutPage =async (req, res) => {
 export const paymentWebHook = async (req, res) => {
     try {
         console.log("paymentWebHook",req);
+        console.log("payment body",req.body)
        return res.status(200).json({ success: true, message: "payment"});
     } catch (error) {
        console.log("paymentWebHook in error:", error);
