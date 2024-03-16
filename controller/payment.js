@@ -44,7 +44,8 @@ export const paymentCheckoutPage =async (req, res) => {
       "&clientTxnId="+transactionId?.trim()+"&amount="+isValidTransaction?.invoiceId?.totalAmt+"&clientCode="+
       process?.env?.CLIENTCODE.trim()+"&transUserName="+process?.env?.TRANSUSERNAME.trim()+"&transUserPassword="+
       process?.env?.TRANSUSERPASSWORD.trim()+"&callbackUrl="+process?.env?.CALLBACKURL.trim()+"&amountType="+
-      "INR"+"&mcc="+process?.env?.MCC.trim()+"&channelId="+"W".trim()+"&transDate="+new Date().getTime()
+      "INR"+"&mcc="+process?.env?.MCC.trim()+"&channelId="+"W".trim()+"&transDate="+new Date().getTime()+
+      "&successURL=http://localhost:5173"+"&failureURL=http://localhost:5173/fail"
 
 
 
@@ -64,6 +65,9 @@ export const paymentWebHook = async (req, res) => {
     try {
         console.log("paymentWebHook",req);
         console.log("payment body",req.body)
+        console.log("payment response",req?.encResponse)
+        console.log("payment body response",req.body?.encResponse)
+
        return res.status(200).json({ success: true, message: "payment"});
     } catch (error) {
        console.log("paymentWebHook in error:", error);
