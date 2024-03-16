@@ -12,6 +12,7 @@ import client from './routes/client.js'
 import job from './routes/job.js'
 import complaint from "./routes/complaint.js"
 import payment from './routes/payment.js'
+import bodyParser from 'body-parser';
 import ejs from 'ejs'
 
 mongoose
@@ -46,6 +47,9 @@ app.use(cors())
 // 	}
 //   });
 app.use(express.json());
+// Parse application/x-www-form-urlencoded
+app.use(bodyParser.urlencoded({ extended: false }));
+
 
 app.use("/api/upload",imageUpload)
 app.use("/api/admin",admin)
