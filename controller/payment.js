@@ -1,4 +1,4 @@
-import Tranaction from "../models/transaction.js";
+import Transaction from "../models/transaction.js";
 import Bill from "../models/bill.js";
 import { validMongooseId } from "../utils/helper.js";
 import crypto from 'crypto'
@@ -31,7 +31,7 @@ export const paymentCheckoutPage =async (req, res) => {
       if(!validMongooseId(transactionId)){
          return res.render("paymentError",{error:"Tranasaction id is invalid/expired"})
       }
-      const isValidTransaction = await Tranaction.findById(transactionId).populate("clientId").populate("invoiceId")
+      const isValidTransaction = await Transaction.findById(transactionId).populate("clientId").populate("invoiceId")
       if(!isValidTransaction){
         return res.render("paymentError",{error:"Tranasaction id is invalid/expired"})
       }
@@ -81,7 +81,7 @@ export const paymentWebHook = async (req, res) => {
          });
 
          if(obj && obj?.statusCode=='0000' && obj?.status=='SUCCESS' && obj?.clientTxnId){
-            const getTransaction = await Tranaction.findById(obj?.clientTxnId)
+            const getTransaction = await Transaction.findById(obj?.clientTxnId)
             if(getTransaction){
                const getBill = await Bill.findByIdAndUpdate(getTransaction?.invoiceId,{
                   $set:{
@@ -90,7 +90,7 @@ export const paymentWebHook = async (req, res) => {
                   }
                },{new:true})
                if(getBill){
-                  const getTransactionDetails = await Tranaction.findByIdAndUpdate(obj?.clientTxnId,{
+                  const getTransactionDetails = await Transaction.findByIdAndUpdate(obj?.clientTxnId,{
                      $set:{
                         isPaid:true,
                         paidAmount:obj?.paidAmount,
@@ -113,7 +113,7 @@ export const paymentWebHook = async (req, res) => {
          }
       }else{
          if(obj && obj?.clientTxnId){
-            const getTransactionDetails = await Tranaction.findByIdAndUpdate(obj?.clientTxnId,{
+            const getTransactionDetails = await Transaction.findByIdAndUpdate(obj?.clientTxnId,{
                $set:{
                   paidAmount:obj?.paidAmount,
                   paymentMode:obj?.paymentMode,

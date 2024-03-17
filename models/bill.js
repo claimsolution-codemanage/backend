@@ -18,7 +18,7 @@ const billSchema = new mongoose.Schema({
     },
     transactionId:{
         type:mongoose.Schema.ObjectId,
-        ref:"tranaction"
+        ref:"transaction"
     },
     sender:{
     type:{},
