@@ -74,6 +74,8 @@ export const paymentWebHook = async (req, res) => {
 
       const decryptData = decrypt(req.body?.encResponse)
 
+      console.log("decrypt response",req.body.encResponse,decryptData)
+
       if(!decryptData){
          return res?.render("paymentFailed",{message:"Invaild Transaction",redirectUrl})
 
