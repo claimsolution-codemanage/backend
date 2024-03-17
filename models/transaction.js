@@ -38,7 +38,10 @@ const transactionSchema = new mongoose.Schema({
     bankErrorCode:{
         type:String
     },
-    sabPaisaTxnld:{
+    sabPaisaTxnId:{
+        type:String,
+    },
+    sabPaisaMessage:{
         type:String,
     },
     transDate:{
