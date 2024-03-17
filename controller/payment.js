@@ -36,6 +36,12 @@ export const paymentCheckoutPage =async (req, res) => {
         return res.render("paymentError",{error:"Tranasaction id is invalid/expired"})
       }
 
+      if(isValidTransaction?.isTranactionCall){
+         return res.render("paymentError",{error:"Tranasaction id is invalid/expired"})
+      }
+
+      const updateIsTransactionCall = await Transaction.findByIdAndUpdate(transactionId,{$set:{isTranactionCall:true}})
+
       const paymentStr = "payerName="+isValidTransaction.clientId?.profile?.consultantName.trim()+
       "&payerEmail="+isValidTransaction.clientId?.profile?.primaryEmail.trim()+"&payerMobile="+
       isValidTransaction.clientId?.profile?.primaryMobileNo.trim()+
@@ -46,7 +52,7 @@ export const paymentCheckoutPage =async (req, res) => {
 
 
 
-      console.log("paymentStr",paymentStr,iv,key);
+      console.log("paymentStr",paymentStr);
       const encData = encrypt(paymentStr?.trim())
 
       console.log({encData:encData,clientCode:process?.env?.CLIENTCODE.trim()});
@@ -60,7 +66,7 @@ export const paymentCheckoutPage =async (req, res) => {
 
 export const paymentWebHook = async (req, res) => {
    const redirectUrl = process?.env?.RedirectUrl
-   console.log("body",req.body.clientCode,req.body?.encResponse);
+   // console.log("body",req.body.clientCode,req.body?.encResponse);
     try {
       if(req.body?.clientCode!=process?.env?.CLIENTCODE || !req.body?.encResponse){
          return res?.render("paymentFailed",{message:"Invalid clientCode",redirectUrl})

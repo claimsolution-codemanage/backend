@@ -48,11 +48,13 @@
                                 <h4 class='fs-4'>
                                 </h4>
                                 <div class="mt-4 d-flex flex-column align-items-center justify-content-center">
-                                    <h5 class="font-size-15 mb-1">Invoice Payment Checkout</h5>
+                                    <h5 class="font-size-15 mb-1 text-primary">Invoice Payment</h5>
+                                    <h6 >Checkout page is loading...</h6>
+                                    <p>Please wait</p>
                                     <form id="paymentForm"  action="https://stage-securepay.sabpaisa.in/SabPaisa/sabPaisaInit?v=1 " method="post">
                                         <input type="hidden"  name="encData" value=<%= encData %> id="frm1">
                                         <input type="hidden" name="clientCode" value=<%= clientCode %>  id="frm2">
-                                        <input type="hidden" type="submit" id="submitButton" name="submit">
+                                        <!-- <input type="hidden" type="submit" id="submitButton" name="submit"> -->
                                     </form>
                                 </div>
                             </div>
@@ -63,7 +65,8 @@
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             // Auto-submit the form when the page is loaded
-            document.getElementById("paymentForm").submit();
+            const myForm = document.getElementById("paymentForm")
+            myForm.submit();
         });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"

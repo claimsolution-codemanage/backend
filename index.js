@@ -61,8 +61,7 @@ app.use("/api/complaint",complaint)
 app.use("/api/payment",payment)
 
 app.get("/",(req,res)=>{
-	res.render("paymentSuccess",{message:"Failed Payment"})
-	// res.status(200).json({success: true,message:"Welcome to server page!"});
+	res.status(200).json({success: true,message:"Welcome to server page!"});
 })
 
 
