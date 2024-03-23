@@ -52,11 +52,11 @@ export const paymentCheckoutPage =async (req, res) => {
 
 
 
-      console.log("paymentStr",paymentStr);
+      // console.log("paymentStr",paymentStr);
       const encData = encrypt(paymentStr?.trim())
 
-      console.log({encData:encData,clientCode:process?.env?.CLIENTCODE.trim()});
-      return res.render("pgCheckout",{encData:encData,clientCode:process?.env?.CLIENTCODE.trim()})
+      // console.log({encData:encData,clientCode:process?.env?.CLIENTCODE.trim()});
+      return res.render("pgCheckout",{encData:encData,clientCode:process?.env?.CLIENTCODE.trim(),checkoutUrl:process.env.CHECKOUT_URL})
 
    } catch (error) {
       console.log("paymentCheckoutPage in error:", error);

@@ -51,7 +51,7 @@
                                     <h5 class="font-size-15 mb-1 text-primary">Invoice Payment</h5>
                                     <h6 >Checkout page is loading...</h6>
                                     <p>Please wait</p>
-                                    <form id="paymentForm"  action="https://stage-securepay.sabpaisa.in/SabPaisa/sabPaisaInit?v=1 " method="post">
+                                    <form id="paymentForm"  action=<%=checkoutUrl %> method="post">
                                         <input type="hidden"  name="encData" value=<%= encData %> id="frm1">
                                         <input type="hidden" name="clientCode" value=<%= clientCode %>  id="frm2">
                                         <!-- <input type="hidden" type="submit" id="submitButton" name="submit"> -->

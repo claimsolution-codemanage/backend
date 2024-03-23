@@ -21,6 +21,7 @@ import Jwt from 'jsonwebtoken'
 import { validateResetPassword } from "../utils/helper.js";
 import jwtDecode from "jwt-decode";
 import { validateBankingDetailsBody, validateProfileBody } from "../utils/validatePatner.js";
+import axios from "axios";
 
 
 export const adminAuthenticate = async (req, res) => {
@@ -779,7 +780,7 @@ export const adminEditClient = async (req, res, next) => {
          "profile.consultantName": req.body.consultantName,
          "profile.fatherName": req.body.fatherName,
          "profile.alternateEmail": req.body.alternateEmail,
-         "profile.primaryMobileNo": req.body.mobileNo,
+         "profile.primaryMobileNo": req.body?.mobileNo,
          "profile.whatsupNo": req.body.whatsupNo,
          "profile.alternateMobileNo": req.body.alternateMobileNo,
          "profile.dob": req.body.dob,
@@ -821,6 +822,7 @@ export const adminEditClient = async (req, res, next) => {
          "profile.consultantName":req.body.consultantName,
          "profile.alternateEmail": req.body.alternateEmail,
          "profile.alternateMobileNo":req.body.alternateMobileNo,
+         "profile.primaryMobileNo":req.body.primaryMobileNo,
          "profile.whatsupNo":req.body.whatsupNo,
          "profile.panNo":req.body.panNo,
          "profile.aadhaarNo":req.body.aadhaarNo ,
@@ -1425,6 +1427,53 @@ export const adminDeleteCaseById = async (req, res) => {
       return res.status(200).json({ success: true, message: "Successfully case deleted" });
    } catch (error) {
       console.log("adminDeleteCaseById in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
+export const adminDeleteCaseDocById = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+
+      const { caseId,docId } = req?.query
+      if (!caseId || !docId) return res.status(400).json({ success: false, message: "caseId and docId are required" })
+      if (!validMongooseId(caseId) || !validMongooseId(docId)) return res.status(400).json({ success: false, message: "Not a valid caseId or docId" })
+
+      const getCase = await Case.findById(caseId);
+      if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
+
+      const filterDocs = getCase?.caseDocs?.filter(doc=>doc?._id==docId)?.[0]
+      if(filterDocs && filterDocs?.docURL){
+         const setAdminHeaders = {
+            "x-auth-token": req?.headers["x-auth-token"]
+        };
+        
+        const requestBody = {
+            files: [filterDocs?.docURL]
+        };
+        
+        const docRes = await axios.delete(
+            `${process.env.STORAGE_URL}/api/storage/deleteSelectedFiles`, 
+            {
+                headers: setAdminHeaders,
+                data: requestBody
+            }
+        );
+        console.log("docRes",docRes?.data);
+      }
+
+
+      const updateCase = await Case.findByIdAndUpdate(caseId,{$pull:{caseDocs:{_id:docId}}}, { new: true })
+
+      return res.status(200).json({ success: true, message: "Successfully case deleted" });
+   } catch (error) {
+      console.log("adminDeleteCaseDocById in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }

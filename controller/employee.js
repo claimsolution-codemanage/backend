@@ -185,7 +185,7 @@ export const employeeEditClient = async (req, res, next) => {
          "profile.consultantName": req.body.consultantName,
          "profile.fatherName": req.body.fatherName,
          "profile.alternateEmail": req.body.alternateEmail,
-         "profile.primaryMobileNo": req.body.mobileNo,
+         "profile.primaryMobileNo": req.body.primaryMobileNo,
          "profile.whatsupNo": req.body.whatsupNo,
          "profile.alternateMobileNo": req.body.alternateMobileNo,
          "profile.dob": req.body.dob,
@@ -230,6 +230,7 @@ export const employeeEditClient = async (req, res, next) => {
          "profile.consultantName":req.body.consultantName,
          "profile.alternateEmail": req.body.alternateEmail,
          "profile.alternateMobileNo":req.body.alternateMobileNo,
+         "profile.primaryMobileNo":req.body.primaryMobileNo,
          "profile.whatsupNo":req.body.whatsupNo,
          "profile.panNo":req.body.panNo,
          "profile.aadhaarNo":req.body.aadhaarNo ,
@@ -599,7 +600,7 @@ export const employeeViewAllInvoice = async (req,res)=>{
          }
        ];
 
-      const getAllBill = await Bill.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const getAllBill = await Bill.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("transactionId");
       const noOfBill = await Bill.find(query?.query).count()
       const aggregateResult = await Bill.aggregate(aggregationPipeline);
       return res.status(200).json({ success: true, message: "get case data", data: getAllBill, noOf: noOfBill,totalAmt:aggregateResult});

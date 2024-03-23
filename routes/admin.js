@@ -8,7 +8,9 @@ adminAuthenticate,adminDashboard,adminUpdateCaseById,adminAddReferenceCaseAndMar
 adminDeletePartnerById,adminDeleteClientById,adminSetIsActiveCase,
 adminEditCaseStatus,adminSetClientTag,adminSetPartnerTag,adminForgetPassword,adminResetForgetPassword,
 getAllAdmin,superAdminSetIsActiveAdmin,superAdminDeleteAdminById,adminViewPartnerReport,
-adminRemoveReferenceCase,adminEditClient,adminUpdateParnterProfile,adminUpdatePartnerBankingDetails,adminUpdateModalSchema
+adminRemoveReferenceCase,adminEditClient,adminUpdateParnterProfile,adminUpdatePartnerBankingDetails,
+adminDeleteCaseDocById,
+adminUpdateModalSchema
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -52,6 +54,8 @@ router.get("/ViewClientById",adminViewClientById)
 router.put("/setIsActiveClient",adminSetIsActiveClient)
 router.put("/setClientTag",adminSetClientTag)
 router.put("/editClient",adminEditClient)
+router.delete("/deleteClientById",adminDeleteClientById)
+
 
 // for case
 router.get("/viewAllCase",viewAllAdminCase)
@@ -64,7 +68,7 @@ router.put("/updateClientCaseFee",adminUpdateClientCaseFee)
 router.put("/changeCaseIsActive",adminSetIsActiveCase)
 router.put("/addReferenceCaseAndMarge",adminAddReferenceCaseAndMarge)
 router.delete("/deleteCaseById",adminDeleteCaseById)
-router.delete("/deleteClientById",adminDeleteClientById)
+router.delete("/deleteCaseDocId",adminDeleteCaseDocById)
 
 
 // share case
