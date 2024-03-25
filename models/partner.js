@@ -53,6 +53,10 @@ const partnerSchema = new mongoose.Schema({
       type:Boolean,
       default:false
    },
+   acceptTnc:{
+      type:Boolean,
+      default:false
+   },
    emailOTP: {
       type: {
          otp:{type:String,default:""},
@@ -173,6 +177,10 @@ const partnerSchema = new mongoose.Schema({
    },
    tlsUrl:{
       type:String,default:""
+   },
+   salesId:{
+      type:mongoose.Schema.ObjectId,
+      ref:"Employee",
    }
 },{timestamps:true});
 

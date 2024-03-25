@@ -1,7 +1,7 @@
 import Employee from "../models/employee.js";
 import Partner from "../models/partner.js";
 import Client from "../models/client.js";
-import { validateEmployeeSignIn,validateEmployeeResetPassword,validateUpdateEmployeeCase } from "../utils/validateEmployee.js";
+import { validateEmployeeSignIn,validateEmployeeResetPassword,validateUpdateEmployeeCase,validateAddPartner,validateAddEmpCase } from "../utils/validateEmployee.js";
 import { authEmployee, authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
 import { validMongooseId,getAllCaseQuery,getAllPartnerSearchQuery,getAllClientSearchQuery,generatePassword } from "../utils/helper.js";
@@ -17,6 +17,8 @@ import { getAllInvoiceQuery } from "../utils/helper.js";
 import { invoiceHtmlToPdfBuffer } from "../utils/createPdf/invoice.js";
 import { validateBankingDetailsBody, validateProfileBody } from "../utils/validatePatner.js";
 // import { getValidateDate } from "../utils/helper.js";
+import { sendAddPartnerRequest } from "../utils/sendMail.js";
+
 
 export const employeeAuthenticate = async(req,res)=>{
    try {
@@ -311,10 +313,13 @@ export const viewAllEmployeeCase = async(req,res)=>{
       const statusType = req.query.status ? req.query.status : "";
       const startDate = req.query.startDate ? req.query.startDate : "";
       const endDate = req.query.endDate ? req.query.endDate : "";
-      const caseAccess = ["assistant","operation","finance"]
+      const caseAccess = ["operation","finance"]
+      const empSaleId =  req?.user?.empType?.toLowerCase()=="sales" ? req?.user?._id :false
+
+      // console.log("empSaleId",empSaleId);
 
       const empId = !caseAccess?.includes(req?.user?.empType?.toLowerCase()) ?  req?.user?._id : false
-      const query = getAllCaseQuery(statusType,searchQuery,startDate,endDate,false,false,empId,true)
+      const query = getAllCaseQuery(statusType,searchQuery,startDate,endDate,false,false,empId,true,empSaleId)
       if(!query.success) return res.status(400).json({success: false, message: query.message})
 
       const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
@@ -366,9 +371,9 @@ export const employeeViewAllPartner = async(req,res)=>{
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo-1)*pageItemLimit :0;
       const searchQuery = req.query.search ? req.query.search : "";
+      const empSaleId =  req?.user?.empType?.toLowerCase()=="sales" ? req?.user?._id :false
 
-
-   const query = getAllPartnerSearchQuery(searchQuery,true)
+   const query = getAllPartnerSearchQuery(searchQuery,true,empSaleId)
    const getAllPartner = await Partner.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: 1 });
    const noOfPartner = await Partner.find(query).count()
     return res.status(200).json({success:true,message:"get partner data",data:getAllPartner,noOfPartner:noOfPartner});
@@ -724,7 +729,9 @@ export const allEmployeeDashboard = async (req, res) => {
       if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
       if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
 
-
+      const empSaleId = employee?.type?.toLowerCase() === "sales" ? req?.user?._id : false;
+      const filter = empSaleId ? { salesId: empSaleId,isActive:true } : { isActive: true };
+      const noOfPartner = await Partner.find(filter).count();
       const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
       const currentMonth = new Date().getMonth() + 1;
       console.log("start", currentMonth, currentYearStart);
@@ -738,18 +745,30 @@ export const allEmployeeDashboard = async (req, res) => {
             totalCases: 0
          });
       }
+
+      let matchStage = {
+         'createdAt': { $gte: currentYearStart },
+         'isActive': true,
+         'isPartnerReferenceCase': false,
+         'isEmpSaleReferenceCase': false
+       };
+       
+       if (empSaleId) {
+         matchStage['empSaleId'] = empSaleId;
+       }
+       
       const pieChartData = await Case.aggregate([
          {
-            '$match': {
-               'createdAt': { $gte: currentYearStart },
-               'isActive':true,
-            }
+            '$match': matchStage
          },
          {
             '$group': {
                '_id': '$currentStatus',
                'totalCases': {
                   '$sum': 1
+               },
+               'totalCaseAmount': {
+                 '$sum': '$claimAmount' // Assuming 'amount' is the field to sum
                }
             }
          },
@@ -759,6 +778,9 @@ export const allEmployeeDashboard = async (req, res) => {
                'totalCase': {
                   '$sum': '$totalCases'
                },
+               'totalCaseAmount': {
+                  '$sum': '$totalCaseAmount'
+                },
                'allCase': {
                   '$push': '$$ROOT'
                }
@@ -768,10 +790,7 @@ export const allEmployeeDashboard = async (req, res) => {
 
       const graphData = await Case.aggregate([
          {
-            $match: {
-               'createdAt': { $gte: currentYearStart },
-               'isActive':true,
-            }
+            '$match': matchStage
          },
          {
             $group: {
@@ -793,10 +812,92 @@ export const allEmployeeDashboard = async (req, res) => {
          });
          return match || month;
       });
-      return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData,employee });
+      return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData,noOfPartner,employee });
    } catch (error) {
       console.log("get dashbaord data error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
 
    }
 };
+
+export const saleEmployeeAddPartner = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      if(!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      if(employee?.type?.toLowerCase()!="sales"){
+         return res.status(400).json({success: false, message:"Access denied"})
+      }
+
+      const { error } = validateAddPartner(req.body);
+      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+      const isPartnerExist = await Partner.find({email:req.body.email})
+      if(isPartnerExist?.length>0 && isPartnerExist[0]?.emailVerify){
+         return res.status(400).json({ success: true, message: "Partner account already exist",});
+      }
+
+      const jwtString = await Jwt.sign({ ...req.body,empId:req?.user?._id},process.env.EMPLOYEE_SECRET_KEY,{expiresIn:'24h'})
+      
+      const requestLink = `/partner/accept-request/${jwtString}`
+      await sendAddPartnerRequest(req.body.email,requestLink)
+      return res.status(200).json({ success: true, message: "Successfully send add partner request"});
+
+   } catch (error) {
+      console.log("updateAdminCase in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+export const saleEmployeeAddCase = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      if(!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      if(employee?.type?.toLowerCase()!="sales"){
+         return res.status(400).json({success: false, message:"Access denied"})
+      }
+
+      const { error } = validateAddEmpCase(req.body);
+      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+      const {partnerEmail,partnerCode} = req.body
+      if(partnerEmail || partnerCode){
+         if(!partnerEmail)  return res.status(400).json({success: false, message:"Partner Email is required"})
+         const getPartner = await Partner.find({email:partnerEmail})
+         if(getPartner?.length==0){
+            return res.status(400).json({success: false, message:"Partner not found"})
+         }else{
+            if(getPartner[0]?.profile?.consultantCode!=partnerCode) return res.status(400).json({success: false, message:"Incorrect email/ consultantCode"})
+            req.body.partnerId=getPartner[0]?._id
+            req.body.partnerName=getPartner[0]?.profile?.consultantName
+         }
+      }
+
+      req.body.empSaleId=employee?._id,
+      req.body.empSaleName=employee?.fullName,
+      req.body.caseFrom = "sale"
+      req.body.processSteps = [{
+        date: Date.now(),
+        remark: "pending stage.",
+        consultant: "",
+      }]
+      const newAddCase = new Case(req.body)
+      const noOfCase = await Case.count()
+      newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
+      await newAddCase.save()
+      return res.status(200).json({ success: true, message: "Successfully add case",_id:newAddCase?._id});
+
+   } catch (error) {
+      console.log("updateAdminCase in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}

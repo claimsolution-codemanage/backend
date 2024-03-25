@@ -4,7 +4,8 @@ const router = express.Router();
 import { signUp,verifyEmailOtp,signIn,partnerForgetPassword,partnerResetPassword,partnerSendMobileOtpCode,partnerMobileNoVerify,
     getProfileDetails,updateProfileDetails,getBankingDetails,updateBankingDetails,
     addNewCase,viewAllPartnerCase,partnerViewCaseById,partnerAuthenticate,partnerAddCaseFile,partnerTls,
-    acceptPartnerTerms_Conditions,getpartnerDashboard,partnerUpdateCaseById,partnerResendOtp
+    acceptPartnerTerms_Conditions,getpartnerDashboard,partnerUpdateCaseById,partnerResendOtp,
+    signUpWithRequest
 
 } from '../controller/partner.js';
 
@@ -19,6 +20,7 @@ router.put("/resetPassword",partnerResetPassword)
 router.post("/sendMobileOtpCode",partnerSendMobileOtpCode)
 router.post("/mobileNoVerify",partnerMobileNoVerify)
 router.post("/resendOtp",partnerResendOtp)
+router.post("/acceptRequest",signUpWithRequest)
 
 
 // router.post("/setForgetPassword",setForgetPassword)

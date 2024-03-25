@@ -664,7 +664,6 @@ export const adminViewPartnerReport = async (req, res) => {
            }
          }
        ];
-      // console.log("query", query);
 
       const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
       const noOfCase = await Case.find(query?.query).count()
@@ -678,6 +677,84 @@ export const adminViewPartnerReport = async (req, res) => {
    }
 }
 
+export const adminViewEmpSaleReport = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      const {empSaleId} = req.query
+      if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid salesId" })
+      const empSale = await Employee.findById(empSaleId).select("-password")
+      if(!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
+      if(empSale.type?.toLowerCase()!="sales") return res.status(404).json({ success: false, message: "Employee designation is not sale" })
+      const pageItemLimit = req.query.limit ? req.query.limit : 10;
+      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const searchQuery = req.query.search ? req.query.search : "";
+      const statusType = req.query.status ? req.query.status : "";
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+      const type = req?.query?.type ? req.query.type : true
+
+      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type,empSaleId)
+      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+      const aggregationPipeline = [
+         { $match: query?.query }, // Match the documents based on the query
+         {
+           $group: {
+             _id: null,
+             totalAmtSum: { $sum: "$claimAmount" }
+           }
+         }
+       ];
+
+      const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const noOfCase = await Case.find(query?.query).count()
+      const aggregateResult = await Case.aggregate(aggregationPipeline);
+      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase,totalAmt:aggregateResult,user:empSale });
+
+   } catch (error) {
+      console.log("updateAdminCase in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+export const adminViewEmpSalePartnerReport = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const {empSaleId} = req.query
+      if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid salesId" })
+      const empSale = await Employee.findById(empSaleId).select("-password")
+      if(!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
+      if(empSale.type?.toLowerCase()!="sales") return res.status(404).json({ success: false, message: "Employee designation is not sale" })
+      
+
+      // query = ?statusType=&search=&limit=&pageNo
+      const pageItemLimit = req.query.limit ? req.query.limit : 10;
+      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const searchQuery = req.query.search ? req.query.search : "";
+      const type = req?.query?.type ? req.query.type : true;
+
+      const query = getAllPartnerSearchQuery(searchQuery, type,empSaleId)
+      const getAllPartner = await Partner.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const noOfPartner = await Partner.find(query).count()
+      return res.status(200).json({ success: true, message: "get partner data", data: getAllPartner, noOfPartner: noOfPartner });
+
+   } catch (error) {
+      console.log("viewAllPartnerByAdmin in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
 
 export const viewCaseByIdByAdmin = async (req, res) => {
    try {

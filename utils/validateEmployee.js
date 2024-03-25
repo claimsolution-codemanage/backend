@@ -63,3 +63,40 @@ export const validateInvoice =(body)=>{
    })
    return bodySchema.validate(body)
 }
+
+
+export const validateAddPartner =(body)=>{
+  const bodySchema = Joi.object({
+    fullName: Joi.string().required(),
+    email: Joi.string().email().required(),
+    mobileNo:Joi.string().required(),
+    workAssociation:Joi.string().required(),
+    areaOfOperation:Joi.string().required(),
+   })
+   return bodySchema.validate(body)
+}
+
+
+export const validateAddEmpCase =(body)=>{
+  const caseSchema = Joi.object({
+      partnerEmail:Joi.string().email().allow('').optional(),
+      partnerCode:Joi.string().allow('').optional(),
+      name:Joi.string().required(),
+      fatherName:Joi.string().allow('').optional(),
+      email:Joi.string().email().allow('').optional(),
+      mobileNo:Joi.string().min(10).max(10).required(),
+      policyType:Joi.string().allow('').optional(),
+      insuranceCompanyName:Joi.string().allow('').optional(),
+      complaintType:Joi.string().allow('').optional(),
+      policyNo:Joi.string().allow('').optional(),
+      address:Joi.string().allow('').optional(),
+      DOB:Joi.not().allow('').optional(),
+      pinCode:Joi.string().allow('').optional(),
+      claimAmount:Joi.number().min(10).required(),
+      city:Joi.string().allow('').optional(),
+      state:Joi.string().allow('').optional(),
+      problemStatement:Joi.string().allow('').optional(),
+      caseDocs:Joi.array().optional(),
+  })
+  return caseSchema.validate(body)
+}

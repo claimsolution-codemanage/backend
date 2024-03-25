@@ -9,7 +9,7 @@ adminDeletePartnerById,adminDeleteClientById,adminSetIsActiveCase,
 adminEditCaseStatus,adminSetClientTag,adminSetPartnerTag,adminForgetPassword,adminResetForgetPassword,
 getAllAdmin,superAdminSetIsActiveAdmin,superAdminDeleteAdminById,adminViewPartnerReport,
 adminRemoveReferenceCase,adminEditClient,adminUpdateParnterProfile,adminUpdatePartnerBankingDetails,
-adminDeleteCaseDocById,
+adminDeleteCaseDocById,adminViewEmpSaleReport,adminViewEmpSalePartnerReport,
 adminUpdateModalSchema
 } from '../controller/admin.js';
 
@@ -90,6 +90,8 @@ router.delete("/adminRemoveComplaintById",adminRemoveComplaintById)
 
 // for report
 router.get("/adminViewPartnerReport",adminViewPartnerReport)
+router.get("/adminViewEmpSaleReport",adminViewEmpSaleReport)
+router.get("/adminViewEmpSalePartnerReport",adminViewEmpSalePartnerReport)
 
 
 // router.put("/updateModalSchema",adminUpdateModalSchema)

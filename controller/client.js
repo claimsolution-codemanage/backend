@@ -431,22 +431,6 @@ export const addNewClientCase = async (req, res) => {
       remark: "pending stage.",
       consultant: "",
     }]
-    // req.body.paymentDetails =
-    //   [{
-    //     caseFees: caseFees,
-    //     verify: "false",
-    //     completed: false,
-    //   }]
-
-    // req.body.caseDocs = req?.body?.caseDocs?.map(caseFile=>{return{
-    //     docDate:new Date(),
-    //     docName:caseFile?.fileType,
-    //     docType:caseFile?.fileType,
-    //     docFormat:caseFile?.fileType,
-    //     docURL:caseFile?.url,
-    //     }})
-
-
     const newAddCase = new Case(req.body)
     const noOfCase = await Case.count()
     newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
@@ -666,7 +650,9 @@ export const clientDashboard = async (req, res) => {
         '$match': {
           'createdAt': { $gte: currentYearStart },
           'clientId': req?.user?._id, // Assuming 'clientId' is the field to match
-          'isActive':true
+          'isActive':true,
+          'isPartnerReferenceCase': false,
+          'isEmpSaleReferenceCase': false,
         }
       },
       {
@@ -701,7 +687,9 @@ export const clientDashboard = async (req, res) => {
         $match: {
           'createdAt': { $gte: currentYearStart },
           'clientId': req?.user?._id,
-          'isActive':true
+          'isActive':true,
+          'isPartnerReferenceCase': false,
+          'isEmpSaleReferenceCase': false,
         }
       },
       {

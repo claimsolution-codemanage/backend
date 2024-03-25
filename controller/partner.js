@@ -42,18 +42,17 @@ export const signUp = async function(req,res){
    if(error) return res.status(400).json({success:false,message:error.details[0].message})
 
    const otp = otp6Digit();
-   const partner = await Partner.find({ mobileNo: req.body.mobileNo });
-   const partnerWithEmail = await Partner.find({email:req.body.email})
+   const partner = await Partner.find({email:req.body.email});
+  //  const partnerWithEmail = await Partner.find({email:req.body.email})
    const {agreement} = req.body
    if(!agreement){
     return res.status(400).json({ success: false, message: "Must agree with our service agreement" })
    }
 
-   if (partner[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Mobile No. already register with us" })
-   if (partnerWithEmail[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Email already register with us" });
+   if (partner[0]?.emailVerify || partner[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Email already register with us" })
+  //  if (partnerWithEmail[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Email already register with us" });
    const bcrypePassword = await bcrypt.hash(req.body.password,10)
-    // req.body.emailOTP = {otp:otp,createAt:Date.now()}
-   if(partner.length == 0 && partnerWithEmail?.length==0) {
+   if(partner.length == 0) {
      const newPartner = new Partner({
        fullName: req.body.fullName,
        email: req.body.email,
@@ -62,13 +61,14 @@ export const signUp = async function(req,res){
        areaOfOperation: req.body.areaOfOperation,
        password:bcrypePassword,
        emailOTP: {otp:otp,createAt:Date.now()},
-       acceptPartnerTls:agreement
+      //  acceptPartnerTls:agreement,
+       acceptTnc:agreement
      })
      await newPartner.save();
      const token = await newPartner.getAuth()
      try {
       await sendOTPMail(req.body.email, otp,"partner");
-      res.status(201).header("x-auth-token", token)
+      return res.status(201).header("x-auth-token", token)
       .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully send OTP"});
    } catch (err) {
     console.log("send otp error",err);
@@ -89,7 +89,8 @@ export const signUp = async function(req,res){
           partnerType:req.body.partnerType,
           password:bcrypePassword,
           emailOTP: {otp:otp,createAt:Date.now()},
-          acceptPartnerTls:agreement
+          // acceptPartnerTls:agreement,
+       acceptTnc:agreement
         }})
       const token = await updatePatner.getAuth()
       try {
@@ -101,29 +102,30 @@ export const signUp = async function(req,res){
         return res.status(400).json({ success: false, message: "Failed to send OTP" });
      }
     }
-    if(partnerWithEmail.length>0){
-      const updatePatner = await Partner.findByIdAndUpdate(partnerWithEmail[0]?._id,{
-        $set:{
-          fullName: req.body.fullName,
-          email: req.body.email,
-          mobileNo: req.body.mobileNo,
-          workAssociation: req.body.workAssociation,
-          areaOfOperation: req.body.areaOfOperation,
-          partnerType:req.body.partnerType,
-          password:bcrypePassword,
-          emailOTP: {otp:otp,createAt:Date.now()},
-          acceptPartnerTls:agreement
-        }})
-      const token = await updatePatner.getAuth()
-      try {
-        await sendOTPMail(req.body.email, otp,"partner");
-        res.status(201).header("x-auth-token", token)
-        .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully send OTP"});
-     } catch (err) {
-      console.log("send otp error",err);
-        return res.status(400).json({ success: false, message: "Failed to send OTP" });
-     }
-    }
+    return res.status(400).json({ success: false, message: "Failed to send OTP" });
+    // if(partnerWithEmail.length>0){
+    //   const updatePatner = await Partner.findByIdAndUpdate(partnerWithEmail[0]?._id,{
+    //     $set:{
+    //       fullName: req.body.fullName,
+    //       email: req.body.email,
+    //       mobileNo: req.body.mobileNo,
+    //       workAssociation: req.body.workAssociation,
+    //       areaOfOperation: req.body.areaOfOperation,
+    //       partnerType:req.body.partnerType,
+    //       password:bcrypePassword,
+    //       emailOTP: {otp:otp,createAt:Date.now()},
+    //       acceptPartnerTls:agreement
+    //     }})
+    //   const token = await updatePatner.getAuth()
+    //   try {
+    //     await sendOTPMail(req.body.email, otp,"partner");
+    //     res.status(201).header("x-auth-token", token)
+    //     .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully send OTP"});
+    //  } catch (err) {
+    //   console.log("send otp error",err);
+    //     return res.status(400).json({ success: false, message: "Failed to send OTP" });
+    //  }
+    // }
 
    }
 
@@ -133,7 +135,7 @@ export const signUp = async function(req,res){
  }
 }
 
-
+//  at time of signup
 export const partnerResendOtp = async (req, res) => {
   try {
     const verify = await authPartner(req, res)
@@ -169,29 +171,19 @@ export const verifyEmailOtp = async (req,res,next)=>{
     
     const partner = await Partner.findById(req?.user?._id);
     if(!partner) return res.status(401).json({success:false,message: "Not register with us"})
-    if (partner?.mobileVerify) return res.status(400).json({ success: false, message: "Account is already verify" })
+    if (partner?.mobileVerify || partner?.emailVerify) return res.status(400).json({ success: false, message: "Account is already verify" })
     if(!req.body.otp) return res.status(404).json({success:false,message: "Otp is required"})
     const validFiveMinutes =new Date().getTime() - 5 * 60 * 1000;
 
     if( new Date(partner.emailOTP?.createAt).getTime()>=validFiveMinutes && partner.emailOTP?.otp==req?.body?.otp){
       console.log(new Date(partner.emailOTP?.createAt).getTime(),validFiveMinutes);
-      // const updatePatner = await Partner.findByIdAndUpdate(partner?._id,{$set:{emailVerify:true}})
-      // const token = updatePatner.getAuth()
-      // return  res.status(200).header("x-auth-token", token)
-      // .header("Access-Control-Expose-Headers", "x-auth-token").json({success: true, message: "Account Verified with email"})
-
       try {
-        // const updatePartner = await Partner.findByIdAndUpdate(req?.user?._id,{$set:{emailVerify:true,mobileVerify:true}})
-        // const admin = await Admin.find({}).select("-password")
-        // const jwtToken = await jwt.sign({_id:partner?._id,email:partner?.email},process.env.PARTNER_SECRET_KEY,{expiresIn:'6h'}
-        // await sendAccountTerm_ConditonsMail(partner?.email,`${process.env.FRONTEND_URL}/partner/acceptTermsAndConditions/${jwtToken}`,"partner",admin[0]?.partnerTlsUrl);
-        // console.log("sendAccountTerm_ConditonsMail partner");
         await sendAccountTerm_ConditonsMail(partner?.email, "partner", `${process?.env?.FRONTEND_URL}/agreement/partner.pdf`);
         const noOfPartners = await Partner.count()
         const updatePartner = await Partner.findByIdAndUpdate(req?.user?._id,{$set:{
-          emailVerify:false,
+          emailVerify:true,
           mobileVerify:true,
-          acceptPartnerTls:true,
+          // acceptPartnerTls:true,
           isActive:true,
           tlsUrl:`${process?.env?.FRONTEND_URL}/agreement/partner.pdf`,
           profile: {
@@ -229,7 +221,7 @@ export const verifyEmailOtp = async (req,res,next)=>{
             cancelledChequeImg: "",
             gstCopyImg: "",
          },
-            }},{new:true})
+        }},{new:true})
 
         const token = updatePartner?.getAuth(true)
         return res.status(200).header("x-auth-token", token)
@@ -392,6 +384,87 @@ export const signIn =async (req,res)=>{
     return res.status(500).json({success: false,message:"Internal server error",error: error});
   }
   }
+
+export const signUpWithRequest =async(req,res)=>{
+  try {
+    const {password,agreement,tokenId} = req.body
+    if(!password)  return res.status(400).json({success:true,message:"Password is required"})
+    if(!agreement)  return res.status(400).json({success:true,message:"Must accept our service agreement"})
+    if(!tokenId)  return res.status(400).json({success:true,message:"Invalid/expired link"})
+    console.log(process.env.EMPLOYEE_SECRET_KEY,process.env.EMPLOYEE_SECRET_KEY);
+    try {
+      await jwt.verify(tokenId,process.env.EMPLOYEE_SECRET_KEY)
+      const decode = await jwtDecode(tokenId)
+      console.log("decode",decode);
+      const bcryptPassword = await bcrypt.hash(password,10)
+      const {fullName,email,mobileNo,workAssociation,areaOfOperation,empId} = decode
+      if(!email || !mobileNo ||!fullName ||!workAssociation ||!areaOfOperation ||!empId) return res.status(400).json({success:false,message:"Invalid/expired link"})
+      const partner = await Partner.find({email:email})
+      if (partner[0]?.isActive || partner[[0]]?.mobileVerify || partner[0]?.emailVerify) return res.status(400).json({ success: false, message: "Account is already exist" })
+      const noOfPartners = await Partner.count()
+      const newPartner = new Partner({
+        fullName: fullName,
+        email: email,
+        mobileNo: mobileNo,
+        workAssociation: workAssociation,
+        areaOfOperation:areaOfOperation,
+        password:bcryptPassword,
+        acceptTnc:agreement,
+          emailVerify:true,
+          mobileVerify:true,
+          isActive:true,
+          tlsUrl:`${process?.env?.FRONTEND_URL}/agreement/partner.pdf`,
+          profile: {
+            profilePhoto: "",
+            consultantName: fullName,
+            consultantCode: `${new Date().getFullYear()}${new Date().getMonth()+1 < 10 ? `0${new Date().getMonth()+1}` :new Date().getMonth()+1}${new Date().getDate()}${noOfPartners}`,
+            associateWithUs:new Date(),
+            primaryEmail:email,
+            alternateEmail: "",
+            primaryMobileNo: mobileNo,
+            alternateMobileNo: "",
+            whatsupNo:"",
+            panNo: "",
+            aadhaarNo: "",
+            dob: null,
+            gender: "",
+            businessName: "",
+            companyName: "",
+            natureOfBusiness: "",
+            designation: "",
+            areaOfOperation: areaOfOperation,
+            workAssociation: workAssociation,
+            state: "",
+            district: "",
+            city: "",
+            pinCode: "",
+            about: "",
+         },
+         bankingDetails: {
+            bankName: "",
+            bankAccountNo: "",
+            bankBranchName: "",
+            gstNo: "",
+            panNo: "",
+            cancelledChequeImg: "",
+            gstCopyImg: "",
+            upiId:"",
+         },
+         salesId:empId
+      })
+      await newPartner.save()
+      const token = newPartner?.getAuth(true)
+      return res.status(200).header("x-auth-token", token)
+      .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully Signup" })
+   } catch (error) {
+    console.log("error",error);
+      return res.status(401).json({success:false,message:"Invalid/expired link"})
+   }
+  } catch (error) {
+    console.log("signUpWithRequest: ",error);
+    return res.status(500).json({success: false,message:"Oops, something went wrong",error: error});
+  }
+}
 
 //   //  for partner forget password
 // export const forgetPassword =async (req,res)=>{
@@ -849,6 +922,8 @@ export const getpartnerDashboard = async (req, res) => {
         '$match': {
           'createdAt': { $gte: currentYearStart },
           'isActive':true,
+          'isPartnerReferenceCase': false,
+          'isEmpSaleReferenceCase': false,
           'partnerId': req?.user?._id // Assuming 'partnerId' is the field to match
         }
       },
@@ -884,7 +959,9 @@ export const getpartnerDashboard = async (req, res) => {
         $match: {
           'createdAt': { $gte: currentYearStart },
           'partnerId': req?.user?._id,
-          'isActive':true
+          'isActive':true,
+          'isPartnerReferenceCase': false,
+          'isEmpSaleReferenceCase': false,
         }
       },
       {

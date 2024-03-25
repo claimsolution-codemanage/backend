@@ -30,8 +30,8 @@ export const getValidateDate =(date)=>{
 }
 
 
-export const getAllCaseQuery =(statusType,searchQuery,startDate,endDate,partnerId,clientId,employeeId,type=true)=>{
-  console.log("parameter",statusType,searchQuery,startDate,endDate,partnerId,clientId,employeeId,type);
+export const getAllCaseQuery =(statusType,searchQuery,startDate,endDate,partnerId,clientId,employeeId,type=true,empSaleId=false)=>{
+  console.log("parameter",empSaleId);
     if (startDate && endDate) {
         const validStartDate = getValidateDate(startDate)
         if(!validStartDate) return {success:false,message:"start date not formated"}
@@ -43,7 +43,8 @@ export const getAllCaseQuery =(statusType,searchQuery,startDate,endDate,partnerI
      $and:[
      partnerId ?  {partnerId:partnerId} : {},
      clientId ?  {clientId:clientId} : {},
-     employeeId ?  {addEmployee:{$in:employeeId}} : {},
+     !empSaleId && employeeId ?  {addEmployee:{$in:employeeId}} : {},
+     empSaleId ?  {empSaleId:empSaleId} : {},
      { isPartnerReferenceCase: false},
      { isEmpSaleReferenceCase: false},
 
@@ -73,9 +74,11 @@ export const getAllCaseQuery =(statusType,searchQuery,startDate,endDate,partnerI
 }
 
 
-export const getAllPartnerSearchQuery =(searchQuery,type)=>{
+export const getAllPartnerSearchQuery =(searchQuery,type,empSaleId=false)=>{
+  console.log("salesId",empSaleId);
 let query = {
     $and:[
+      empSaleId ?  {salesId:empSaleId} : {},
       {isActive:type},
       {
       $or: [
