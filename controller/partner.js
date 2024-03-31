@@ -195,7 +195,7 @@ export const verifyEmailOtp = async (req, res, next) => {
       console.log(new Date(partner.emailOTP?.createAt).getTime(), validFiveMinutes);
       try {
         const today = new Date()
-        const modifiedPdfBytes = editServiceAgreement("agreement/partner.pdf", today)
+        const modifiedPdfBytes =await editServiceAgreement("agreement/partner.pdf", today)
         await sendAccountTerm_ConditonsMail(partner?.email, "partner", modifiedPdfBytes);
         const noOfPartners = await Partner.count()
         const updatePartner = await Partner.findByIdAndUpdate(req?.user?._id, {
