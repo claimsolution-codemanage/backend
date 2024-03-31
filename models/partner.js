@@ -181,7 +181,8 @@ const partnerSchema = new mongoose.Schema({
    salesId:{
       type:mongoose.Schema.ObjectId,
       ref:"Employee",
-   }
+   },
+   shareEmployee:{type:Array,default:[]},
 },{timestamps:true});
 
 partnerSchema.methods.getAuth = function(auth=false){

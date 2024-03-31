@@ -2,17 +2,20 @@ import Admin from "../models/admin.js";
 import {
    validateAdminSignUp, validateAdminSignIn, validateAdminResetPassword, validateUpdateAdminCase,
    validateAdminSettingDetails, validateAdminAddCaseFee, validateAdminUpdateCasePayment, validateAdminAddEmployeeToCase,
-   validateEditAdminCaseStatus
+   validateEditAdminCaseStatus,validateAdminSharePartner
 } from "../utils/validateAdmin.js";
 import bcrypt from 'bcrypt';
 import { generatePassword } from "../utils/helper.js";
 import { sendAdminSigninMail, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import { authAdmin } from "../middleware/authentication.js";
 import Employee from "../models/employee.js";
-import { validateEmployeeSignUp,validateEmployeeUpdate } from "../utils/validateEmployee.js";
+import { validateEmployeeSignUp, validateEmployeeUpdate } from "../utils/validateEmployee.js";
 import { validMongooseId } from "../utils/helper.js";
 import Case from "../models/case.js";
-import { getAllPartnerSearchQuery, getAllClientSearchQuery, getAllCaseQuery, getAllEmployeeSearchQuery } from "../utils/helper.js";
+import {
+   getAllPartnerSearchQuery, getAllClientSearchQuery, getAllCaseQuery,
+   getAllEmployeeSearchQuery, getDownloadCaseExcel, getAllPartnerDownloadExcel,getAllClientDownloadExcel
+} from "../utils/helper.js";
 import Partner from "../models/partner.js";
 import Client from '../models/client.js'
 import { validateAddClientCase, validateClientProfileBody } from "../utils/validateClient.js";
@@ -22,6 +25,9 @@ import { validateResetPassword } from "../utils/helper.js";
 import jwtDecode from "jwt-decode";
 import { validateBankingDetailsBody, validateProfileBody } from "../utils/validatePatner.js";
 import axios from "axios";
+import ExcelJS from 'exceljs';
+import { Readable } from 'stream';
+
 
 
 export const adminAuthenticate = async (req, res) => {
@@ -87,7 +93,7 @@ export const adminSignin = async (req, res) => {
       const admin = await Admin.find({ email: req.body.email })
       if (admin.length == 0) return res.status(404).json({ success: false, message: "Admin account not exists" })
 
-      if(!admin[0]?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin[0]?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       const checkAuthAdmin = await bcrypt.compare(req.body.password, admin?.[0]?.password)
       if (!checkAuthAdmin) return res.status(401).json({ success: false, message: "invaild email/password" })
@@ -115,7 +121,7 @@ export const adminResetPassword = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { password, confirmPassword } = req.body
@@ -171,7 +177,7 @@ export const getSettingDetails = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id).select("-password")
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
 
@@ -248,11 +254,11 @@ export const adminDashboard = async (req, res) => {
       if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
-      const noOfClient = await Client.find({isActive:true}).count()
-      const noOfPartner = await Partner.find({isActive:true}).count()
-      const noOfEmployee = await Employee.find({isActive:true}).count()
+      const noOfClient = await Client.find({ isActive: true }).count()
+      const noOfPartner = await Partner.find({ isActive: true }).count()
+      const noOfEmployee = await Employee.find({ isActive: true }).count()
       const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
       const currentMonth = new Date().getMonth() + 1;
       console.log("start", currentMonth, currentYearStart);
@@ -270,10 +276,10 @@ export const adminDashboard = async (req, res) => {
          {
             '$match': {
                'createdAt': { $gte: currentYearStart },
-               'isActive':true,
+               'isActive': true,
                'isPartnerReferenceCase': false,
                'isEmpSaleReferenceCase': false,
-          
+
             }
          },
          {
@@ -283,7 +289,7 @@ export const adminDashboard = async (req, res) => {
                   '$sum': 1
                },
                'totalCaseAmount': {
-                 '$sum': '$claimAmount' // Assuming 'amount' is the field to sum
+                  '$sum': '$claimAmount' // Assuming 'amount' is the field to sum
                }
             }
          },
@@ -295,7 +301,7 @@ export const adminDashboard = async (req, res) => {
                },
                'totalCaseAmount': {
                   '$sum': '$totalCaseAmount'
-                },
+               },
                'allCase': {
                   '$push': '$$ROOT'
                }
@@ -307,7 +313,7 @@ export const adminDashboard = async (req, res) => {
          {
             $match: {
                'createdAt': { $gte: currentYearStart },
-               'isActive':true,
+               'isActive': true,
                'isPartnerReferenceCase': false,
                'isEmpSaleReferenceCase': false,
             }
@@ -332,7 +338,7 @@ export const adminDashboard = async (req, res) => {
          });
          return match || month;
       });
-      return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData,noOfClient,noOfPartner,noOfEmployee });
+      return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData, noOfClient, noOfPartner, noOfEmployee });
    } catch (error) {
       console.log("get dashbaord data error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -376,7 +382,7 @@ export const adminSetIsActiveEmployee = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { _id, status } = req.query
@@ -405,7 +411,7 @@ export const createEmployeeAccount = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { error } = validateEmployeeSignUp(req.body)
@@ -421,7 +427,7 @@ export const createEmployeeAccount = async (req, res) => {
          email: req.body.email,
          mobileNo: req.body.mobileNo,
          password: bcryptPassword,
-         type:req?.body?.type ? req?.body?.type : "assistant",
+         type: req?.body?.type ? req?.body?.type : "assistant",
       })
       try {
          await sendEmployeeSigninMail(req.body.email, systemPassword);
@@ -442,13 +448,13 @@ export const createEmployeeAccount = async (req, res) => {
 
 export const adminUpdateEmployeeAccount = async (req, res) => {
    try {
-      const {_id} = req.query
+      const { _id } = req.query
       const verify = await authAdmin(req, res)
       if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       const { error } = validateEmployeeUpdate(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
@@ -456,14 +462,14 @@ export const adminUpdateEmployeeAccount = async (req, res) => {
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
       const updateEmployee = await Employee.findByIdAndUpdate(_id, {
-         $set:{
-            fullName:req.body.fullName,
-             type:req.body.type,
-            designation:req.body.designation,
+         $set: {
+            fullName: req.body.fullName,
+            type: req.body.type,
+            designation: req.body.designation,
          }
       })
       if (!updateEmployee) return res.status(401).json({ success: false, message: "Employee not found" })
-      return res.status(200).json({ success: true, message: "Successfully update Employee"});
+      return res.status(200).json({ success: true, message: "Successfully update Employee" });
 
 
 
@@ -476,20 +482,20 @@ export const adminUpdateEmployeeAccount = async (req, res) => {
 
 export const adminDeleteEmployeeAccount = async (req, res) => {
    try {
-      const {_id} = req.query
+      const { _id } = req.query
       const verify = await authAdmin(req, res)
       if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
       const employee = await Employee.findById(_id)
       if (!employee) return res.status(401).json({ success: false, message: "Employee not found" })
       const deletedEmployee = await Employee.findByIdAndDelete(_id)
-      return res.status(200).json({ success: true, message: "Successfully remove Employee"});
+      return res.status(200).json({ success: true, message: "Successfully remove Employee" });
 
    } catch (error) {
       console.log("updateEmployeeAccount in error:", error);
@@ -505,7 +511,7 @@ export const adminViewAllEmployee = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       // query = ?statusType=&search=&limit=&pageNo
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
@@ -524,6 +530,87 @@ export const adminViewAllEmployee = async (req, res) => {
    }
 }
 
+export const adminGetSaleEmployee = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      // query = ?statusType=&search=&limit=&pageNo
+      const pageItemLimit = req.query.limit ? req.query.limit : 10;
+      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const searchQuery = req.query.search ? req.query.search : "";
+
+      let query = {
+         $and:[
+            { type: { $regex: "sales", $options: "i" }},
+            {
+             $or: [
+                  { fullName: { $regex: searchQuery, $options: "i" }},
+                  { email: { $regex: searchQuery, $options: "i" }},
+                  { mobileNo: { $regex: searchQuery, $options: "i" }},
+                  { type: { $regex: searchQuery, $options: "i" }},
+                  { designation: { $regex: searchQuery, $options: "i" }},
+
+              ]
+            }
+         ]
+         };
+      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const noOfEmployee = await Employee.find(query).count()
+      return res.status(200).json({ success: true, message: "get sale employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
+
+   } catch (error) {
+      console.log("adminViewAllEmployee in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+export const adminGetNormalEmployee = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      // query = ?statusType=&search=&limit=&pageNo
+      const pageItemLimit = req.query.limit ? req.query.limit : 10;
+      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const searchQuery = req.query.search ? req.query.search : "";
+
+      const excludedTypes = ["Sales", "Operation", "Finance"];
+      let query = {
+         $and:[
+            { type: { $nin: excludedTypes }},
+            {
+             $or: [
+                  { fullName: { $regex: searchQuery, $options: "i" }},
+                  { email: { $regex: searchQuery, $options: "i" }},
+                  { mobileNo: { $regex: searchQuery, $options: "i" }},
+                  { type: { $regex: searchQuery, $options: "i" }},
+                  { designation: { $regex: searchQuery, $options: "i" }},
+
+              ]
+            }
+         ]
+         };
+      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const noOfEmployee = await Employee.find(query).count()
+      return res.status(200).json({ success: true, message: "get normal employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
+
+   } catch (error) {
+      console.log("adminViewAllEmployee in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
 export const changeStatusAdminCase = async (req, res) => {
    try {
       const verify = await authAdmin(req, res)
@@ -531,7 +618,7 @@ export const changeStatusAdminCase = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { error } = validateUpdateAdminCase(req.body)
@@ -560,7 +647,7 @@ export const adminEditCaseStatus = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { error } = validateEditAdminCaseStatus(req.body)
@@ -596,7 +683,7 @@ export const viewAllAdminCase = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       // query = ?statusType=&search=&limit=&pageNo
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
@@ -609,22 +696,22 @@ export const viewAllAdminCase = async (req, res) => {
 
       const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type)
       if (!query.success) return res.status(400).json({ success: false, message: query.message })
-      console.log("query",query?.query);
+      console.log("query", query?.query);
       const aggregationPipeline = [
          { $match: query?.query }, // Match the documents based on the query
          {
-           $group: {
-             _id: null,
-             totalAmtSum: { $sum: "$claimAmount" } // Calculate the sum of totalAmt
-           }
+            $group: {
+               _id: null,
+               totalAmtSum: { $sum: "$claimAmount" } // Calculate the sum of totalAmt
+            }
          }
-       ];
+      ];
       // console.log("query", query);
 
       const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
       const noOfCase = await Case.find(query?.query).count()
       const aggregateResult = await Case.aggregate(aggregationPipeline);
-      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase,totalAmt:aggregateResult });
+      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult });
 
    } catch (error) {
       console.log("updateAdminCase in error:", error);
@@ -640,10 +727,10 @@ export const adminViewPartnerReport = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
       if (!validMongooseId(req.query.partnerId)) return res.status(400).json({ success: false, message: "Not a valid partnerId" })
       const partner = await Partner.findById(req.query.partnerId).select("-password")
-      if(!partner) return res.status(404).json({ success: false, message: "Parnter not found" })
+      if (!partner) return res.status(404).json({ success: false, message: "Parnter not found" })
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = req.query.search ? req.query.search : "";
@@ -654,21 +741,21 @@ export const adminViewPartnerReport = async (req, res) => {
 
       const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, req.query.partnerId, false, false, type)
       if (!query.success) return res.status(400).json({ success: false, message: query.message })
-      console.log("query",query?.query);
+      console.log("query", query?.query);
       const aggregationPipeline = [
          { $match: query?.query }, // Match the documents based on the query
          {
-           $group: {
-             _id: null,
-             totalAmtSum: { $sum: "$claimAmount" } // Calculate the sum of totalAmt
-           }
+            $group: {
+               _id: null,
+               totalAmtSum: { $sum: "$claimAmount" } // Calculate the sum of totalAmt
+            }
          }
-       ];
+      ];
 
       const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
       const noOfCase = await Case.find(query?.query).count()
       const aggregateResult = await Case.aggregate(aggregationPipeline);
-      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase,totalAmt:aggregateResult,user:partner });
+      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult, user: partner });
 
    } catch (error) {
       console.log("updateAdminCase in error:", error);
@@ -684,12 +771,12 @@ export const adminViewEmpSaleReport = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-      const {empSaleId} = req.query
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      const { empSaleId } = req.query
       if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid salesId" })
       const empSale = await Employee.findById(empSaleId).select("-password")
-      if(!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
-      if(empSale.type?.toLowerCase()!="sales") return res.status(404).json({ success: false, message: "Employee designation is not sale" })
+      if (!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
+      if (empSale.type?.toLowerCase() != "sales") return res.status(404).json({ success: false, message: "Employee designation is not sale" })
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = req.query.search ? req.query.search : "";
@@ -698,22 +785,22 @@ export const adminViewEmpSaleReport = async (req, res) => {
       const endDate = req.query.endDate ? req.query.endDate : "";
       const type = req?.query?.type ? req.query.type : true
 
-      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type,empSaleId)
+      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type, empSaleId)
       if (!query.success) return res.status(400).json({ success: false, message: query.message })
       const aggregationPipeline = [
          { $match: query?.query }, // Match the documents based on the query
          {
-           $group: {
-             _id: null,
-             totalAmtSum: { $sum: "$claimAmount" }
-           }
+            $group: {
+               _id: null,
+               totalAmtSum: { $sum: "$claimAmount" }
+            }
          }
-       ];
+      ];
 
       const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
       const noOfCase = await Case.find(query?.query).count()
       const aggregateResult = await Case.aggregate(aggregationPipeline);
-      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase,totalAmt:aggregateResult,user:empSale });
+      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult, user: empSale });
 
    } catch (error) {
       console.log("updateAdminCase in error:", error);
@@ -729,24 +816,27 @@ export const adminViewEmpSalePartnerReport = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
-      const {empSaleId} = req.query
+      const { empSaleId } = req.query
       if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid salesId" })
       const empSale = await Employee.findById(empSaleId).select("-password")
-      if(!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
-      if(empSale.type?.toLowerCase()!="sales") return res.status(404).json({ success: false, message: "Employee designation is not sale" })
-      
+      if (!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
+      if (empSale.type?.toLowerCase() != "sales") return res.status(404).json({ success: false, message: "Employee designation is not sale" })
+
 
       // query = ?statusType=&search=&limit=&pageNo
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = req.query.search ? req.query.search : "";
       const type = req?.query?.type ? req.query.type : true;
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
 
-      const query = getAllPartnerSearchQuery(searchQuery, type,empSaleId)
-      const getAllPartner = await Partner.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
-      const noOfPartner = await Partner.find(query).count()
+      const query = getAllPartnerSearchQuery(searchQuery, type, empSaleId, startDate, endDate)
+      if (!query.success) return res.status(400).json({ success: false, message: query?.message })
+      const getAllPartner = await Partner.find(query?.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const noOfPartner = await Partner.find(query?.query).count()
       return res.status(200).json({ success: true, message: "get partner data", data: getAllPartner, noOfPartner: noOfPartner });
 
    } catch (error) {
@@ -763,7 +853,7 @@ export const viewCaseByIdByAdmin = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
 
@@ -788,17 +878,20 @@ export const viewAllPartnerByAdmin = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       // query = ?statusType=&search=&limit=&pageNo
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = req.query.search ? req.query.search : "";
       const type = req?.query?.type ? req.query.type : true;
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
 
-      const query = getAllPartnerSearchQuery(searchQuery, type)
-      const getAllPartner = await Partner.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
-      const noOfPartner = await Partner.find(query).count()
+      const query = getAllPartnerSearchQuery(searchQuery, type, false, startDate, endDate)
+      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+      const getAllPartner = await Partner.find(query.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const noOfPartner = await Partner.find(query.query).count()
       return res.status(200).json({ success: true, message: "get partner data", data: getAllPartner, noOfPartner: noOfPartner });
 
    } catch (error) {
@@ -815,7 +908,7 @@ export const viewPartnerByIdByAdmin = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
 
@@ -841,123 +934,125 @@ export const adminEditClient = async (req, res, next) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
 
       const { _id } = req.query;
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-     const { error } = validateClientProfileBody(req.body);
-     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-     const updateClientDetails = await Client.findByIdAndUpdate(_id, {
-       $set: {
-         isProfileCompleted: true,
-         "profile.profilePhoto": req.body.profilePhoto,
-         "profile.consultantName": req.body.consultantName,
-         "profile.fatherName": req.body.fatherName,
-         "profile.alternateEmail": req.body.alternateEmail,
-         "profile.primaryMobileNo": req.body?.mobileNo,
-         "profile.whatsupNo": req.body.whatsupNo,
-         "profile.alternateMobileNo": req.body.alternateMobileNo,
-         "profile.dob": req.body.dob,
-         "profile.address": req.body.address,
-         "profile.state": req.body.state,
-         "profile.city": req.body.city,
-         "profile.pinCode": req.body.pinCode,
-         "profile.about": req.body.about,
-       }
-     }, { new: true })
-    
-     if(!updateClientDetails){
-      return res.status(400).json({ success: true, message: "Client not found"})
-     }
-     return res.status(200).json({ success: true, message: "Successfully Update Client",_id:updateClientDetails?._id})
-   } catch (error) {
-     console.log("updateClientDetails: ", error);
-     return res.status(500).json({ success: false, message: "Internal server error", error: error });
-   }
- }
+      const { error } = validateClientProfileBody(req.body);
+      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+      const updateClientDetails = await Client.findByIdAndUpdate(_id, {
+         $set: {
+            isProfileCompleted: true,
+            "profile.profilePhoto": req.body.profilePhoto,
+            "profile.consultantName": req.body.consultantName,
+            "profile.fatherName": req.body.fatherName,
+            "profile.alternateEmail": req.body.alternateEmail,
+            "profile.primaryMobileNo": req.body?.mobileNo,
+            "profile.whatsupNo": req.body.whatsupNo,
+            "profile.alternateMobileNo": req.body.alternateMobileNo,
+            "profile.dob": req.body.dob,
+            "profile.address": req.body.address,
+            "profile.state": req.body.state,
+            "profile.city": req.body.city,
+            "profile.pinCode": req.body.pinCode,
+            "profile.about": req.body.about,
+         }
+      }, { new: true })
 
- export const adminUpdateParnterProfile =async (req,res)=>{
+      if (!updateClientDetails) {
+         return res.status(400).json({ success: true, message: "Client not found" })
+      }
+      return res.status(200).json({ success: true, message: "Successfully Update Client", _id: updateClientDetails?._id })
+   } catch (error) {
+      console.log("updateClientDetails: ", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
+export const adminUpdateParnterProfile = async (req, res) => {
    try {
       const verify = await authAdmin(req, res)
       if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       const { _id } = req.query;
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-     const {error} = validateProfileBody(req.body);
-     if(error) return res.status(400).json({success:false,message:error.details[0].message})
-     const updatePatnerDetails = await Partner.findByIdAndUpdate(_id,{
-       $set:{
-         "profile.profilePhoto":req.body.profilePhoto,
-         "profile.consultantName":req.body.consultantName,
-         "profile.alternateEmail": req.body.alternateEmail,
-         "profile.alternateMobileNo":req.body.alternateMobileNo,
-         "profile.primaryMobileNo":req.body.primaryMobileNo,
-         "profile.whatsupNo":req.body.whatsupNo,
-         "profile.panNo":req.body.panNo,
-         "profile.aadhaarNo":req.body.aadhaarNo ,
-         "profile.dob":req.body.dob,
-         "profile.designation":req.body.designation,
-         "profile.areaOfOperation":req.body.areaOfOperation ,
-         "profile.workAssociation": req.body.workAssociation,
-         "profile.state":req.body.state,
-         "profile.gender":req.body.gender ,
-         "profile.district":req.body.district ,
-         "profile.city":req.body.city ,
-         "profile.pinCode":req.body.pinCode ,
-         "profile.about":req.body.about,
-       }},{new: true})
+      const { error } = validateProfileBody(req.body);
+      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+      const updatePatnerDetails = await Partner.findByIdAndUpdate(_id, {
+         $set: {
+            "profile.profilePhoto": req.body.profilePhoto,
+            "profile.consultantName": req.body.consultantName,
+            "profile.alternateEmail": req.body.alternateEmail,
+            "profile.alternateMobileNo": req.body.alternateMobileNo,
+            "profile.primaryMobileNo": req.body.primaryMobileNo,
+            "profile.whatsupNo": req.body.whatsupNo,
+            "profile.panNo": req.body.panNo,
+            "profile.aadhaarNo": req.body.aadhaarNo,
+            "profile.dob": req.body.dob,
+            "profile.designation": req.body.designation,
+            "profile.areaOfOperation": req.body.areaOfOperation,
+            "profile.workAssociation": req.body.workAssociation,
+            "profile.state": req.body.state,
+            "profile.gender": req.body.gender,
+            "profile.district": req.body.district,
+            "profile.city": req.body.city,
+            "profile.pinCode": req.body.pinCode,
+            "profile.about": req.body.about,
+         }
+      }, { new: true })
 
-       if(!updatePatnerDetails) return res.status(400).json({success: true, message: "Partner not found"})
-     return  res.status(200).json({success: true, message: "Successfully update partner profile"})
+      if (!updatePatnerDetails) return res.status(400).json({ success: true, message: "Partner not found" })
+      return res.status(200).json({ success: true, message: "Successfully update partner profile" })
    } catch (error) {
-     console.log("updatePatnerDetails: ",error);
-     return res.status(500).json({success: false,message:"Internal server error",error: error});
+      console.log("updatePatnerDetails: ", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
-   }  
+}
 
-   export const adminUpdatePartnerBankingDetails =async (req,res)=>{
-      try {
-         const verify = await authAdmin(req, res)
-         if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-   
-         const admin = await Admin.findById(req?.user?._id)
-         if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-         if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-   
-         const { _id } = req.query;
-         if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
-   
-        const {error} = validateBankingDetailsBody(req.body);
-        if(error) return res.status(400).json({success:false,message:error.details[0].message})
+export const adminUpdatePartnerBankingDetails = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-        const updatePatnerDetails = await Partner.findByIdAndUpdate(_id,{
-          $set:{
-           "bankingDetails.bankName": req.body.bankName,
-           "bankingDetails.bankAccountNo": req.body.bankAccountNo,
-           "bankingDetails.bankBranchName": req.body.bankBranchName,
-           "bankingDetails.gstNo": req.body.gstNo,
-           "bankingDetails.panNo":req.body.panNo,
-           "bankingDetails.cancelledChequeImg": req.body.cancelledChequeImg,
-           "bankingDetails.gstCopyImg":req.body.gstCopyImg,
-           "bankingDetails.ifscCode":req.body.ifscCode,
-           "bankingDetails.upiId":req.body.upiId,
-    
-          }},{new: true})
-          if(!updatePatnerDetails) return res.status(400).json({success: true, message: "Partner not found"})
-        return  res.status(200).json({success: true, message: "Successfully update banking details"})
-      } catch (error) {
-        console.log("updatePatnerDetails: ",error);
-        return res.status(500).json({success: false,message:"Internal server error",error: error});
-      }
-      }
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const { _id } = req.query;
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+
+      const { error } = validateBankingDetailsBody(req.body);
+      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+      const updatePatnerDetails = await Partner.findByIdAndUpdate(_id, {
+         $set: {
+            "bankingDetails.bankName": req.body.bankName,
+            "bankingDetails.bankAccountNo": req.body.bankAccountNo,
+            "bankingDetails.bankBranchName": req.body.bankBranchName,
+            "bankingDetails.gstNo": req.body.gstNo,
+            "bankingDetails.panNo": req.body.panNo,
+            "bankingDetails.cancelledChequeImg": req.body.cancelledChequeImg,
+            "bankingDetails.gstCopyImg": req.body.gstCopyImg,
+            "bankingDetails.ifscCode": req.body.ifscCode,
+            "bankingDetails.upiId": req.body.upiId,
+
+         }
+      }, { new: true })
+      if (!updatePatnerDetails) return res.status(400).json({ success: true, message: "Partner not found" })
+      return res.status(200).json({ success: true, message: "Successfully update banking details" })
+   } catch (error) {
+      console.log("updatePatnerDetails: ", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
 
 
 
@@ -969,7 +1064,7 @@ export const adminSetIsActivePartner = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { _id, status } = req.query
@@ -998,7 +1093,7 @@ export const adminSetPartnerTag = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { _id, profileTag } = req.body
@@ -1021,7 +1116,7 @@ export const adminSetClientTag = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { _id, profileTag } = req.body
@@ -1046,19 +1141,23 @@ export const adminViewAllClient = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       // query = ?statusType=&search=&limit=&pageNo
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = req.query.search ? req.query.search : "";
       const type = req.query.type ? req.query.type : true
-      console.log("type", type,pageItemLimit,pageNo,searchQuery);
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
 
-      const query = getAllClientSearchQuery(searchQuery, type)
-      const getAllClient = await Client.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
-      const noOfClient = await Client.find(query).count()
-      
+      console.log("type", type, pageItemLimit, pageNo, searchQuery);
+
+      const query = getAllClientSearchQuery(searchQuery, type,startDate,endDate)
+      if(!query?.success) return res.status(400).json({success:false,message:query.message})
+      const getAllClient = await Client.find(query.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const noOfClient = await Client.find(query.query).count()
+
       return res.status(200).json({ success: true, message: "get client data", data: getAllClient, noOfClient: noOfClient });
 
    } catch (error) {
@@ -1075,7 +1174,7 @@ export const adminViewClientById = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
 
@@ -1100,7 +1199,7 @@ export const adminUpdateCaseById = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Client account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { _id } = req.query
@@ -1141,7 +1240,7 @@ export const adminSetIsActiveClient = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { _id, status } = req.query
@@ -1175,7 +1274,7 @@ export const adminAddCaseFeeClient = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { _id } = req.query
@@ -1211,7 +1310,7 @@ export const adminUpdateClientCaseFee = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { error } = validateAdminUpdateCasePayment(req.query)
@@ -1248,9 +1347,10 @@ export const adminShareCaseToEmployee = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
+      
       const { error } = validateAdminAddEmployeeToCase(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
@@ -1264,6 +1364,36 @@ export const adminShareCaseToEmployee = async (req, res) => {
    }
 }
 
+
+export const adminSharePartnerToSaleEmp = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      
+      const { error } = validateAdminSharePartner(req.body)
+      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+      const updatePartners = req.body?.sharePartners?.map(casePartners => Partner.findByIdAndUpdate(casePartners, { $push: { shareEmployee: { $each: req?.body?.shareEmployee } } }, { new: true }))
+      console.log("updatePartners", updatePartners);
+      try {
+         const allUpdatePartner = await Promise.all(updatePartners)
+         return res.status(200).json({ success: true, message: "Successfully share partner" });
+      } catch (error) {
+         return res.status(400).json({ success: false, message: "Failed to share" })
+      }
+
+   } catch (error) {
+      console.log("adminSetCaseFee in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
+
 export const adminAddCaseComment = async (req, res) => {
    try {
       const verify = await authAdmin(req, res)
@@ -1271,7 +1401,7 @@ export const adminAddCaseComment = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       if (!req?.body?.Comment) return res.status(400).json({ success: false, message: "Case Comment required" })
@@ -1302,37 +1432,37 @@ export const adminAddReferenceCaseAndMarge = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
-      const { partnerId, partnerCaseId,empSaleId, empSaleCaseId,clientCaseId } = req?.query
+      const { partnerId, partnerCaseId, empSaleId, empSaleCaseId, clientCaseId } = req?.query
       if (!validMongooseId(clientCaseId)) return res.status(400).json({ success: false, message: "Not a valid clientCaseId" })
 
       if (!partnerId && !empSaleId) return res.status(400).json({ success: false, message: "For add case refernce must provide partnerId or employeeId" })
-      if(partnerId){
+      if (partnerId) {
          if (!partnerId || !partnerCaseId) return res.status(400).json({ success: false, message: "For add partner reference partnerId,partnerCaseId are required" })
          if (!validMongooseId(partnerId)) return res.status(400).json({ success: false, message: "Not a valid partnerId" })
          if (!validMongooseId(partnerCaseId)) return res.status(400).json({ success: false, message: "Not a valid partnerCaseId" })
 
          const getPartner = await Partner.findById(partnerId)
          if (!getPartner) return res.status(404).json({ success: false, message: "Partner Not found" })
-         
+
          const getPartnerCase = await Case.findById(partnerCaseId)
          if (!getPartnerCase) return res.status(404).json({ success: false, message: "Partner case Not found" })
-      
-      
+
+
          const getClientCase = await Case.findById(clientCaseId)
          if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
-         console.log(getPartnerCase?.policyNo?.toLowerCase(),getClientCase?.policyNo?.toLowerCase(),getPartnerCase?.email?.toLowerCase(),getClientCase?.email?.toLowerCase() );
+         console.log(getPartnerCase?.policyNo?.toLowerCase(), getClientCase?.policyNo?.toLowerCase(), getPartnerCase?.email?.toLowerCase(), getClientCase?.email?.toLowerCase());
 
-         if(getPartnerCase?.policyNo?.toLowerCase()!=getClientCase?.policyNo?.toLowerCase() || getPartnerCase?.email?.toLowerCase()!=getClientCase?.email?.toLowerCase() ){
+         if (getPartnerCase?.policyNo?.toLowerCase() != getClientCase?.policyNo?.toLowerCase() || getPartnerCase?.email?.toLowerCase() != getClientCase?.email?.toLowerCase()) {
             return res.status(404).json({ success: false, message: "Partner and client must have same policyNo and emailId" })
          }
 
-         if(getClientCase?.partnerReferenceCaseDetails?._id){
+         if (getClientCase?.partnerReferenceCaseDetails?._id) {
             return res.status(404).json({ success: false, message: "Case already have the partner case reference" })
          }
-      
+
          const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
             {
                $set: {
@@ -1346,25 +1476,25 @@ export const adminAddReferenceCaseAndMarge = async (req, res) => {
                   },
                }
             }, { new: true })
-         await Case.findByIdAndUpdate(getPartnerCase?._id,{$set:{ isPartnerReferenceCase:true,}})
+         await Case.findByIdAndUpdate(getPartnerCase?._id, { $set: { isPartnerReferenceCase: true, } })
          return res.status(200).json({ success: true, message: "Successfully add case reference ", data: updateAndMergeCase });
       }
-      if(empSaleId){
+      if (empSaleId) {
          if (!empSaleId || !empSaleCaseId) return res.status(400).json({ success: false, message: "For add sale reference empSaleId,empSaleCaseId are required" })
          if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid empSaleId" })
          if (!validMongooseId(empSaleCaseId)) return res.status(400).json({ success: false, message: "Not a valid empSaleCaseId" })
 
          const getEmployee = await Employee.findById(empSaleId)
          if (!getEmployee) return res.status(404).json({ success: false, message: "Employee Not found" })
-         
+
          const getEmployeeCase = await Case.findById(empSaleCaseId)
          if (!getEmployeeCase) return res.status(404).json({ success: false, message: "Employee case Not found" })
-      
-      
+
+
          const getClientCase = await Case.findById(clientCaseId)
          if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
-      
-         if(getEmployeeCase?.policyNo?.toLowerCase()!=getClientCase?.policyNo?.toLowerCase() || getEmployeeCase?.email?.toLowerCase()!=getClientCase?.email?.toLowerCase() ){
+
+         if (getEmployeeCase?.policyNo?.toLowerCase() != getClientCase?.policyNo?.toLowerCase() || getEmployeeCase?.email?.toLowerCase() != getClientCase?.email?.toLowerCase()) {
             return res.status(404).json({ success: false, message: "sale-employee and client must have same policyNo and emailId" })
          }
 
@@ -1372,7 +1502,7 @@ export const adminAddReferenceCaseAndMarge = async (req, res) => {
             {
                $set: {
                   empSaleId: getEmployee?._id?.toString(),
-                  empSaleName:getEmployee?.fullName,
+                  empSaleName: getEmployee?.fullName,
                   empSaleReferenceCaseDetails: {
                      referenceId: getEmployeeCase?._id?.toString(),
                      name: getEmployee?.fullName,
@@ -1381,11 +1511,11 @@ export const adminAddReferenceCaseAndMarge = async (req, res) => {
                   },
                }
             }, { new: true })
-         await Case.findByIdAndUpdate(getEmployeeCase?._id,{$set:{ isEmpSaleReferenceCase:true,}})
+         await Case.findByIdAndUpdate(getEmployeeCase?._id, { $set: { isEmpSaleReferenceCase: true, } })
          return res.status(200).json({ success: true, message: "Successfully add case reference ", data: updateAndMergeCase });
       }
 
-      return res.status(400).json({ success: true, message: "Failded to add case reference"});
+      return res.status(400).json({ success: true, message: "Failded to add case reference" });
    } catch (error) {
       console.log("adminAddRefenceCaseAndMarge in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -1400,22 +1530,22 @@ export const adminRemoveReferenceCase = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
-      const { type,_id} = req?.query
+      const { type, _id } = req?.query
 
-      if(!type)  return res.status(400).json({ success: false, message: "Please select the type of reference to remove" })
+      if (!type) return res.status(400).json({ success: false, message: "Please select the type of reference to remove" })
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid CaseId" })
 
-      if(type?.toLowerCase()=="partner"){
+      if (type?.toLowerCase() == "partner") {
          const getClientCase = await Case.findById(_id)
          if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
-          if (!validMongooseId(getClientCase?.partnerReferenceCaseDetails?.referenceId)) return res.status(400).json({ success: false, message: "Not a valid partner CaseId" })
-         
-          console.log(getClientCase?.partnerReferenceCaseDetails?.referenceId);
-        const updatedPartnerCase = await Case.findByIdAndUpdate(getClientCase?.partnerReferenceCaseDetails?.referenceId,{$set:{ isPartnerReferenceCase:false,}},{ new: true })
-         if(!updatedPartnerCase) return res.status(404).json({ success: false, message: "Partner case is not found of the added reference case" })
+         if (!validMongooseId(getClientCase?.partnerReferenceCaseDetails?.referenceId)) return res.status(400).json({ success: false, message: "Not a valid partner CaseId" })
+
+         console.log(getClientCase?.partnerReferenceCaseDetails?.referenceId);
+         const updatedPartnerCase = await Case.findByIdAndUpdate(getClientCase?.partnerReferenceCaseDetails?.referenceId, { $set: { isPartnerReferenceCase: false, } }, { new: true })
+         if (!updatedPartnerCase) return res.status(404).json({ success: false, message: "Partner case is not found of the added reference case" })
 
          const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
             {
@@ -1425,16 +1555,16 @@ export const adminRemoveReferenceCase = async (req, res) => {
                   partnerReferenceCaseDetails: {},
                }
             }, { new: true })
-      
-      return res.status(200).json({ success: true, message: "Successfully remove partner reference case" })
+
+         return res.status(200).json({ success: true, message: "Successfully remove partner reference case" })
       }
-      if(type?.toLowerCase()=="sale-emp"){
+      if (type?.toLowerCase() == "sale-emp") {
          const getClientCase = await Case.findById(_id)
          if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
-          if (!validMongooseId(getClientCase?.empSaleReferenceCaseDetails?.referenceId)) return res.status(400).json({ success: false, message: "Not a valid employee CaseId" })
-         
-        const updatedPartnerCase = await Case.findByIdAndUpdate(getClientCase?.empSaleReferenceCaseDetails?.referenceId,{$set:{ isEmpSaleReferenceCase:false,}},{ new: true })
-         if(!updatedPartnerCase) return res.status(404).json({ success: false, message: "Employee  case is not found of the added reference case" })
+         if (!validMongooseId(getClientCase?.empSaleReferenceCaseDetails?.referenceId)) return res.status(400).json({ success: false, message: "Not a valid employee CaseId" })
+
+         const updatedPartnerCase = await Case.findByIdAndUpdate(getClientCase?.empSaleReferenceCaseDetails?.referenceId, { $set: { isEmpSaleReferenceCase: false, } }, { new: true })
+         if (!updatedPartnerCase) return res.status(404).json({ success: false, message: "Employee  case is not found of the added reference case" })
 
          const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
             {
@@ -1445,7 +1575,7 @@ export const adminRemoveReferenceCase = async (req, res) => {
                }
             }, { new: true })
 
-          return res.status(200).json({ success: true, message: "Successfully remove employee reference case" })
+         return res.status(200).json({ success: true, message: "Successfully remove employee reference case" })
       }
 
       return res.status(400).json({ success: false, message: "Not a valid type" })
@@ -1462,7 +1592,7 @@ export const adminSetIsActiveCase = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { _id, status } = req.query
@@ -1491,7 +1621,7 @@ export const adminDeleteCaseById = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { caseId } = req?.query
@@ -1515,38 +1645,38 @@ export const adminDeleteCaseDocById = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
-      const { caseId,docId } = req?.query
+      const { caseId, docId } = req?.query
       if (!caseId || !docId) return res.status(400).json({ success: false, message: "caseId and docId are required" })
       if (!validMongooseId(caseId) || !validMongooseId(docId)) return res.status(400).json({ success: false, message: "Not a valid caseId or docId" })
 
       const getCase = await Case.findById(caseId);
       if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
 
-      const filterDocs = getCase?.caseDocs?.filter(doc=>doc?._id==docId)?.[0]
-      if(filterDocs && filterDocs?.docURL){
+      const filterDocs = getCase?.caseDocs?.filter(doc => doc?._id == docId)?.[0]
+      if (filterDocs && filterDocs?.docURL) {
          const setAdminHeaders = {
             "x-auth-token": req?.headers["x-auth-token"]
-        };
-        
-        const requestBody = {
+         };
+
+         const requestBody = {
             files: [filterDocs?.docURL]
-        };
-        
-        const docRes = await axios.delete(
-            `${process.env.STORAGE_URL}/api/storage/deleteSelectedFiles`, 
+         };
+
+         const docRes = await axios.delete(
+            `${process.env.STORAGE_URL}/api/storage/deleteSelectedFiles`,
             {
-                headers: setAdminHeaders,
-                data: requestBody
+               headers: setAdminHeaders,
+               data: requestBody
             }
-        );
-        console.log("docRes",docRes?.data);
+         );
+         console.log("docRes", docRes?.data);
       }
 
 
-      const updateCase = await Case.findByIdAndUpdate(caseId,{$pull:{caseDocs:{_id:docId}}}, { new: true })
+      const updateCase = await Case.findByIdAndUpdate(caseId, { $pull: { caseDocs: { _id: docId } } }, { new: true })
 
       return res.status(200).json({ success: true, message: "Successfully case deleted" });
    } catch (error) {
@@ -1562,7 +1692,7 @@ export const adminDeletePartnerById = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { partnerId } = req?.query
@@ -1586,7 +1716,7 @@ export const adminDeleteClientById = async (req, res) => {
 
       const admin = await Admin.findById(req?.user?._id)
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const { clientId } = req?.query
@@ -1609,7 +1739,7 @@ export const adminForgetPassword = async (req, res) => {
       const admin = await Admin.find({ email: req.body.email, })
       if (admin.length == 0) return res.status(404).json({ success: false, message: "Account not exist" })
       if (!admin[0]?.isActive) return res.status(404).json({ success: false, message: "Account not active" })
-      
+
 
 
       const jwtToken = await Jwt.sign({ _id: admin[0]?._id, email: admin[0]?.email }, process.env.ADMIN_SECRET_KEY, { expiresIn: '5m' })
@@ -1648,10 +1778,10 @@ export const getAllAdmin = async (req, res) => {
          ]
       }
 
-      const noofAdmin = await Admin.find(query).count()-1
+      const noofAdmin = await Admin.find(query).count() - 1
 
       const allAdmins = await Admin.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
-      const filterSuperAdmin = allAdmins.filter(admin=>admin?.email.toLowerCase()!==process?.env?.ADMIN_MAIL_ID?.toLowerCase())
+      const filterSuperAdmin = allAdmins.filter(admin => admin?.email.toLowerCase() !== process?.env?.ADMIN_MAIL_ID?.toLowerCase())
       res.status(200).json({ success: true, message: "Successfully get all admin", data: filterSuperAdmin, noofAdmin: noofAdmin })
 
    } catch (error) {
@@ -1693,7 +1823,7 @@ export const superAdminDeleteAdminById = async (req, res) => {
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
       if (admin?.email !== process.env.ADMIN_MAIL_ID) return res.status(404).json({ success: false, message: "Access Denied!" })
 
-      const { _id} = req.query
+      const { _id } = req.query
       if (!_id) return res.status(400).json({ success: false, message: "required admin id" })
 
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
@@ -1740,13 +1870,219 @@ export const adminResetForgetPassword = async (req, res) => {
 
 export const adminUpdateModalSchema = async (req, res) => {
    try {
-     const updateSchema = await Case.updateMany({ $or: [{ isEmpSaleReferenceCase: { $exists: false } }, { isPartnerReferenceCase: { $exists: false } }] },
-      { $set: { isEmpSaleReferenceCase: false, isPartnerReferenceCase: false } },)
+      const updateSchema = await Case.updateMany({ $or: [{ isEmpSaleReferenceCase: { $exists: false } }, { isPartnerReferenceCase: { $exists: false } }] },
+         { $set: { isEmpSaleReferenceCase: false, isPartnerReferenceCase: false } },)
 
-      res.status(200).json({ success: true, message: "Schema modal updated",});
+      res.status(200).json({ success: true, message: "Schema modal updated", });
    } catch (error) {
       console.log("adminUpdateModalSchema in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }
 
+//  for download data in excel
+export const adminDownloadAllCase = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+
+      // query = ?statusType=&search=&limit=&pageNo
+      const searchQuery = req.query.search ? req.query.search : "";
+      const statusType = req.query.status ? req.query.status : "";
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+      const type = req?.query?.type ? req.query.type : true
+
+      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type)
+      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+      const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
+
+      const excelBuffer = await getDownloadCaseExcel(getAllCase)
+      res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.status(200)
+      res.send(excelBuffer)
+
+   } catch (error) {
+      console.log("adminDeleteClientById in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
+export const adminDownloadAllPartner = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      // query = ?statusType=&search=&limit=&pageNo
+      const searchQuery = req.query.search ? req.query.search : "";
+      const type = req?.query?.type ? req.query.type : true;
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+
+      const query = getAllPartnerSearchQuery(searchQuery, type, false, startDate, endDate)
+      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+      const getAllPartner = await Partner.find(query.query).select("-password").sort({ createdAt: -1 });
+
+      // Generate Excel buffer
+      const excelBuffer = await getAllPartnerDownloadExcel(getAllPartner);
+
+      res.setHeader('Content-Disposition', 'attachment; filename="partners.xlsx"')
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.status(200)
+      res.send(excelBuffer)
+
+   } catch (error) {
+      console.log("adminDownloadAllPartner in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+export const adminDownloadPartnerReport = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      if (!validMongooseId(req.query.partnerId)) return res.status(400).json({ success: false, message: "Not a valid partnerId" })
+      const partner = await Partner.findById(req.query.partnerId).select("-password")
+      if (!partner) return res.status(404).json({ success: false, message: "Parnter not found" })
+      const searchQuery = req.query.search ? req.query.search : "";
+      const statusType = req.query.status ? req.query.status : "";
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+      const type = req?.query?.type ? req.query.type : true
+
+      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, req.query.partnerId, false, false, type)
+      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+
+      const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
+
+      const excelBuffer = await getDownloadCaseExcel(getAllCase)
+      res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.status(200)
+      res.send(excelBuffer)
+
+   } catch (error) {
+      console.log("updateAdminCase in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+export const adminEmpSaleReportDownload = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      const { empSaleId } = req.query
+      if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid salesId" })
+      const empSale = await Employee.findById(empSaleId).select("-password")
+      if (!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
+      if (empSale.type?.toLowerCase() != "sales") return res.status(404).json({ success: false, message: "Employee designation is not sale" })
+      const searchQuery = req.query.search ? req.query.search : "";
+      const statusType = req.query.status ? req.query.status : "";
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+      const type = req?.query?.type ? req.query.type : true
+
+      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type, empSaleId)
+      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+
+      const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
+      const excelBuffer = await getDownloadCaseExcel(getAllCase)
+      res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.status(200)
+      res.send(excelBuffer)
+   } catch (error) {
+      console.log("adminEmpSaleReportDownload in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+export const adminEmpSalePartnerReportDownload = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const { empSaleId } = req.query
+      if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid salesId" })
+      const empSale = await Employee.findById(empSaleId).select("-password")
+      if (!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
+      if (empSale.type?.toLowerCase() != "sales") return res.status(404).json({ success: false, message: "Employee designation is not sale" })
+
+      const searchQuery = req.query.search ? req.query.search : "";
+      const type = req?.query?.type ? req.query.type : true;
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+
+      const query = getAllPartnerSearchQuery(searchQuery, type, empSaleId, startDate, endDate)
+      if (!query.success) return res.status(400).json({ success: false, message: query?.message })
+      const getAllPartner = await Partner.find(query?.query).select("-password").sort({ createdAt: -1 });
+      // Generate Excel buffer
+      const excelBuffer = await getAllPartnerDownloadExcel(getAllPartner,true);
+
+      res.setHeader('Content-Disposition', 'attachment; filename="partners.xlsx"')
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.status(200)
+      res.send(excelBuffer)
+
+   } catch (error) {
+      console.log("viewAllPartnerByAdmin in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+export const adminAllClientDownload = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const searchQuery = req.query.search ? req.query.search : "";
+      const type = req.query.type ? req.query.type : true
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+
+      const query = getAllClientSearchQuery(searchQuery, type,startDate,endDate)
+      if(!query?.success) return res.status(400).json({success:false,message:query.message})
+      const getAllClient = await Client.find(query.query).select("-password").sort({ createdAt: -1 });
+      // Generate Excel buffer
+      const excelBuffer = await getAllClientDownloadExcel(getAllClient);
+
+      res.setHeader('Content-Disposition', 'attachment; filename="clients.xlsx"')
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.status(200)
+      res.send(excelBuffer)
+   } catch (error) {
+      console.log("adminAllClientDownload in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}

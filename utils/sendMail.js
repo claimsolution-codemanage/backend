@@ -110,19 +110,24 @@ export const sendAddPartnerRequest = (email,link) => {
 };
 
 
-export const sendAccountTerm_ConditonsMail = (email,as,fileURL) => {
-	console.log("mail option",email,as,fileURL);
+export const sendAccountTerm_ConditonsMail = (email,as,pdfBytes) => {
+	console.log("mail option",email,as);
 	const mailOptions = {
 		from: process.env.GMAIL_USER,
 		to: email,
 		cc:process.env.CC_MAIL_ID,
-		subject: "Service agreement",
+		subject: "Service Agreement",
 		html: sendCompanyTLS(as),
+		// attachments: [{
+		// 	filename: 'service_agreement.pdf',
+		// 	path: fileURL,
+		// 	contentType: 'application/pdf'
+		//   }],
 		attachments: [{
-			filename: 'service_agreement.pdf',
-			path: fileURL,
-			contentType: 'application/pdf'
-		  }],
+            filename: 'service_agreement.pdf',
+            content: pdfBytes,
+            encoding: 'base64'
+        }]
 	};
 	return new Promise((resolve, reject) => {
 		transport.sendMail(mailOptions, (error, info) => {

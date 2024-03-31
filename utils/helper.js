@@ -1,7 +1,9 @@
 import mongoose from "mongoose";
 import validateDate from "validate-date";
 import Joi from "joi";
-
+import ExcelJS from 'exceljs';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import fsAsync from 'fs/promises'
 export const validMongooseId = (id)=>{
        return mongoose.Types.ObjectId.isValid(id)
 }
@@ -74,11 +76,17 @@ export const getAllCaseQuery =(statusType,searchQuery,startDate,endDate,partnerI
 }
 
 
-export const getAllPartnerSearchQuery =(searchQuery,type,empSaleId=false)=>{
-  console.log("salesId",empSaleId);
+export const getAllPartnerSearchQuery =(searchQuery,type,empSaleId=false,startDate="",endDate="")=>{
+  console.log("salesId",empSaleId,startDate,endDate);
+  if (startDate && endDate) {
+    const validStartDate = getValidateDate(startDate)
+    if(!validStartDate) return {success:false,message:"start date not formated"}
+    const validEndDate = getValidateDate(endDate)
+    if(!validEndDate) return {success:false,message:"end date not formated"}
+  }
 let query = {
     $and:[
-      empSaleId ?  {salesId:empSaleId} : {},
+      empSaleId ?  {shareEmployee:{$in:empSaleId}} : {},
       {isActive:type},
       {
       $or: [
@@ -90,13 +98,26 @@ let query = {
               { "profile.aadhaarNo": { $regex: searchQuery, $options: "i" }},
               { "profile.panNo": { $regex: searchQuery, $options: "i" }},
           ]
-    }]
+    },
+    startDate && endDate ? {
+      createdAt: { $gte: new Date(startDate).setHours(0, 0, 0, 0), 
+        $lte: new Date(endDate).setHours(23, 59, 59, 999) }
+  } : {}
+  ]
 };
-return query
+return {success:true,query:query}
 }
 
-export const getAllClientSearchQuery =(searchQuery,type)=>{
-  console.log("query",searchQuery,type);
+export const getAllClientSearchQuery =(searchQuery,type,startDate="",endDate="")=>{
+  console.log("query",searchQuery,type,startDate,endDate);
+
+  if (startDate && endDate) {
+    const validStartDate = getValidateDate(startDate)
+    if(!validStartDate) return {success:false,message:"start date not formated"}
+    const validEndDate = getValidateDate(endDate)
+    if(!validEndDate) return {success:false,message:"end date not formated"}
+  }
+
   let query = {
     $and:[
       {isActive:type},
@@ -111,9 +132,13 @@ export const getAllClientSearchQuery =(searchQuery,type)=>{
                 { "profile.panNo": { $regex: searchQuery, $options: "i" }},
               ]
         },
+        startDate && endDate ? {
+          createdAt: { $gte: new Date(startDate).setHours(0, 0, 0, 0), 
+            $lte: new Date(endDate).setHours(23, 59, 59, 999) }
+      } : {}
     ]
   };
-  return query
+return {success:true,query:query}
   }
 
   export const getAllEmployeeSearchQuery =(searchQuery)=>{
@@ -198,4 +223,192 @@ export const getAllInvoiceQuery =(searchQuery,startDate,endDate,clientId=false)=
 
   console.log("my-query",query);
   return {success:true,query:query}
+}
+
+
+export const getDownloadCaseExcel =async(getAllCase=[])=>{
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Cases');
+  // Define Excel columns
+  worksheet.columns = [
+     { header: 'Case From', key: 'caseFrom', width: 20 },
+     { header: 'File No', key: 'fileNo', width: 30 },
+     { header: 'Current Status', key: 'currentStatus', width: 30 },
+     { header: 'Name', key: 'name', width: 30 },
+     { header: 'Father Name', key: 'fatherName', width: 30 },
+     { header: 'Mobile No', key: 'mobileNo', width: 30 },
+     { header: 'Policy Type', key: 'policyType', width: 30 },
+     { header: 'Insurance Company Name', key: 'insuranceCompanyName', width: 30 },
+     { header: 'Complaint Type', key: 'complaintType', width: 30 },
+     { header: 'Policy No', key: 'policyNo', width: 30 },
+     { header: 'Address', key: 'address', width: 30 },
+     { header: 'DOB', key: 'DOB', width: 30 },
+     { header: 'Pin Code', key: 'pinCode', width: 30 },
+     { header: 'claim Amount', key: 'claimAmount', width: 30 },
+     { header: 'City', key: 'city', width: 30 },
+     { header: 'State', key: 'state', width: 30 },
+     { header: 'Problem Statement', key: 'problemStatement', width: 30 },
+  ];
+
+  // Populate Excel rows with data
+  getAllCase.forEach((caseData, index) => {
+     worksheet.addRow({
+        caseFrom: caseData?.caseFrom,
+        fileNo: caseData?.fileNo,
+        currentStatus: caseData?.currentStatus,
+        name: caseData.name,
+        fatherName: caseData?.fatherName,
+        email: caseData?.email,
+        mobileNo: caseData?.mobileNo,
+        policyType: caseData?.policyType,
+        insuranceCompanyName: caseData?.insuranceCompanyName,
+        complaintType: caseData?.complaintType,
+        policyNo: caseData?.policyNo,
+        address: caseData?.address,
+        DOB: caseData?.DOB,
+        pinCode: caseData?.pinCode,
+        claimAmount: caseData?.claimAmount,
+        city: caseData?.city,
+        state: caseData?.state,
+        problemStatement: caseData?.problemStatement,
+     });
+  });
+
+
+  // Generate Excel buffer
+  return await workbook.xlsx.writeBuffer();
+}
+
+export const getAllPartnerDownloadExcel =async(getAllPartner=[],type=false)=>{
+  const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Cases');
+      // Define Excel columns
+      worksheet.columns = [
+        { header: 'Type', key: 'type', width: 20 },
+         { header: 'Consultant Name', key: 'consultantName', width: 20 },
+         { header: 'Consultant Code', key: 'consultantCode', width: 30 },
+         { header: 'Associate With Us', key: 'associateWithUs', width: 30 },
+         { header: 'Work Association', key: 'workAssociation', width: 30 },
+         { header: 'Alternate Email', key: 'alternateEmail', width: 30 },
+         { header: 'Whatsapp No', key: 'whatsappNo', width: 30 },
+         { header: 'Alternate MobileNo', key: 'alternateMobileNo', width: 30 },
+         { header: 'PanNo', key: 'panNo', width: 30 },
+         { header: 'AadhaarNo', key: 'aadhaarNo', width: 30 },
+         { header: 'DOB', key: 'dob', width: 30 },
+         { header: 'Area Of Operation', key: 'areaOfOperation', width: 30 },
+         { header: 'State', key: 'state', width: 30 },
+         { header: 'District', key: 'district', width: 30 },
+         { header: 'City', key: 'city', width: 30 },
+         { header: 'PinCode', key: 'pinCode', width: 30 },
+         { header: 'About', key: 'about', width: 30 },
+         { header: 'Bank Name', key: 'bankName', width: 30 },
+         { header: 'Bank AccountNo', key: 'bankAccountNo', width: 30 },
+         { header: 'Bank Branch Name', key: 'bankBranchName', width: 30 },
+         { header: 'GSTNo', key: 'gstNo', width: 30 },
+         { header: 'PANNo', key: 'panNo', width: 30 },
+         { header: 'IFSC Code', key: 'ifscCode', width: 30 },
+         { header: 'UPI Id', key: 'upiId', width: 30 },
+      ];
+
+      // Populate Excel rows with data
+      getAllPartner.forEach((partnerData, index) => {
+         worksheet.addRow({
+          type:type ? (partnerData?.shareEmployee?.includes(partnerData?.salesId) ? "Added" :"Shared") :partnerData?.salesId ? "Sales" :"Self",
+            consultantName: partnerData?.profile?.consultantName,
+            consultantCode: partnerData?.profile?.consultantCode,
+            associateWithUs: partnerData?.profile?.associateWithUs,
+            workAssociation: partnerData?.profile?.workAssociation,
+            alternateEmail: partnerData?.profile?.alternateEmail,
+            whatsappNo: partnerData?.profile?.whatsupNo,
+            alternateMobileNo: partnerData?.profile?.alternateMobileNo,
+            panNo: partnerData?.profile?.panNo,
+            aadhaarNo: partnerData?.profile?.aadhaarNo,
+            dob: partnerData?.profile?.dob,
+            gender: partnerData?.profile?.gender,
+            areaOfOperation: partnerData?.profile?.areaOfOperation,
+            state: partnerData?.profile?.state,
+            district: partnerData?.profile?.district,
+            city: partnerData?.profile?.city,
+            pinCode: partnerData?.profile?.pinCode,
+            about: partnerData?.profile?.about,
+            bankName: partnerData?.bankingDetails?.bankName,
+            bankAccountNo: partnerData?.bankingDetails?.bankAccountNo,
+            bankBranchName: partnerData?.bankingDetails?.bankBranchName,
+            gstNo: partnerData?.bankingDetails?.gstNo,
+            panNo: partnerData?.bankingDetails?.panNo,
+            ifscCode: partnerData?.bankingDetails?.ifscCode,
+            upiId: partnerData?.bankingDetails?.upiId,
+         });
+      });
+
+
+      // Generate Excel buffer
+      return await workbook.xlsx.writeBuffer();
+}
+
+export const getAllClientDownloadExcel =async(getAllClient=[])=>{
+  const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Cases');
+      // Define Excel columns
+      worksheet.columns = [
+         { header: 'Name', key: 'consultantName', width: 20 },
+         { header: 'Customer Code', key: 'consultantCode', width: 30 },
+         { header: 'Associate With Us', key: 'associateWithUs', width: 30 },
+         { header: 'Father Name', key: 'fatherName', width: 30 },
+         { header: 'Mobile No', key: 'primaryMobileNo', width: 30 },
+         { header: 'Email', key: 'primaryEmail', width: 30 },
+         { header: 'Whatsapp No', key: 'whatsappNo', width: 30 },
+         { header: 'DOB', key: 'dob', width: 30 },
+         { header: 'Address', key: 'address', width: 30 },
+         { header: 'City', key: 'city', width: 30 },
+         { header: 'State', key: 'state', width: 30 },
+         { header: 'PinCode', key: 'pinCode', width: 30 },
+         { header: 'About', key: 'about', width: 30 },
+      ];
+
+      // Populate Excel rows with data
+
+      let rowData = 
+      getAllClient.forEach((partnerData, index) => {
+         worksheet.addRow({
+            consultantName: partnerData?.profile?.consultantName,
+            consultantCode: partnerData?.profile?.consultantCode,
+            associateWithUs: partnerData?.profile?.associateWithUs,
+            fatherName: partnerData?.profile?.fatherName,
+            primaryMobileNo: partnerData?.profile?.primaryMobileNo,
+            primaryEmail: partnerData?.profile?.primaryEmail,
+            whatsappNo: partnerData?.profile?.whatsupNo,
+            dob: partnerData?.profile?.dob,
+            address: partnerData?.profile?.address,
+            city: partnerData?.profile?.city,
+            state: partnerData?.profile?.state,
+            pinCode: partnerData?.profile?.pinCode,
+            about: partnerData?.profile?.about,
+         });
+      });
+
+      // Generate Excel buffer
+      return await workbook.xlsx.writeBuffer();
+}
+
+const dateOptions = {
+  weekday: 'short',
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: 'numeric',
+  second: 'numeric',
+  timeZoneName: 'short'
+};
+
+
+export const editServiceAgreement =async(path,date)=>{
+  const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
+  const existingPdfBytes = await fsAsync.readFile(path);
+  const pdfBytes = await PDFDocument.load(existingPdfBytes);
+  const page = pdfBytes.getPages()[pdfBytes.getPages()?.length ? pdfBytes.getPages()?.length-1 : 0]; // Assuming you're working with the first page
+  page.drawText(today, { x: 50, y: 50 });
+  const modifiedPdfBytes = await pdfBytes.save();
+  return modifiedPdfBytes;
 }

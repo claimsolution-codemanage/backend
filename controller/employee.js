@@ -374,8 +374,9 @@ export const employeeViewAllPartner = async(req,res)=>{
       const empSaleId =  req?.user?.empType?.toLowerCase()=="sales" ? req?.user?._id :false
 
    const query = getAllPartnerSearchQuery(searchQuery,true,empSaleId)
-   const getAllPartner = await Partner.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: 1 });
-   const noOfPartner = await Partner.find(query).count()
+   if(!query.success) return res.status(400).json({success:false,message:query.message})
+   const getAllPartner = await Partner.find(query.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: 1 });
+   const noOfPartner = await Partner.find(query.query).count()
     return res.status(200).json({success:true,message:"get partner data",data:getAllPartner,noOfPartner:noOfPartner});
      
    } catch (error) {
@@ -423,10 +424,13 @@ export const employeeViewAllClient = async(req,res)=>{
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo-1)*pageItemLimit :0;
       const searchQuery = req.query.search ? req.query.search : "";
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
 
-   const query = getAllClientSearchQuery(searchQuery,true)
-   const getAllClient = await Client.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: 1 });
-   const noOfClient = await Client.find(query).count()
+   const query = getAllClientSearchQuery(searchQuery,true,startDate,endDate)
+   if(!query?.success) return res.status(400).json({success:false,message:query.message})
+   const getAllClient = await Client.find(query.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: 1 });
+   const noOfClient = await Client.find(query.query).count()
     return res.status(200).json({success:true,message:"get client data",data:getAllClient,noOfClient:noOfClient});
      
    } catch (error) {

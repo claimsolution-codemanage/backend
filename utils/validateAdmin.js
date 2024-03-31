@@ -93,6 +93,16 @@ export const validateAdminAddEmployeeToCase =(body)=>{
    return bodySchema.validate(body)
 }
 
+export const validateAdminSharePartner =(body)=>{
+  const bodySchema = Joi.object({
+    shareEmployee: Joi.array().items(Joi.any()).min(1).required(),
+    sharePartners: Joi.array().items(Joi.any()).min(1).required(),
+   })
+ 
+   return bodySchema.validate(body)
+}
+
+
 export const validateAdminAddJob =(body)=>{
   const bodySchema = Joi.object({
     title:Joi.string().required(),

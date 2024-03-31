@@ -10,7 +10,9 @@ adminEditCaseStatus,adminSetClientTag,adminSetPartnerTag,adminForgetPassword,adm
 getAllAdmin,superAdminSetIsActiveAdmin,superAdminDeleteAdminById,adminViewPartnerReport,
 adminRemoveReferenceCase,adminEditClient,adminUpdateParnterProfile,adminUpdatePartnerBankingDetails,
 adminDeleteCaseDocById,adminViewEmpSaleReport,adminViewEmpSalePartnerReport,
-adminUpdateModalSchema
+adminDownloadAllCase,adminDownloadAllPartner,adminDownloadPartnerReport,
+adminEmpSaleReportDownload,adminEmpSalePartnerReportDownload,adminAllClientDownload,
+adminGetSaleEmployee,adminSharePartnerToSaleEmp,adminGetNormalEmployee
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -38,6 +40,8 @@ router.put("/updateEmployeeAccount", adminUpdateEmployeeAccount)
 router.delete("/deleteEmployeeAccount", adminDeleteEmployeeAccount)
 router.put("/setIsActiveEmployee",adminSetIsActiveEmployee)
 router.get("/adminViewAllEmployee",adminViewAllEmployee)
+router.get("/sale-employee",adminGetSaleEmployee)
+router.get("/normal-employee",adminGetNormalEmployee)
 
 // for partner
 router.get("/viewAllPartner",viewAllPartnerByAdmin)
@@ -75,6 +79,11 @@ router.delete("/deleteCaseDocId",adminDeleteCaseDocById)
 router.put("/addEmployeeToCase",adminShareCaseToEmployee)
 router.put("/addCaseCommit",adminAddCaseComment)
 
+
+// share partner
+router.put("/addSharePartner",adminSharePartnerToSaleEmp)
+
+
 //  for tnc
 router.put("/uploadCompanyClientTls",uploadCompanyClientTls)
 router.put("/uploadCompanyPartnerTls",uploadCompanyPartnerTls)
@@ -92,6 +101,17 @@ router.delete("/adminRemoveComplaintById",adminRemoveComplaintById)
 router.get("/adminViewPartnerReport",adminViewPartnerReport)
 router.get("/adminViewEmpSaleReport",adminViewEmpSaleReport)
 router.get("/adminViewEmpSalePartnerReport",adminViewEmpSalePartnerReport)
+
+// for download
+router.get("/download/allcase",adminDownloadAllCase)
+router.get("/download/allpartner",adminDownloadAllPartner)
+router.get("/download/allClient",adminAllClientDownload)
+router.get("/download/partnerReport",adminDownloadPartnerReport)
+router.get("/download/empSaleReport",adminEmpSaleReportDownload)
+router.get("/download/empSalePartnerReport",adminEmpSalePartnerReportDownload)
+
+
+
 
 
 // router.put("/updateModalSchema",adminUpdateModalSchema)

@@ -9,11 +9,12 @@ import { getAllCaseQuery } from "../utils/helper.js";
 import { validMongooseId } from "../utils/helper.js";
 import jwt from 'jsonwebtoken'
 import { sendForgetPasswordMail, sendAccountTerm_ConditonsMail } from "../utils/sendMail.js";
-import { validateResetPassword, validateAddCaseFile,getAllInvoiceQuery } from "../utils/helper.js";
+import { validateResetPassword, validateAddCaseFile,getAllInvoiceQuery,editServiceAgreement } from "../utils/helper.js";
 import jwtDecode from 'jwt-decode'
 import Admin from "../models/admin.js";
 import Bill from "../models/bill.js"
 import Tranaction from "../models/transaction.js";
+import { encrypt } from "./payment.js";
 
 export const clientAuthenticate = async (req, res) => {
   try {
@@ -168,7 +169,10 @@ export const verifyClientEmailOtp = async (req, res) => {
       //   .header("Access-Control-Expose-Headers", "x-auth-token").json({success: true, message: "Account Verified with email"})
       try {
         // const admin = await Admin.find({}).select("-password")
-        await sendAccountTerm_ConditonsMail(client?.email, "client", `${process?.env?.FRONTEND_URL}/agreement/client.pdf`);
+        const today = new Date()
+        const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", today)
+        await sendAccountTerm_ConditonsMail(client?.email, "client", modifiedPdfBytes);
+        // await sendAccountTerm_ConditonsMail(client?.email, "client", `${process?.env?.FRONTEND_URL}/agreement/client.pdf`);
         const noOfClients = await Client.count()
         const updateClient = await Client.findByIdAndUpdate(req?.user?._id, {
           $set: {
@@ -181,7 +185,7 @@ export const verifyClientEmailOtp = async (req, res) => {
             "profile.profilePhoto": "",
             "profile.consultantName": client.fullName,
             "profile.consultantCode": `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfClients}`,
-            "profile.associateWithUs": new Date(),
+            "profile.associateWithUs": today,
             "profile.fatherName": "",
             "profile.primaryEmail": client.email,
             "profile.alternateEmail": "",
@@ -802,8 +806,22 @@ export const clientPayInvoiceById = async(req,res)=>{
       const getCase = await Case.findById(caseId)
       if(!getCase) return res.status(404).json({success: false, message:"Case not found"})
       const newTransaction = new Tranaction({clientId:req?.user?._id,invoiceId:invoiceId,caseId:caseId})
-     await newTransaction.save()
-      return res.status(200).json({success:true,message:"transaction create",tranactionId:newTransaction?._id});
+    
+    const paymentStr = "payerName="+client?.profile?.consultantName.trim()+
+    "&payerEmail="+client?.profile?.primaryEmail.trim()+"&payerMobile="+
+    client?.profile?.primaryMobileNo.trim()+
+    "&clientTxnId="+newTransaction?._id+"&amount="+getInvoice?.totalAmt+"&clientCode="+
+    process?.env?.CLIENTCODE.trim()+"&transUserName="+process?.env?.TRANSUSERNAME.trim()+"&transUserPassword="+
+    process?.env?.TRANSUSERPASSWORD.trim()+"&callbackUrl="+process?.env?.CALLBACKURL.trim()+"&amountType="+
+    "INR"+"&mcc="+process?.env?.MCC.trim()+"&channelId="+"W".trim()+"&transDate="+new Date().getTime()
+
+    console.log("paymentStr",paymentStr);
+
+    const encData = encrypt(paymentStr?.trim())
+    await newTransaction.save()
+ 
+    
+    return res.status(200).json({success:true,message:"transaction create",tranactionId:newTransaction?._id,encData:encData,clientCode:process?.env?.CLIENTCODE.trim()});
 
 
     

@@ -7,14 +7,14 @@ const algo = 'aes-128-cbc';
 const key = Buffer.from(process.env.AUTHKEY, 'utf-8');
 const iv = Buffer.from(process.env.AUTHIV, 'utf-8');
 
-function encrypt(data) {
+export const encrypt=(data)=> {
    const cipher = crypto.createCipheriv(algo,key,iv);
    let encrypted = cipher.update(data, 'utf-8', 'base64');
    encrypted += cipher.final('base64');
    return encrypted
 }
 
-function decrypt(encryptedData){
+export const decrypt =(encryptedData)=>{
    let decipher = crypto.createDecipheriv(algo,key,iv);
    let decrypted = decipher.update(encryptedData, 'base64', 'utf-8');
    decrypted += decipher.final('utf-8');
