@@ -102,6 +102,14 @@ export const validateAdminSharePartner =(body)=>{
    return bodySchema.validate(body)
 }
 
+export const validateAdminRemovePartner =(body)=>{
+  const bodySchema = Joi.object({
+    removePartners: Joi.array().items(Joi.any()).min(1).required(),
+   })
+ 
+   return bodySchema.validate(body)
+}
+
 
 export const validateAdminAddJob =(body)=>{
   const bodySchema = Joi.object({

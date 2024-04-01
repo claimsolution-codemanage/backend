@@ -12,7 +12,7 @@ adminRemoveReferenceCase,adminEditClient,adminUpdateParnterProfile,adminUpdatePa
 adminDeleteCaseDocById,adminViewEmpSaleReport,adminViewEmpSalePartnerReport,
 adminDownloadAllCase,adminDownloadAllPartner,adminDownloadPartnerReport,
 adminEmpSaleReportDownload,adminEmpSalePartnerReportDownload,adminAllClientDownload,
-adminGetSaleEmployee,adminSharePartnerToSaleEmp,adminGetNormalEmployee
+adminGetSaleEmployee,adminSharePartnerToSaleEmp,adminGetNormalEmployee,adminRemovePartnerToSaleEmp
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -82,6 +82,7 @@ router.put("/addCaseCommit",adminAddCaseComment)
 
 // share partner
 router.put("/addSharePartner",adminSharePartnerToSaleEmp)
+router.put("/removePartner",adminRemovePartnerToSaleEmp)
 
 
 //  for tnc

@@ -2,7 +2,7 @@ import Admin from "../models/admin.js";
 import {
    validateAdminSignUp, validateAdminSignIn, validateAdminResetPassword, validateUpdateAdminCase,
    validateAdminSettingDetails, validateAdminAddCaseFee, validateAdminUpdateCasePayment, validateAdminAddEmployeeToCase,
-   validateEditAdminCaseStatus,validateAdminSharePartner
+   validateEditAdminCaseStatus,validateAdminSharePartner,validateAdminRemovePartner,
 } from "../utils/validateAdmin.js";
 import bcrypt from 'bcrypt';
 import { generatePassword } from "../utils/helper.js";
@@ -1385,6 +1385,39 @@ export const adminSharePartnerToSaleEmp = async (req, res) => {
          return res.status(200).json({ success: true, message: "Successfully share partner" });
       } catch (error) {
          return res.status(400).json({ success: false, message: "Failed to share" })
+      }
+
+   } catch (error) {
+      console.log("adminSetCaseFee in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
+export const adminRemovePartnerToSaleEmp = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const {_id} = req?.query
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid SaleId" })
+
+      const getEmployee = await Employee.findById(_id)
+      if (!getEmployee) return res.status(404).json({ success: false, message: "Employee Not found" })
+
+      const { error } = validateAdminRemovePartner(req.body)
+      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+      const updatePartners = req.body?.removePartners?.map(removePartner => Partner.findByIdAndUpdate(removePartner, { $pull: { shareEmployee: _id } }, { new: true }))
+      try {
+         const allUpdatePartner = await Promise.all(updatePartners)
+         console.log("updatePartners", allUpdatePartner);
+         return res.status(200).json({ success: true, message: "Successfully remove partner" });
+      } catch (error) {
+         return res.status(400).json({ success: false, message: "Failed to remove" })
       }
 
    } catch (error) {
