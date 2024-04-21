@@ -117,6 +117,15 @@ const clientSchema = new mongoose.Schema({
       about: {
          type: String,
       },
+      kycPhoto: {
+         type: String,
+      },
+      kycAadhaar: {
+         type: String,
+      },
+      kycPan: {
+         type: String,
+      },
    },
 
 },{timestamps:true});

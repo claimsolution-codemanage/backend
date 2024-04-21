@@ -6,7 +6,8 @@ employeeAuthenticate,employeeAddCaseComment,employeeResetForgetPassword,
 employeeCreateInvoice,employeeViewAllInvoice,employeeViewInvoiceById,employeeDownloadInvoiceById,
 employeeEditInvoice,allEmployeeDashboard,employeeUnActiveInvoice,employeeUpdateCaseById,
 employeeEditClient,employeeupdateParnterProfile,employeeUpdatePartnerBankingDetails,
-saleEmployeeAddPartner,saleEmployeeAddCase
+saleEmployeeAddPartner,saleEmployeeAddCase,employeeUploadImage,employeeUploadAttachment,
+employeeRemoveInvoice
 } from '../controller/employee.js';
 
 
@@ -40,12 +41,17 @@ router.post("/finance/createInvoice",employeeCreateInvoice)
 router.get("/finance/viewAllInvoice",employeeViewAllInvoice)
 router.get("/finance/viewInvoiceById",employeeViewInvoiceById)
 router.put("/finance/editInvoiceById",employeeEditInvoice)
-router.put("/finance/removeInvoiceById",employeeUnActiveInvoice)
+router.put("/finance/unActiveInvoiceById",employeeUnActiveInvoice)
 router.get("/finance/downloadInvoiceById",employeeDownloadInvoiceById)
+router.delete("/finance/removeInvoiceById",employeeRemoveInvoice)
 
 // for sales employee
 router.post("/addPartner",saleEmployeeAddPartner)
 router.post("/sale/addCase",saleEmployeeAddCase)
+
+// for upload
+router.post("/upload/image",employeeUploadImage)
+router.post("/upload/attachment",employeeUploadAttachment)
 
 
 

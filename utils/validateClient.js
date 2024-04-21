@@ -43,6 +43,9 @@ export const validateClientProfileBody =(body)=>{
          city: Joi.string().allow('').optional(),
          pinCode:Joi.string().allow('').optional(),
          about: Joi.string().max(250).required().allow('').optional(),
+         kycPhoto: Joi.string().allow('').optional(),
+         kycAadhar:Joi.string().allow('').optional(),
+         kycPan: Joi.string().allow('').optional(),
     })
     return profileSchema.validate(body)
   }

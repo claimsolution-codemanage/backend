@@ -36,7 +36,8 @@ const billSchema = new mongoose.Schema({
     subAmt: {type:Number,require:true},
     gstAmt:{type:Number,require:true},
     totalAmt:{type:Number,require:true},
-    invoiceDate:{type:String,require:true},
+    // invoiceDate:{type:String,require:true},
+    billDate:{type:Number,default:new Date().getTime()}
 },{timestamps:true});
 
 

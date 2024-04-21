@@ -9,12 +9,31 @@ import { getAllCaseQuery } from "../utils/helper.js";
 import { validMongooseId } from "../utils/helper.js";
 import jwt from 'jsonwebtoken'
 import { sendForgetPasswordMail, sendAccountTerm_ConditonsMail } from "../utils/sendMail.js";
-import { validateResetPassword, validateAddCaseFile,getAllInvoiceQuery,editServiceAgreement } from "../utils/helper.js";
+import { validateResetPassword, validateAddCaseFile, getAllInvoiceQuery, editServiceAgreement } from "../utils/helper.js";
 import jwtDecode from 'jwt-decode'
 import Admin from "../models/admin.js";
 import Bill from "../models/bill.js"
 import Tranaction from "../models/transaction.js";
 import { encrypt } from "./payment.js";
+import { firebaseUpload } from "../utils/helper.js";
+
+export const clientUploadImage = async (req, res) => {
+  try {
+    firebaseUpload(req, res, "images");
+  } catch (error) {
+    console.log("clientUploadImage", error);
+    return res.status(500).json({ success: false, message: "Oops something went wrong" });
+  }
+}
+
+export const clientUploadAttachment = async (req, res) => {
+  try {
+    firebaseUpload(req, res, "attachments");
+  } catch (error) {
+    console.log("clientUploadAttachment", error);
+    return res.status(500).json({ success: false, message: "Oops something went wrong" });
+  }
+}
 
 export const clientAuthenticate = async (req, res) => {
   try {
@@ -40,10 +59,10 @@ export const clientSignUp = async (req, res) => {
 
     const otp = otp6Digit();
     const client = await Client.find({ mobileNo: req.body.mobileNo });
-    const clientWithEmail = await Client.find({email:req?.body?.email})
-    const {agreement} = req.body
-    if(!agreement){
-     return res.status(400).json({ success: false, message: "Must agree with our service agreement" })
+    const clientWithEmail = await Client.find({ email: req?.body?.email })
+    const { agreement } = req.body
+    if (!agreement) {
+      return res.status(400).json({ success: false, message: "Must agree with our service agreement" })
     }
 
     if (client[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Mobile No. already register with us" })
@@ -51,14 +70,14 @@ export const clientSignUp = async (req, res) => {
 
     // req.body.emailOTP = {otp:otp,createAt:Date.now()}
     const bcrypePassword = await bcrypt.hash(req.body.password, 10)
-    if (client.length == 0 && clientWithEmail.length==0) {
+    if (client.length == 0 && clientWithEmail.length == 0) {
       const newClient = new Client({
         fullName: req.body.fullName,
         email: req.body.email,
         mobileNo: req.body.mobileNo,
         password: bcrypePassword,
         emailOTP: { otp: otp, createAt: Date.now() },
-        acceptClientTls:agreement
+        acceptClientTls: agreement
       })
       const token = await newClient.getAuth()
       await newClient.save();
@@ -72,7 +91,7 @@ export const clientSignUp = async (req, res) => {
       }
 
     } else {
-      if(client?.length>0){
+      if (client?.length > 0) {
         const updateClient = await Client.findByIdAndUpdate(client[0]?._id, {
           $set: {
             fullName: req.body.fullName,
@@ -80,7 +99,7 @@ export const clientSignUp = async (req, res) => {
             mobileNo: req.body.mobileNo,
             password: bcrypePassword,
             emailOTP: { otp: otp, createAt: Date.now() },
-            acceptClientTls:agreement
+            acceptClientTls: agreement
           }
         })
         const token = await updateClient.getAuth()
@@ -92,7 +111,7 @@ export const clientSignUp = async (req, res) => {
           console.log("send otp error", err);
           return res.status(400).json({ success: false, message: "Failed to send OTP" });
         }
-      }else if(clientWithEmail.length>0){
+      } else if (clientWithEmail.length > 0) {
         const updateClient = await Client.findByIdAndUpdate(clientWithEmail[0]?._id, {
           $set: {
             fullName: req.body.fullName,
@@ -100,7 +119,7 @@ export const clientSignUp = async (req, res) => {
             mobileNo: req.body.mobileNo,
             password: bcrypePassword,
             emailOTP: { otp: otp, createAt: Date.now() },
-            acceptClientTls:agreement
+            acceptClientTls: agreement
           }
         })
         const token = await updateClient.getAuth()
@@ -112,7 +131,7 @@ export const clientSignUp = async (req, res) => {
           console.log("send otp error", err);
           return res.status(400).json({ success: false, message: "Failed to send OTP" });
         }
-      }else{
+      } else {
         return res.status(400).json({ success: false, message: "Account already Exist" });
       }
     }
@@ -134,16 +153,16 @@ export const clientResendOtp = async (req, res) => {
     if (client?.mobileVerify || client?.isActive || client?.emailVerify) return res.status(400).json({ success: false, message: "Already register with us" })
 
     const otp = otp6Digit();
-    const updateClient = await Client.findByIdAndUpdate(req?.user?._id,{$set:{emailOTP: { otp: otp, createAt: Date.now()}}})
-    if(!updateClient) return res.status(401).json({ success: false, message: "Not SignUp with us" })
+    const updateClient = await Client.findByIdAndUpdate(req?.user?._id, { $set: { emailOTP: { otp: otp, createAt: Date.now() } } })
+    if (!updateClient) return res.status(401).json({ success: false, message: "Not SignUp with us" })
 
-      try {
-        await sendOTPMail(client?.email, otp, "client");
-        res.status(200).json({ success: true, message: "Successfully resend OTP" });
-      } catch (err) {
-        console.log("send otp error", err);
-        return res.status(400).json({ success: false, message: "Failed to send OTP" });
-      }
+    try {
+      await sendOTPMail(client?.email, otp, "client");
+      res.status(200).json({ success: true, message: "Successfully resend OTP" });
+    } catch (err) {
+      console.log("send otp error", err);
+      return res.status(400).json({ success: false, message: "Failed to send OTP" });
+    }
   } catch (error) {
     console.log("resend otp error: ", error);
     res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -180,7 +199,7 @@ export const verifyClientEmailOtp = async (req, res) => {
             mobileVerify: true,
             acceptClientTls: true,
             isActive: true,
-            isProfileCompleted:true,
+            isProfileCompleted: false,
             tlsUrl: "",
             "profile.profilePhoto": "",
             "profile.consultantName": client.fullName,
@@ -202,6 +221,10 @@ export const verifyClientEmailOtp = async (req, res) => {
             "profile.city": "",
             "profile.pinCode": "",
             "profile.about": "",
+            "profile.kycPhoto": "",
+            "profile.kycAadhar": "",
+            "profile.kycPan": "",
+
           }
         }, { new: true })
 
@@ -346,7 +369,7 @@ export const clientsignIn = async (req, res) => {
     // if(!client[0]?.acceptClientTls) return res.status(400).json({success:false,message:"Please accept our TLS first"})
     const validPassword = await bcrypt.compare(req.body.password, client[0].password,)
     if (!validPassword) return res.status(401).json({ success: false, message: "invaild email/password" })
-    const updateLoginHistory = await Client.findByIdAndUpdate(client[0]?._id,{$set:{recentLogin:new Date(),lastLogin:client[0]?.recentLogin ? client[0]?.recentLogin : new Date()}})
+    const updateLoginHistory = await Client.findByIdAndUpdate(client[0]?._id, { $set: { recentLogin: new Date(), lastLogin: client[0]?.recentLogin ? client[0]?.recentLogin : new Date() } })
     const token = client[0]?.getAuth(true)
 
     return res.status(200).header("x-auth-token", token)
@@ -392,16 +415,15 @@ export const updateClientProfile = async (req, res, next) => {
         "profile.primaryMobileNo": req.body.mobileNo,
         "profile.whatsupNo": req.body.whatsupNo,
         "profile.alternateMobileNo": req.body.alternateMobileNo,
-        // "profile.panNo": req.body.panNo,
-        // "profile.aadhaarNo": req.body.aadhaarNo,
         "profile.dob": req.body.dob,
-        // "profile.gender": req.body.gender,
         "profile.address": req.body.address,
         "profile.state": req.body.state,
-        // "profile.district": req.body.district,
         "profile.city": req.body.city,
         "profile.pinCode": req.body.pinCode,
         "profile.about": req.body.about,
+        "profile.kycPhoto": req.body?.kycPhoto,
+        "profile.kycAadhar": req.body.kycAadhar,
+        "profile.kycPan": req.body.kycPan,
       }
     }, { new: true })
     const token = updateClientDetails?.getAuth(true)
@@ -422,7 +444,7 @@ export const addNewClientCase = async (req, res) => {
     if (!client?.isActive) return res.status(400).json({ success: false, message: "Account is not active" })
     const { error } = validateAddClientCase(req.body);
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-    const { admin } = await Admin.find({email:process.env.ADMIN_MAIL_ID})
+    const { admin } = await Admin.find({ email: process.env.ADMIN_MAIL_ID })
     // console.log("admin",admin);
     const caseFees = admin?.length > 0 ? (admin[0]?.consultantFee ? admin[0].consultantFee : 2000) : 2000
     req.body.consultantCode = client?.profile?.consultantCode
@@ -439,7 +461,7 @@ export const addNewClientCase = async (req, res) => {
     const noOfCase = await Case.count()
     newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
     await newAddCase.save()
-    return res.status(201).json({ success: true, message: "Successfully add new case", _id: newAddCase?._id })
+    return res.status(201).json({ success: true, message: "Successfully add new case", data: newAddCase })
   } catch (error) {
     console.log("addNewCase: ", error);
     return res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -447,43 +469,45 @@ export const addNewClientCase = async (req, res) => {
 }
 
 
-export const clientUpdateCaseById = async(req,res)=>{
+export const clientUpdateCaseById = async (req, res) => {
   try {
-     const verify =  await authClient(req,res)
-     if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+    const verify = await authClient(req, res)
+    if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-     const client = await Client.findById(req?.user?._id)
-     if(!client) return res.status(401).json({success: false, message:"Client account not found"})
+    const client = await Client.findById(req?.user?._id)
+    if (!client) return res.status(401).json({ success: false, message: "Client account not found" })
     if (!client?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
 
 
-     const {_id} = req.query
-     if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+    const { _id } = req.query
+    if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-     if(!client?.isActive) return res.status(401).json({success: false, message:"Account is not active"})
-     const mycase = await Case.find({_id:_id,clientId:client?._id})
-    if(mycase.length==0) return res.status(404).json({success: false, message:"Case not found"})
+    if (!client?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
+    const mycase = await Case.find({ _id: _id, clientId: client?._id })
+    if (mycase.length == 0) return res.status(404).json({ success: false, message: "Case not found" })
 
-    const {error} = validateAddClientCase(req.body);
-    if(error) return res.status(400).json({success:false,message:error.details[0].message})
+    const { error } = validateAddClientCase(req.body);
+    if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-    req.body.caseDocs = req?.body?.caseDocs?.map(caseFile=>{return{
-      docDate: caseFile?.docDate ? caseFile?.docDate : new Date(),
-      docName:caseFile?.docName,
-      docType:caseFile?.docFormat,
-      docFormat:caseFile?.docFormat,
-      docURL:caseFile?.docURL,
-      }})
+    req.body.caseDocs = req?.body?.caseDocs?.map(caseFile => {
+      return {
+        docDate: caseFile?.docDate ? caseFile?.docDate : new Date(),
+        docName: caseFile?.docName,
+        docType: caseFile?.docFormat,
+        docFormat: caseFile?.docFormat,
+        docURL: caseFile?.docURL,
+      }
+    })
 
-    console.log("case_id",_id,req.body);
+    console.log("case_id", _id, req.body);
 
-    const updateCase =await Case.findByIdAndUpdate(_id,{$set:{...req.body}},{new:true})        
-     return res.status(200).json({success:true,message:"Successfully update case",data:updateCase});
-    
+    const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body } }, { new: true })
+    return res.status(200).json({ success: true, message: "Successfully update case", data: updateCase });
+
   } catch (error) {
-     console.log("updatePartnerCase in error:",error);
-     res.status(500).json({success:false,message:"Internal server error",error:error});
-     
+    console.log("updatePartnerCase in error:", error);
+    res.status(500).json({ success: false, message: "Internal server error", error: error });
+
   }
 }
 
@@ -527,8 +551,8 @@ export const viewClientAllCase = async (req, res) => {
     const startDate = req.query.startDate ? req.query.startDate : "";
     const endDate = req.query.endDate ? req.query.endDate : "";
 
-    const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, req?.user?._id, false,true)
-    console.log("query",query);
+    const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, req?.user?._id, false, true)
+    console.log("query", query);
     if (!query.success) return res.status(400).json({ success: false, message: query.message })
 
     //  console.log("query",query?.query);
@@ -631,9 +655,9 @@ export const clientDashboard = async (req, res) => {
     if (!client) return res.status(401).json({ success: false, message: "User account not found" });
     if (!client?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
 
-    const clientNeccessaryData ={
-      lastLogin:client?.lastLogin,
-      recentLogin:client?.recentLogin,
+    const clientNeccessaryData = {
+      lastLogin: client?.lastLogin,
+      recentLogin: client?.recentLogin,
     }
 
     const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
@@ -654,7 +678,7 @@ export const clientDashboard = async (req, res) => {
         '$match': {
           'createdAt': { $gte: currentYearStart },
           'clientId': req?.user?._id, // Assuming 'clientId' is the field to match
-          'isActive':true,
+          'isActive': true,
           'isPartnerReferenceCase': false,
           'isEmpSaleReferenceCase': false,
         }
@@ -691,7 +715,7 @@ export const clientDashboard = async (req, res) => {
         $match: {
           'createdAt': { $gte: currentYearStart },
           'clientId': req?.user?._id,
-          'isActive':true,
+          'isActive': true,
           'isPartnerReferenceCase': false,
           'isEmpSaleReferenceCase': false,
         }
@@ -717,7 +741,7 @@ export const clientDashboard = async (req, res) => {
       return match || month;
     });
 
-    return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData,clientNeccessaryData });
+    return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData, clientNeccessaryData });
 
   } catch (error) {
     console.log("get dashbaord data error:", error);
@@ -726,109 +750,109 @@ export const clientDashboard = async (req, res) => {
   }
 };
 
-export const clientViewAllInvoice = async (req,res)=>{
+export const clientViewAllInvoice = async (req, res) => {
   try {
-     const verify =  await authClient(req,res)
-     if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+    const verify = await authClient(req, res)
+    if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-     const client = await Client.findById(req?.user?._id)
-     if(!client) return res.status(401).json({success: false, message:"Account not found"})
-     if(!client?.isActive) return res.status(401).json({success: false, message:"Account not active"})
+    const client = await Client.findById(req?.user?._id)
+    if (!client) return res.status(401).json({ success: false, message: "Account not found" })
+    if (!client?.isActive) return res.status(401).json({ success: false, message: "Account not active" })
 
 
-     const pageItemLimit = req.query.limit ? req.query.limit : 10;
-     const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
-     const searchQuery = req.query.search ? req.query.search : "";
-     const startDate = req.query.startDate ? req.query.startDate : "";
-     const endDate = req.query.endDate ? req.query.endDate : "";
+    const pageItemLimit = req.query.limit ? req.query.limit : 10;
+    const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+    const searchQuery = req.query.search ? req.query.search : "";
+    const startDate = req.query.startDate ? req.query.startDate : "";
+    const endDate = req.query.endDate ? req.query.endDate : "";
 
-     const query = getAllInvoiceQuery(searchQuery, startDate, endDate,req?.user?._id)
-     if (!query.success) return res.status(400).json({ success: false, message: query.message })
-     const aggregationPipeline = [
-        { $match: query.query }, // Match the documents based on the query
-        {
-          $group: {
-            _id: null,
-            totalAmtSum: { $sum: "$totalAmt" } // Calculate the sum of totalAmt
-          }
+    const query = getAllInvoiceQuery(searchQuery, startDate, endDate, req?.user?._id,true)
+    if (!query.success) return res.status(400).json({ success: false, message: query.message })
+    const aggregationPipeline = [
+      { $match: query.query }, // Match the documents based on the query
+      {
+        $group: {
+          _id: null,
+          totalAmtSum: { $sum: "$totalAmt" } // Calculate the sum of totalAmt
         }
-      ];
+      }
+    ];
 
-     const getAllBill = await Bill.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("transactionId");
-     const noOfBill = await Bill.find(query?.query).count()
-     const aggregateResult = await Bill.aggregate(aggregationPipeline);
-     return res.status(200).json({ success: true, message: "get case data", data: getAllBill, noOf: noOfBill,totalAmt:aggregateResult});
+    const getAllBill = await Bill.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("transactionId");
+    const noOfBill = await Bill.find(query?.query).count()
+    const aggregateResult = await Bill.aggregate(aggregationPipeline);
+    return res.status(200).json({ success: true, message: "get case data", data: getAllBill, noOf: noOfBill, totalAmt: aggregateResult });
 
   } catch (error) {
-     console.log("employee-get invoice in error:",error);
-     return res.status(500).json({success:false,message:"Internal server error",error:error});
+    console.log("employee-get invoice in error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error: error });
   }
 }
 
-export const clientViewInvoiceById = async(req,res)=>{
+export const clientViewInvoiceById = async (req, res) => {
   try {
-     const verify =  await authClient(req,res)
-     if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+    const verify = await authClient(req, res)
+    if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-     const client = await Client.findById(req?.user?._id)
-     if(!client) return res.status(401).json({success: false, message:"Account not found"})
-     if(!client?.isActive) return res.status(401).json({success: false, message:"Account not active"})
- 
-     const {_id} = req.query;
-     if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
- 
-     const getInvoice = await Bill.findById(_id)
-     if(!getInvoice) return res.status(404).json({success: false, message:"Invoice not found"})
-   return res.status(200).json({success:true,message:"get invoice by id data",data:getInvoice});
-    
+    const client = await Client.findById(req?.user?._id)
+    if (!client) return res.status(401).json({ success: false, message: "Account not found" })
+    if (!client?.isActive) return res.status(401).json({ success: false, message: "Account not active" })
+
+    const { _id } = req.query;
+    if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+
+    const getInvoice = await Bill.findById(_id)
+    if (!getInvoice) return res.status(404).json({ success: false, message: "Invoice not found" })
+    return res.status(200).json({ success: true, message: "get invoice by id data", data: getInvoice });
+
   } catch (error) {
-     console.log("employeeViewPartnerById in error:",error);
-     res.status(500).json({success:false,message:"Internal server error",error:error});
-     
+    console.log("employeeViewPartnerById in error:", error);
+    res.status(500).json({ success: false, message: "Internal server error", error: error });
+
   }
 }
 
-export const clientPayInvoiceById = async(req,res)=>{
+export const clientPayInvoiceById = async (req, res) => {
   try {
-     const verify =  await authClient(req,res)
-     if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+    const verify = await authClient(req, res)
+    if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-     const client = await Client.findById(req?.user?._id)
-     if(!client) return res.status(401).json({success: false, message:"Account not found"})
-     if(!client?.isActive) return res.status(401).json({success: false, message:"Account not active"})
- 
-     const {invoiceId,caseId} = req.query;
-     if(!validMongooseId(invoiceId) && !validMongooseId(caseId)) return res.status(400).json({success: false, message:"Case or invoice id is not valid"})
- 
-     const getInvoice = await Bill.findById(invoiceId)
-      if(!getInvoice) return res.status(404).json({success: false, message:"Invoice not found"})
+    const client = await Client.findById(req?.user?._id)
+    if (!client) return res.status(401).json({ success: false, message: "Account not found" })
+    if (!client?.isActive) return res.status(401).json({ success: false, message: "Account not active" })
 
-      const getCase = await Case.findById(caseId)
-      if(!getCase) return res.status(404).json({success: false, message:"Case not found"})
-      const newTransaction = new Tranaction({clientId:req?.user?._id,invoiceId:invoiceId,caseId:caseId})
-    
-    const paymentStr = "payerName="+client?.profile?.consultantName.trim()+
-    "&payerEmail="+client?.profile?.primaryEmail.trim()+"&payerMobile="+
-    client?.profile?.primaryMobileNo.trim()+
-    "&clientTxnId="+newTransaction?._id+"&amount="+getInvoice?.totalAmt+"&clientCode="+
-    process?.env?.CLIENTCODE.trim()+"&transUserName="+process?.env?.TRANSUSERNAME.trim()+"&transUserPassword="+
-    process?.env?.TRANSUSERPASSWORD.trim()+"&callbackUrl="+process?.env?.CALLBACKURL.trim()+"&amountType="+
-    "INR"+"&mcc="+process?.env?.MCC.trim()+"&channelId="+"W".trim()+"&transDate="+new Date().getTime()
+    const { invoiceId, caseId } = req.query;
+    if (!validMongooseId(invoiceId) && !validMongooseId(caseId)) return res.status(400).json({ success: false, message: "Case or invoice id is not valid" })
 
-    console.log("paymentStr",paymentStr);
+    const getInvoice = await Bill.findById(invoiceId)
+    if (!getInvoice) return res.status(404).json({ success: false, message: "Invoice not found" })
+
+    const getCase = await Case.findById(caseId)
+    if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
+    const newTransaction = new Tranaction({ clientId: req?.user?._id, invoiceId: invoiceId, caseId: caseId })
+
+    const paymentStr = "payerName=" + client?.profile?.consultantName.trim() +
+      "&payerEmail=" + client?.profile?.primaryEmail.trim() + "&payerMobile=" +
+      client?.profile?.primaryMobileNo.trim() +
+      "&clientTxnId=" + newTransaction?._id + "&amount=" + getInvoice?.totalAmt + "&clientCode=" +
+      process?.env?.CLIENTCODE.trim() + "&transUserName=" + process?.env?.TRANSUSERNAME.trim() + "&transUserPassword=" +
+      process?.env?.TRANSUSERPASSWORD.trim() + "&callbackUrl=" + process?.env?.CALLBACKURL.trim() + "&amountType=" +
+      "INR" + "&mcc=" + process?.env?.MCC.trim() + "&channelId=" + "W".trim() + "&transDate=" + new Date().getTime()
+
+    console.log("paymentStr", paymentStr);
 
     const encData = encrypt(paymentStr?.trim())
     await newTransaction.save()
- 
-    
-    return res.status(200).json({success:true,message:"transaction create",tranactionId:newTransaction?._id,encData:encData,clientCode:process?.env?.CLIENTCODE.trim()});
 
 
-    
+    return res.status(200).json({ success: true, message: "transaction create", tranactionId: newTransaction?._id, encData: encData, clientCode: process?.env?.CLIENTCODE.trim() });
+
+
+
   } catch (error) {
-     console.log("employeeViewPartnerById in error:",error);
-     res.status(500).json({success:false,message:"Internal server error",error:error});
-     
+    console.log("employeeViewPartnerById in error:", error);
+    res.status(500).json({ success: false, message: "Internal server error", error: error });
+
   }
 }
 

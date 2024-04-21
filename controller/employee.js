@@ -18,6 +18,7 @@ import { invoiceHtmlToPdfBuffer } from "../utils/createPdf/invoice.js";
 import { validateBankingDetailsBody, validateProfileBody } from "../utils/validatePatner.js";
 // import { getValidateDate } from "../utils/helper.js";
 import { sendAddPartnerRequest } from "../utils/sendMail.js";
+import { firebaseUpload } from "../utils/helper.js";
 
 
 export const employeeAuthenticate = async(req,res)=>{
@@ -36,6 +37,27 @@ export const employeeAuthenticate = async(req,res)=>{
       
    }
  }
+
+ export const employeeUploadImage = async (req, res) => {
+   try {
+     firebaseUpload(req, res, "images");
+   } catch (error) {
+     console.log("employeeUploadImage", error);
+     return res.status(500).json({ success: false, message: "Oops something went wrong" });
+   }
+ }
+ 
+ export const employeeUploadAttachment = async (req, res) => {
+   try {
+     firebaseUpload(req, res, "attachments");
+   } catch (error) {
+     console.log("employeeUploadAttachment", error);
+     return res.status(500).json({ success: false, message: "Oops something went wrong" });
+   }
+ }
+ 
+
+
 
 export const employeeSignin = async(req,res)=>{
    try {
@@ -196,6 +218,9 @@ export const employeeEditClient = async (req, res, next) => {
          "profile.city": req.body.city,
          "profile.pinCode": req.body.pinCode,
          "profile.about": req.body.about,
+         "profile.kycPhoto":req?.body?.kycPhoto,
+         "profile.kycAadhaar":req?.body?.kycAadhaar,
+         "profile.kycPan":req?.body?.kycPan
        }
      }, { new: true })
     
@@ -246,6 +271,9 @@ export const employeeEditClient = async (req, res, next) => {
          "profile.city":req.body.city ,
          "profile.pinCode":req.body.pinCode ,
          "profile.about":req.body.about,
+         "profile.kycPhoto":req?.body?.kycPhoto,
+         "profile.kycAadhaar":req?.body?.kycAadhaar,
+         "profile.kycPan":req?.body?.kycPan
        }},{new: true})
 
        if(!updatePatnerDetails) return res.status(400).json({success: true, message: "Partner not found"})
@@ -572,7 +600,7 @@ export const employeeCreateInvoice = async (req,res)=>{
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
       const billCount = await Bill.find({}).count()
-      const newInvoice = new Bill({...req.body,caseId,clientId,invoiceNo:`CS-${billCount+1}`})
+      const newInvoice = new Bill({...req.body,caseId,clientId,invoiceNo:`ACS-${billCount+1}`})
       newInvoice.save()
       return  res.status(200).json({success: true, message: "Successfully create invoice",_id:newInvoice?._id});
    } catch (error) {
@@ -596,8 +624,9 @@ export const employeeViewAllInvoice = async (req,res)=>{
       const searchQuery = req.query.search ? req.query.search : "";
       const startDate = req.query.startDate ? req.query.startDate : "";
       const endDate = req.query.endDate ? req.query.endDate : "";
+      const type = req?.query?.type
 
-      const query = getAllInvoiceQuery(searchQuery, startDate, endDate,false)
+      const query = getAllInvoiceQuery(searchQuery, startDate, endDate,false,type)
       if (!query.success) return res.status(400).json({ success: false, message: query.message })
       const aggregationPipeline = [
          { $match: query.query }, // Match the documents based on the query
@@ -694,9 +723,13 @@ export const employeeEditInvoice = async (req,res)=>{
       const { error } = validateInvoice(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      const invoice = await Bill.findByIdAndUpdate(_id,{$set:req?.body}) 
-
-      return  res.status(200).json({success: true, message: "Successfully update invoice"});
+      const getInvoice = await Bill.findById(_id)
+      if(!getInvoice?.isPaid){
+         const invoice = await Bill.findByIdAndUpdate(_id,{$set:req?.body}) 
+         return  res.status(200).json({success: true, message: "Successfully update invoice"});
+      }else{
+         return  res.status(400).json({success: true, message: "Paid invoice not be editable"});
+      }
    } catch (error) {
       console.log("employee-create invoice in error:",error);
       return res.status(500).json({success:false,message:"Internal server error",error:error});
@@ -713,17 +746,40 @@ export const employeeUnActiveInvoice = async (req,res)=>{
       if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
       if(employee?.type?.toLowerCase()!="finance") return res.status(400).json({success: false, message:"Access Denied"})
 
-      const {_id} = req.query;
+      const {_id,type} = req.query;
       if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+      const invoice = await Bill.findByIdAndUpdate(_id,{$set:{isActive: type==true ? false : true}}) 
 
-      const invoice = await Bill.findByIdAndUpdate(_id,{$set:{isActive:false}}) 
-
-      return  res.status(200).json({success: true, message: "Successfully remove invoice"});
+      return  res.status(200).json({success: true, message: `Successfully ${type!=true ? "remove" : "restore"} invoice`});
    } catch (error) {
       console.log("employee-remove invoice in error:",error);
       return res.status(500).json({success:false,message:"Internal server error",error:error});
    }
 }
+
+export const employeeRemoveInvoice = async (req,res)=>{
+   try {
+      const verify =  await authEmployee(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const employee = await Employee.findById(req?.user?._id)
+      if(!employee) return res.status(401).json({success: false, message:"Employee account not found"})
+      if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
+      if(employee?.type?.toLowerCase()!="finance") return res.status(400).json({success: false, message:"Access Denied"})
+
+      const {_id,type} = req.query;
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+
+      const invoice = await Bill.findByIdAndDelete(_id) 
+
+      return  res.status(200).json({success: true, message: `Successfully delete invoice`});
+   } catch (error) {
+      console.log("admin-delete invoice in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
+
 
 export const allEmployeeDashboard = async (req, res) => {
    try {
@@ -897,7 +953,7 @@ export const saleEmployeeAddCase = async (req, res) => {
       const noOfCase = await Case.count()
       newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
       await newAddCase.save()
-      return res.status(200).json({ success: true, message: "Successfully add case",_id:newAddCase?._id});
+      return res.status(200).json({ success: true, message: "Successfully add case",data:newAddCase});
 
    } catch (error) {
       console.log("updateAdminCase in error:", error);

@@ -15,6 +15,7 @@ import jwtDecode from "jwt-decode";
 import Admin from "../models/admin.js";
 import { sendAccountTerm_ConditonsMail } from "../utils/sendMail.js";
 import { editServiceAgreement } from "../utils/helper.js";
+import { firebaseUpload } from "../utils/helper.js";
 
 
 
@@ -35,6 +36,26 @@ export const partnerAuthenticate = async (req, res) => {
 
   }
 }
+
+
+export const partnerUploadImage = async (req, res) => {
+  try {
+    firebaseUpload(req, res, "images");
+  } catch (error) {
+    console.log("partnerUploadImage", error);
+    return res.status(500).json({ success: false, message: "Oops something went wrong" });
+  }
+}
+
+export const partnerUploadAttachment = async (req, res) => {
+  try {
+    firebaseUpload(req, res, "attachments");
+  } catch (error) {
+    console.log("partnerUploadAttachment", error);
+    return res.status(500).json({ success: false, message: "Oops something went wrong" });
+  }
+}
+
 
 
 //  for create new account
@@ -230,6 +251,9 @@ export const verifyEmailOtp = async (req, res, next) => {
               city: "",
               pinCode: "",
               about: "",
+              kycPhoto:"",
+              kycAadhaar:"",
+              kycPan:"",
             },
             bankingDetails: {
               bankName: "",
@@ -671,6 +695,9 @@ export const updateProfileDetails = async (req, res) => {
         "profile.city": req.body.city,
         "profile.pinCode": req.body.pinCode,
         "profile.about": req.body.about,
+        "profile.kycPhoto":req.body.kycPhoto,
+        "profile.kycAadhaar":req.body.kycAadhaar,
+        "profile.kycPan":req.body.kycPan,
       }
     }, { new: true })
     return res.status(200).json({ success: true, message: "Successfully update profile details" })
@@ -718,7 +745,6 @@ export const updateBankingDetails = async (req, res) => {
         "bankingDetails.gstCopyImg": req.body.gstCopyImg,
         "bankingDetails.ifscCode": req.body.ifscCode,
         "bankingDetails.upiId": req.body.upiId,
-
       }
     }, { new: true })
     return res.status(200).json({ success: true, message: "Successfully update banking details" })
@@ -804,11 +830,24 @@ export const viewAllPartnerCase = async (req, res) => {
 
     const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, req?.user?._id, false, false, true)
     if (!query.success) return res.status(400).json({ success: false, message: query.message })
+    const aggregationPipeline = [
+      { $match: query?.query }, // Match the documents based on the query
+      {
+         $group: {
+            _id: null,
+            totalAmtSum: { $sum: "$claimAmount" }, // Calculate the sum of totalAmt
+            totalResolvedAmt: {
+               $sum: { $cond: [{ $eq: ["$currentStatus", "Resolve"] }, "$claimAmount", 0] } // Calculate the sum of claimAmount for resolved cases
+            }
+         }
+      }
+   ];
 
     //  console.log("query",query?.query);
     const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
     const noOfCase = await Case.find(query?.query).count()
-    return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase });
+    const aggregateResult = await Case.aggregate(aggregationPipeline);
+    return res.status(200).json({ success: true, message: "get case data", totalAmt: aggregateResult, data: getAllCase, noOfCase: noOfCase });
 
   } catch (error) {
     console.log("updateAdminCase in error:", error);

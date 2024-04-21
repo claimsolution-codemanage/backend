@@ -5,7 +5,7 @@ import {
    validateEditAdminCaseStatus,validateAdminSharePartner,validateAdminRemovePartner,
 } from "../utils/validateAdmin.js";
 import bcrypt from 'bcrypt';
-import { generatePassword } from "../utils/helper.js";
+import { generatePassword, getAllInvoiceQuery } from "../utils/helper.js";
 import { sendAdminSigninMail, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import { authAdmin } from "../middleware/authentication.js";
 import Employee from "../models/employee.js";
@@ -27,6 +27,10 @@ import { validateBankingDetailsBody, validateProfileBody } from "../utils/valida
 import axios from "axios";
 import ExcelJS from 'exceljs';
 import { Readable } from 'stream';
+import { firebaseUpload } from "../utils/helper.js";
+import { validateInvoice } from "../utils/validateEmployee.js";
+import Bill from "../models/bill.js";
+import { bucket } from "../index.js";
 
 
 
@@ -46,6 +50,24 @@ export const adminAuthenticate = async (req, res) => {
 
    }
 }
+
+export const adminUploadImage = async (req, res) => {
+   try {
+     firebaseUpload(req, res, "images");
+   } catch (error) {
+     console.log("adminUploadImage", error);
+     return res.status(500).json({ success: false, message: "Oops something went wrong" });
+   }
+ }
+ 
+ export const adminUploadAttachment = async (req, res) => {
+   try {
+     firebaseUpload(req, res, "attachments");
+   } catch (error) {
+     console.log("adminUploadAttachment", error);
+     return res.status(500).json({ success: false, message: "Oops something went wrong" });
+   }
+ }
 
 
 export const adminSignUp = async (req, res) => {
@@ -96,8 +118,8 @@ export const adminSignin = async (req, res) => {
       if (!admin[0]?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       const checkAuthAdmin = await bcrypt.compare(req.body.password, admin?.[0]?.password)
-      if (!checkAuthAdmin) return res.status(401).json({ success: false, message: "invaild email/password" })
       // console.log("admin",admin);
+      if (!checkAuthAdmin) return res.status(401).json({ success: false, message: "invaild email/password" })
       const isSuperAdmin = req.body.email === process.env.ADMIN_MAIL_ID
 
       const token = await admin[0]?.getAuth(isSuperAdmin)
@@ -741,20 +763,24 @@ export const adminViewPartnerReport = async (req, res) => {
 
       const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, req.query.partnerId, false, false, type)
       if (!query.success) return res.status(400).json({ success: false, message: query.message })
-      console.log("query", query?.query);
       const aggregationPipeline = [
          { $match: query?.query }, // Match the documents based on the query
          {
             $group: {
                _id: null,
-               totalAmtSum: { $sum: "$claimAmount" } // Calculate the sum of totalAmt
+               totalAmtSum: { $sum: "$claimAmount" }, // Calculate the sum of totalAmt
+               totalResolvedAmt: {
+                  $sum: { $cond: [{ $eq: ["$currentStatus", "Resolve"] }, "$claimAmount", 0] } // Calculate the sum of claimAmount for resolved cases
+               }
             }
          }
       ];
 
+
       const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
       const noOfCase = await Case.find(query?.query).count()
       const aggregateResult = await Case.aggregate(aggregationPipeline);
+      console.log("aggregateResult",aggregateResult);
       return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult, user: partner });
 
    } catch (error) {
@@ -959,6 +985,9 @@ export const adminEditClient = async (req, res, next) => {
             "profile.city": req.body.city,
             "profile.pinCode": req.body.pinCode,
             "profile.about": req.body.about,
+            "profile.kycPhoto":req?.body?.kycPhoto,
+            "profile.kycAadhaar":req?.body?.kycAadhaar,
+            "profile.kycPan":req?.body?.kycPan
          }
       }, { new: true })
 
@@ -1006,6 +1035,9 @@ export const adminUpdateParnterProfile = async (req, res) => {
             "profile.city": req.body.city,
             "profile.pinCode": req.body.pinCode,
             "profile.about": req.body.about,
+            "profile.kycPhoto":req?.body?.kycPhoto,
+            "profile.kycAadhaar":req?.body?.kycAadhaar,
+            "profile.kycPan":req?.body?.kycPan
          }
       }, { new: true })
 
@@ -1688,24 +1720,38 @@ export const adminDeleteCaseDocById = async (req, res) => {
       const getCase = await Case.findById(caseId);
       if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
 
+
       const filterDocs = getCase?.caseDocs?.filter(doc => doc?._id == docId)?.[0]
       if (filterDocs && filterDocs?.docURL) {
-         const setAdminHeaders = {
-            "x-auth-token": req?.headers["x-auth-token"]
-         };
-
-         const requestBody = {
-            files: [filterDocs?.docURL]
-         };
-
-         const docRes = await axios.delete(
-            `${process.env.STORAGE_URL}/api/storage/deleteSelectedFiles`,
-            {
-               headers: setAdminHeaders,
-               data: requestBody
+         if(filterDocs?.docURL?.includes("https://firebasestorage.googleapis.com/")){
+            const parts = filterDocs?.docURL.split('/');
+            const encodedFilename = parts[parts.length - 1];
+            const endParts = encodedFilename?.split("?")?.[0]
+            const decodedFilename = decodeURIComponent(endParts);
+            if(decodedFilename){
+               const file = bucket.file(decodedFilename);
+               await file.delete()
             }
-         );
-         console.log("docRes", docRes?.data);
+              
+          
+         }else{
+            const setAdminHeaders = {
+               "x-auth-token": req?.headers["x-auth-token"]
+            };
+   
+            const requestBody = {
+               files: [filterDocs?.docURL]
+            };
+   
+            const docRes = await axios.delete(
+               `${process.env.STORAGE_URL}/api/storage/deleteSelectedFiles`,
+               {
+                  headers: setAdminHeaders,
+                  data: requestBody
+               }
+            );
+            console.log("docRes", docRes?.data);
+         }
       }
 
 
@@ -2117,5 +2163,176 @@ export const adminAllClientDownload = async (req, res) => {
       console.log("adminAllClientDownload in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
 
+   }
+}
+
+
+export const adminCreateInvoice = async (req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+   
+      const {clientId,caseId} = req.query
+      console.log(clientId,caseId);
+      if(!validMongooseId(clientId) || !validMongooseId(caseId)) return res.status(400).json({ success: false, message: "caseId and clientId must be valid" })
+
+      const getClient = await Client.findById(clientId)
+      if(!getClient) return res.status(400).json({ success: false, message: "Client not found" })
+      const getCase = await Case.findById(caseId)
+      if(!getCase) return res.status(400).json({ success: false, message: "Case not found" })
+
+      const { error } = validateInvoice(req.body)
+      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+      const billCount = await Bill.find({}).count()
+      const newInvoice = new Bill({...req.body,caseId,clientId,invoiceNo:`ACS-${billCount+1}`})
+      newInvoice.save()
+      return  res.status(200).json({success: true, message: "Successfully create invoice",_id:newInvoice?._id});
+   } catch (error) {
+      console.log("admin-create invoice in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
+
+export const adminViewAllInvoice = async (req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const pageItemLimit = req.query.limit ? req.query.limit : 10;
+      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const searchQuery = req.query.search ? req.query.search : "";
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+      const type = req?.query?.type
+
+      const query = getAllInvoiceQuery(searchQuery, startDate, endDate,false,type)
+      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+      const aggregationPipeline = [
+         { $match: query.query }, // Match the documents based on the query
+         {
+           $group: {
+             _id: null,
+             totalAmtSum: { $sum: "$totalAmt" } // Calculate the sum of totalAmt
+           }
+         }
+       ];
+
+      const getAllBill = await Bill.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("transactionId");
+      const noOfBill = await Bill.find(query?.query).count()
+      const aggregateResult = await Bill.aggregate(aggregationPipeline);
+      return res.status(200).json({ success: true, message: "get case data", data: getAllBill, noOf: noOfBill,totalAmt:aggregateResult});
+
+   } catch (error) {
+      console.log("admin-get invoice in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
+export const adminViewInvoiceById = async(req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+
+      
+      const {_id} = req.query;
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+  
+      const getInvoice = await Bill.findById(_id)
+      if(!getInvoice) return res.status(404).json({success: false, message:"Invoice not found"})
+    return res.status(200).json({success:true,message:"get invoice by id data",data:getInvoice});
+     
+   } catch (error) {
+      console.log("employeeViewPartnerById in error:",error);
+      res.status(500).json({success:false,message:"Internal server error",error:error});
+      
+   }
+}
+
+
+export const adminEditInvoice = async (req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const {_id} = req.query;
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+
+      const { error } = validateInvoice(req.body)
+      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+      const getInvoice = await Bill.findById(_id)
+      if(!getInvoice?.isPaid){
+         const invoice = await Bill.findByIdAndUpdate(_id,{$set:req?.body}) 
+         return  res.status(200).json({success: true, message: "Successfully update invoice"});
+      }else{
+         return  res.status(400).json({success: true, message: "Paid invoice not be editable"});
+      }
+
+
+   } catch (error) {
+      console.log("admin-create invoice in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
+export const adminUnActiveInvoice = async (req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const {_id,type} = req.query;
+      console.log("type1",type);
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+
+      const invoice = await Bill.findByIdAndUpdate(_id,{$set:{isActive: type==true ? false : true}}) 
+
+      return  res.status(200).json({success: true, message: `Successfully ${type!=true ? "remove" : "restore"} invoice`});
+   } catch (error) {
+      console.log("admin-remove invoice in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
+export const adminRemoveInvoice = async (req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const {_id,type} = req.query;
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+
+      const invoice = await Bill.findByIdAndDelete(_id) 
+
+      return  res.status(200).json({success: true, message: `Successfully delete invoice`});
+   } catch (error) {
+      console.log("admin-delete invoice in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
    }
 }

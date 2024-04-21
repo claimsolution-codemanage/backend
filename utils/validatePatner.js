@@ -102,6 +102,9 @@ export const validateProfileBody =(body)=>{
       city: Joi.string().allow('').optional(),
       pinCode: Joi.string().allow('').optional(),
       about: Joi.string().allow('').max(200).optional(),
+      kycPhoto:Joi.string().allow('').optional(),
+      kycAadhaar:Joi.string().allow('').optional(),
+      kycPan:Joi.string().allow('').optional(),
   })
   return profileSchema.validate(body)
 }
@@ -111,12 +114,12 @@ export const validateBankingDetailsBody =(body)=>{
     bankName: Joi.string().required(),
     bankAccountNo: Joi.string().required(),
     bankBranchName: Joi.string().required(),
-    gstNo: Joi.string().min(15).max(15).required(),
+    gstNo: Joi.string().min(15).max(15).allow('').optional(),
     panNo:Joi.string().min(10).max(10).required(),
     ifscCode:Joi.string().required(),
-    upiId:Joi.string().required(),
-    cancelledChequeImg: Joi.string().required(),
-    gstCopyImg:Joi.string().required(),
+    upiId:Joi.string().allow('').optional(),
+    cancelledChequeImg: Joi.string().allow('').optional(),
+    gstCopyImg:Joi.string().allow('').optional(),
 
   })
   return bankingDetailsSchema.validate(body)

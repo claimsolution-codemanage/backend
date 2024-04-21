@@ -4,7 +4,7 @@ import {clientSignUp,clientsignIn,verifyClientEmailOtp,updateClientProfile,getCl
     addNewClientCase,viewClientCaseById,viewClientAllCase,clientForgetPassword,clientResetPassword,
     clientMobileNoVerify,clientSendMobileOtpCode,clientAuthenticate,clientAddCaseFile,clientTls,
     acceptClientTerms_Conditions,clientDashboard,clientUpdateCaseById,clientResendOtp,clientViewAllInvoice,clientViewInvoiceById,
-    clientPayInvoiceById
+    clientPayInvoiceById,clientUploadImage,clientUploadAttachment
 } from '../controller/client.js';
 
 
@@ -30,6 +30,8 @@ router.get("/getClientDashboardData",clientDashboard)
 router.get("/getClientViewAllInvoice",clientViewAllInvoice)
 router.get("/getClientViewInvoiceById",clientViewInvoiceById)
 router.post("/clientPayInvoiceById",clientPayInvoiceById)
+router.post("/upload/image",clientUploadImage)
+router.post("/upload/attachment",clientUploadAttachment)
 
 
 

@@ -12,7 +12,9 @@ adminRemoveReferenceCase,adminEditClient,adminUpdateParnterProfile,adminUpdatePa
 adminDeleteCaseDocById,adminViewEmpSaleReport,adminViewEmpSalePartnerReport,
 adminDownloadAllCase,adminDownloadAllPartner,adminDownloadPartnerReport,
 adminEmpSaleReportDownload,adminEmpSalePartnerReportDownload,adminAllClientDownload,
-adminGetSaleEmployee,adminSharePartnerToSaleEmp,adminGetNormalEmployee,adminRemovePartnerToSaleEmp
+adminGetSaleEmployee,adminSharePartnerToSaleEmp,adminGetNormalEmployee,adminRemovePartnerToSaleEmp,
+adminUploadImage,adminUploadAttachment,adminCreateInvoice,adminViewAllInvoice,adminViewInvoiceById,
+adminUnActiveInvoice,adminEditInvoice,adminRemoveInvoice
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -98,10 +100,23 @@ router.put("/removeReferenceCase",adminRemoveReferenceCase)
 router.get("/viewAllComplaint",viewAllAdminComplaint)
 router.delete("/adminRemoveComplaintById",adminRemoveComplaintById)
 
+
+// for invoice
+router.post("/createInvoice",adminCreateInvoice)
+router.get("/viewAllInvoice",adminViewAllInvoice)
+router.get("/viewInvoiceById",adminViewInvoiceById)
+router.put("/editInvoiceById",adminEditInvoice)
+router.put("/unActiveInvoiceById",adminUnActiveInvoice)
+router.delete("/deleteInvoice",adminRemoveInvoice)
+
 // for report
 router.get("/adminViewPartnerReport",adminViewPartnerReport)
 router.get("/adminViewEmpSaleReport",adminViewEmpSaleReport)
 router.get("/adminViewEmpSalePartnerReport",adminViewEmpSalePartnerReport)
+
+// for upload
+router.post("/upload/image",adminUploadImage)
+router.post("/upload/attachment",adminUploadAttachment)
 
 // for download
 router.get("/download/allcase",adminDownloadAllCase)

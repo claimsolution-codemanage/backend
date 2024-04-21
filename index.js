@@ -14,6 +14,15 @@ import complaint from "./routes/complaint.js"
 import payment from './routes/payment.js'
 import bodyParser from 'body-parser';
 import ejs from 'ejs'
+import firebaseAdmin from 'firebase-admin';
+import { serviceAccount } from "./firebase/config.js";
+
+firebaseAdmin.initializeApp({
+	credential:firebaseAdmin.credential.cert(serviceAccount),
+	storageBucket:process.env.FIREBASE_STORAGE
+})
+
+export const bucket = firebaseAdmin.storage().bucket();
 
 mongoose
 	.connect(process.env.DB_URL)
@@ -60,8 +69,13 @@ app.use("/api/job",job)
 app.use("/api/complaint",complaint)
 app.use("/api/payment",payment)
 
-app.get("/",(req,res)=>{
-	res.status(200).json({success: true,message:"Welcome to server page!"});
+
+app.get("/",async(req,res)=>{
+	try {
+		res.status(200).send({success:true,message:'Backend server is working!',});
+	} catch (error) {
+		res.status(500).json({success:false,message:"Oops something went wrong"})
+	}
 })
 
 

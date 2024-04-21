@@ -145,6 +145,15 @@ const partnerSchema = new mongoose.Schema({
          type: String,
          maxlength:250
       },
+      kycPhoto: {
+         type: String,
+      },
+      kycAadhaar: {
+         type: String,
+      },
+      kycPan: {
+         type: String,
+      },
    },
    bankingDetails: {
       bankName: {

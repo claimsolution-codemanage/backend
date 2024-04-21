@@ -68,6 +68,7 @@ const caseSchema = new mongoose.Schema({
          docFormat:{type:String},
          docFormat:{type:String},
          docURL:{type:String},
+         isMerge:{type:String,default:false},
       },
       ]
    },
