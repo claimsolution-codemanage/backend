@@ -4,7 +4,7 @@ import Client from "../models/client.js";
 import { validateEmployeeSignIn,validateEmployeeResetPassword,validateUpdateEmployeeCase,validateAddPartner,validateAddEmpCase } from "../utils/validateEmployee.js";
 import { authEmployee, authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
-import { validMongooseId,getAllCaseQuery,getAllPartnerSearchQuery,getAllClientSearchQuery,generatePassword } from "../utils/helper.js";
+import { validMongooseId,getAllCaseQuery,getAllPartnerSearchQuery,getAllClientSearchQuery,generatePassword, getDownloadCaseExcel } from "../utils/helper.js";
 import { sendForgetPasswordMail } from "../utils/sendMail.js";
 import Jwt from "jsonwebtoken";
 import Case from "../models/case.js";
@@ -961,3 +961,38 @@ export const saleEmployeeAddCase = async (req, res) => {
 
    }
 }
+
+export const salesDownloadCaseReport = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      if(!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      const empSaleId =  req?.user?.empType?.toLowerCase()=="sales" ? req?.user?._id :false
+
+ 
+       // query = ?statusType=&search=&limit=&pageNo
+       const searchQuery = req.query.search ? req.query.search : "";
+       const statusType = req.query.status ? req.query.status : "";
+       const startDate = req.query.startDate ? req.query.startDate : "";
+       const endDate = req.query.endDate ? req.query.endDate : "";
+       const type = req?.query?.type ? req.query.type : true
+ 
+       const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type,empSaleId)
+       if (!query.success) return res.status(400).json({ success: false, message: query.message })
+       const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
+ 
+       const excelBuffer = await getDownloadCaseExcel(getAllCase)
+       res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
+       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+       res.status(200)
+       res.send(excelBuffer)
+ 
+   } catch (error) {
+      console.log("updateAdminCase in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+ 
+   }
+ }

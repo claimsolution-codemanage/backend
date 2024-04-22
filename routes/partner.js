@@ -5,7 +5,7 @@ import { signUp,verifyEmailOtp,signIn,partnerForgetPassword,partnerResetPassword
     getProfileDetails,updateProfileDetails,getBankingDetails,updateBankingDetails,
     addNewCase,viewAllPartnerCase,partnerViewCaseById,partnerAuthenticate,partnerAddCaseFile,partnerTls,
     acceptPartnerTerms_Conditions,getpartnerDashboard,partnerUpdateCaseById,partnerResendOtp,
-    signUpWithRequest,partnerUploadImage,partnerUploadAttachment
+    signUpWithRequest,partnerUploadImage,partnerUploadAttachment,partnerDownloadReport
 
 } from '../controller/partner.js';
 
@@ -44,6 +44,9 @@ router.put("/acceptPartnerTerms_Conditions",acceptPartnerTerms_Conditions)
 // for upload
 router.post("/upload/image",partnerUploadImage)
 router.post("/upload/attachment",partnerUploadAttachment)
+
+
+router.get("/downloadReport",partnerDownloadReport)
 
 
 

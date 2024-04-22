@@ -422,7 +422,7 @@ export const updateClientProfile = async (req, res, next) => {
         "profile.pinCode": req.body.pinCode,
         "profile.about": req.body.about,
         "profile.kycPhoto": req.body?.kycPhoto,
-        "profile.kycAadhar": req.body.kycAadhar,
+        "profile.kycAadhaar": req.body.kycAadhaar,
         "profile.kycPan": req.body.kycPan,
       }
     }, { new: true })

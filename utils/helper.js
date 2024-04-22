@@ -247,7 +247,7 @@ export const getAllInvoiceQuery = (searchQuery,startDate,endDate,clientId=false,
 }
 
 
-export const getDownloadCaseExcel = async (getAllCase = []) => {
+export const getDownloadCaseExcel = async (getAllCase = [],notFrom) => {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Cases');
   // Define Excel columns

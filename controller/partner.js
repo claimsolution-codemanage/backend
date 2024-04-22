@@ -4,7 +4,7 @@ import {
   validateAddCase
 
 } from "../utils/validatePatner.js";
-import { otp6Digit, getAllCaseQuery } from "../utils/helper.js";
+import { otp6Digit, getAllCaseQuery, getDownloadCaseExcel } from "../utils/helper.js";
 import { sendOTPMail, sendForgetPasswordMail } from '../utils/sendMail.js'
 import { authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
@@ -1066,3 +1066,35 @@ export const getpartnerDashboard = async (req, res) => {
   }
 };
 
+export const partnerDownloadReport = async (req, res) => {
+  try {
+    const verify = await authPartner(req, res);
+    if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
+
+    const partner = await Partner.findById(req?.user?._id).select("-password");
+    if (!partner) return res.status(401).json({ success: false, message: "User account not found" });
+    if (!partner?.isActive) return res.status(400).json({ success: false, message: "Account is not active" })
+
+      // query = ?statusType=&search=&limit=&pageNo
+      const searchQuery = req.query.search ? req.query.search : "";
+      const statusType = req.query.status ? req.query.status : "";
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+      const type = req?.query?.type ? req.query.type : true
+
+      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, partner?._id, false, false, type)
+      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+      const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
+
+      const excelBuffer = await getDownloadCaseExcel(getAllCase)
+      res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.status(200)
+      res.send(excelBuffer)
+
+  } catch (error) {
+     console.log("updateAdminCase in error:", error);
+     res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+  }
+}
