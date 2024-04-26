@@ -16,6 +16,8 @@ import Admin from "../models/admin.js";
 import { sendAccountTerm_ConditonsMail } from "../utils/sendMail.js";
 import { editServiceAgreement } from "../utils/helper.js";
 import { firebaseUpload } from "../utils/helper.js";
+import CaseDoc from "../models/caseDoc.js";
+import CaseStatus from "../models/caseStatus.js";
 
 
 
@@ -253,6 +255,7 @@ export const verifyEmailOtp = async (req, res, next) => {
               about: "",
               kycPhoto:"",
               kycAadhaar:"",
+              kycAadhaarBack:"",
               kycPan:"",
             },
             bankingDetails: {
@@ -697,6 +700,7 @@ export const updateProfileDetails = async (req, res) => {
         "profile.about": req.body.about,
         "profile.kycPhoto":req.body.kycPhoto,
         "profile.kycAadhaar":req.body.kycAadhaar,
+        "profile.kycAadhaarBack":req?.body?.kycAadhaarBack,
         "profile.kycPan":req.body.kycPan,
       }
     }, { new: true })
@@ -770,25 +774,38 @@ export const addNewCase = async (req, res) => {
     req.body.partnerName = partner?.profile?.consultantName
     req.body.consultantCode = partner?.profile?.consultantCode
     req.body.caseFrom = "partner"
-    req.body.processSteps = [{
-      date: Date.now(),
-      remark: "pending stage.",
-      consultant: "",
-    }]
-    req.body.caseDocs = req?.body?.caseDocs?.map(caseFile => {
-      return {
-        docDate: new Date(),
-        docName: caseFile?.docName,
-        docType: caseFile?.docFormat,
-        docFormat: caseFile?.docFormat,
-        docURL: caseFile?.docURL,
-      }
-    })
+    req.body.processSteps = []
+    // req.body.caseDocs = req?.body?.caseDocs?.map(caseFile => {
+    //   return {
+    //     docDate: new Date(),
+    //     docName: caseFile?.docName,
+    //     docType: caseFile?.docFormat,
+    //     docFormat: caseFile?.docFormat,
+    //     docURL: caseFile?.docURL,
+    //   }
+    // })
 
-    const newAddCase = new Case(req.body)
+    const newAddCase = new Case({...req.body,caseDocs:[]})
     const noOfCase = await Case.count()
     newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
     await newAddCase.save()
+
+    const defaultStatus = new CaseStatus({
+      caseId: newAddCase?._id?.toString()
+    })
+    await defaultStatus.save()
+
+    await Promise.all(req?.body?.caseDocs?.map(async (doc) => {
+      const newDoc = new CaseDoc({
+        name: doc?.docName,
+        type: doc?.docType,
+        format: doc?.docFormat,
+        url: doc?.docURL,
+        partnerId: req?.user?._id,
+        caseId: newAddCase?._id?.toString(),
+      })
+      return newDoc.save()
+    }))
     return res.status(201).json({ success: true, message: "Successfully add new case", data: newAddCase })
   } catch (error) {
     console.log("addNewCase: ", error);
@@ -844,7 +861,7 @@ export const viewAllPartnerCase = async (req, res) => {
    ];
 
     //  console.log("query",query?.query);
-    const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+    const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
     const noOfCase = await Case.find(query?.query).count()
     const aggregateResult = await Case.aggregate(aggregationPipeline);
     return res.status(200).json({ success: true, message: "get case data", totalAmt: aggregateResult, data: getAllCase, noOfCase: noOfCase });
@@ -870,10 +887,15 @@ export const partnerViewCaseById = async (req, res) => {
     if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
     if (!partner?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
-    const mycase = await Case.findById(_id)
-    if (!mycase) return res.status(404).json({ success: false, message: "Case not found" })
+    const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails")
+    if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
+    const getCaseDoc = await CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
+    const getCaseStatus = await CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
+    const getCaseJson = getCase.toObject()
+    getCaseJson.caseDocs = getCaseDoc
+    getCaseJson.processSteps = getCaseStatus
 
-    return res.status(200).json({ success: true, message: "get case data", data: mycase });
+    return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
 
   } catch (error) {
     console.log("updateAdminCase in error:", error);
@@ -939,15 +961,20 @@ export const partnerAddCaseFile = async (req, res) => {
     console.log("add case file", req.body);
     if (!req.body?.docURL) return res.status(400).json({ success: false, message: "Please upload file first" })
     const { error } = validateAddCaseFile(req.body);
-    req.body.docDate = new Date()
-    req.body.docName = req?.body?.docName,
-      req.body.docType = req?.body?.docType,
-      req.body.docFormat = req?.body?.docType
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
 
     const mycase = await Case.findByIdAndUpdate(_id, { $push: { caseDocs: req.body } }, { new: true })
     if (!mycase) return res.status(404).json({ success: false, message: "Case not found" })
+    const addNewDoc = new CaseDoc({
+      name: req.body.docName,
+      type: req.body.docType,
+      format: req.body.docFormat,
+      url: req.body.docURL,
+      caseId: mycase._id?.toString(),
+      partnerId: req?.user?._id
+    })
+    await addNewDoc.save()
 
     return res.status(200).json({ success: true, message: "Successfully add case file" })
 

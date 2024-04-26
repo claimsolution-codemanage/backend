@@ -14,7 +14,8 @@ adminDownloadAllCase,adminDownloadAllPartner,adminDownloadPartnerReport,
 adminEmpSaleReportDownload,adminEmpSalePartnerReportDownload,adminAllClientDownload,
 adminGetSaleEmployee,adminSharePartnerToSaleEmp,adminGetNormalEmployee,adminRemovePartnerToSaleEmp,
 adminUploadImage,adminUploadAttachment,adminCreateInvoice,adminViewAllInvoice,adminViewInvoiceById,
-adminUnActiveInvoice,adminEditInvoice,adminRemoveInvoice
+adminUnActiveInvoice,adminEditInvoice,adminRemoveInvoice,adminSyncModal,
+adminAllUnactiveCaseDoc,adminUnactiveCaseDoc
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -77,6 +78,11 @@ router.delete("/deleteCaseById",adminDeleteCaseById)
 router.delete("/deleteCaseDocId",adminDeleteCaseDocById)
 
 
+// case doc
+router.put("/unActiveDoc",adminUnactiveCaseDoc)
+router.get("/allUnactiveCaseDoc",adminAllUnactiveCaseDoc)
+
+
 // share case
 router.put("/addEmployeeToCase",adminShareCaseToEmployee)
 router.put("/addCaseCommit",adminAddCaseComment)
@@ -131,6 +137,7 @@ router.get("/download/empSalePartnerReport",adminEmpSalePartnerReportDownload)
 
 
 // router.put("/updateModalSchema",adminUpdateModalSchema)
+router.post("/synModal",adminSyncModal)
 
 
 

@@ -88,6 +88,35 @@ export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, par
   return { success: true, query: query }
 }
 
+export const getAllCaseDocQuery = (searchQuery, startDate, endDate) => {
+   if (startDate && endDate) {
+     const validStartDate = getValidateDate(startDate)
+     if (!validStartDate) return { success: false, message: "start date not formated" }
+     const validEndDate = getValidateDate(endDate)
+     if (!validEndDate) return { success: false, message: "end date not formated" }
+   }
+ 
+   let query = {
+     $and: [
+       { isActive: false },
+       {
+         $or: [
+           { name: { $regex: searchQuery, $options: "i" } },
+           { type: { $regex: searchQuery, $options: "i" } },
+           { format: { $regex: searchQuery, $options: "i" } },
+         ]
+       },
+       startDate && endDate ? {
+         createdAt: {
+           $gte: new Date(startDate).setHours(0, 0, 0, 0),
+           $lte: new Date(endDate).setHours(23, 59, 59, 999)
+         }
+       } : {}
+     ]
+   };
+   return { success: true, query: query }
+ }
+
 
 export const getAllPartnerSearchQuery = (searchQuery, type, empSaleId = false, startDate = "", endDate = "") => {
   console.log("salesId", empSaleId, startDate, endDate);
@@ -158,15 +187,19 @@ export const getAllClientSearchQuery = (searchQuery, type, startDate = "", endDa
   return { success: true, query: query }
 }
 
-export const getAllEmployeeSearchQuery = (searchQuery) => {
+export const getAllEmployeeSearchQuery = (searchQuery,type=true) => {
   let query = {
-    $or: [
-      { fullName: { $regex: searchQuery, $options: "i" } },
-      { email: { $regex: searchQuery, $options: "i" } },
-      { mobileNo: { $regex: searchQuery, $options: "i" } },
-      { type: { $regex: searchQuery, $options: "i" } },
-      { designation: { $regex: searchQuery, $options: "i" } },
-
+    $and:[
+      {isActive:type},
+      {
+        $or: [
+          { fullName: { $regex: searchQuery, $options: "i" } },
+          { email: { $regex: searchQuery, $options: "i" } },
+          { mobileNo: { $regex: searchQuery, $options: "i" } },
+          { type: { $regex: searchQuery, $options: "i" } },
+          { designation: { $regex: searchQuery, $options: "i" } },
+        ]
+      }
     ]
   };
   return query
@@ -206,7 +239,7 @@ export const validateAddComplaint = (body) => {
 }
 
 
-export const getAllInvoiceQuery = (searchQuery,startDate,endDate,clientId=false,type=false) => {
+export const getAllInvoiceQuery = (searchQuery,startDate,endDate,clientId=false,type=true) => {
   console.log("type",searchQuery,startDate,endDate,clientId,type);
   if (startDate && endDate) {
     const validStartDate = getValidateDate(startDate)

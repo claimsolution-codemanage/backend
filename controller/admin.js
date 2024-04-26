@@ -5,7 +5,7 @@ import {
    validateEditAdminCaseStatus,validateAdminSharePartner,validateAdminRemovePartner,
 } from "../utils/validateAdmin.js";
 import bcrypt from 'bcrypt';
-import { generatePassword, getAllInvoiceQuery } from "../utils/helper.js";
+import { generatePassword, getAllCaseDocQuery, getAllInvoiceQuery } from "../utils/helper.js";
 import { sendAdminSigninMail, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import { authAdmin } from "../middleware/authentication.js";
 import Employee from "../models/employee.js";
@@ -31,8 +31,9 @@ import { firebaseUpload } from "../utils/helper.js";
 import { validateInvoice } from "../utils/validateEmployee.js";
 import Bill from "../models/bill.js";
 import { bucket } from "../index.js";
-
-
+import CaseDoc from "../models/caseDoc.js";
+import CaseStatus from "../models/caseStatus.js";
+import CaseComment from "../models/caseComment.js";
 
 export const adminAuthenticate = async (req, res) => {
    try {
@@ -539,8 +540,9 @@ export const adminViewAllEmployee = async (req, res) => {
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = req.query.search ? req.query.search : "";
+      const type = req.query.type ? req.query.type : true;
 
-      const query = getAllEmployeeSearchQuery(searchQuery)
+      const query = getAllEmployeeSearchQuery(searchQuery,type)
       const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
       const noOfEmployee = await Employee.find(query).count()
       return res.status(200).json({ success: true, message: "get employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
@@ -648,11 +650,17 @@ export const changeStatusAdminCase = async (req, res) => {
 
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-
-      const updateStatusBody = { date: new Date(), status: req.body.status, remark: req.body.remark, consultant: admin?.fullName }
-
-      const updateCase = await Case.findByIdAndUpdate(req.body._id, { $push: { processSteps: updateStatusBody }, currentStatus: req.body.status }, { new: true })
+      const updateCase = await Case.findByIdAndUpdate(req.body._id, {currentStatus: req.body.status }, { new: true })
       if (!updateCase) return res.status(404).json({ success: false, message: "Case not found" })
+
+      const addNewStatus = new CaseStatus({
+         remark:req.body.remark,
+         status:req.body.status,
+         consultant:admin?.fullName,
+         adminId:req?.user?._id,
+         caseId:req.body._id
+      })
+      await addNewStatus.save()
       return res.status(200).json({ success: true, message: `Case status change to ${req.body.status}` });
    } catch (error) {
       console.log("updateAdminCase in error:", error);
@@ -679,17 +687,19 @@ export const adminEditCaseStatus = async (req, res) => {
 
       const updateCase = await Case.findByIdAndUpdate(req.body.caseId, {
          $set: {
-            'processSteps.$[elem].status': req.body.status,
-            'processSteps.$[elem].remark': req.body.remark,
             ...(req.body.isCurrentStatus ? { currentStatus: req.body.status } : {}),
-            'processSteps.$[elem].consultant': admin?.fullName,
          }
       },
-         {
-            "arrayFilters": [{ "elem._id": req.body?.processId }],
-            new: true
-         },)
+         {new: true},)
       if (!updateCase) return res.status(404).json({ success: false, message: "Case not found" })
+      const updateStatus = await CaseStatus.findByIdAndUpdate( req.body?.processId,{
+         $set:{
+            status:req.body.status,
+            remark:req.body.remark,
+            consultant:admin?.fullName,
+            adminId:req?.user?._id
+         }
+      } )
       return res.status(200).json({ success: true, message: "Successfully update case process" });
    } catch (error) {
       console.log("updateAdminCaseProcess in error:", error);
@@ -730,7 +740,7 @@ export const viewAllAdminCase = async (req, res) => {
       ];
       // console.log("query", query);
 
-      const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
       const noOfCase = await Case.find(query?.query).count()
       const aggregateResult = await Case.aggregate(aggregationPipeline);
       return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult });
@@ -886,9 +896,17 @@ export const viewCaseByIdByAdmin = async (req, res) => {
       const { _id } = req.query;
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-      const getCase = await Case.findById(_id)
+      const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails")
       if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
-      return res.status(200).json({ success: true, message: "get case data", data: getCase });
+      const getCaseDoc = await CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
+      const getCaseStatus = await CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
+      const getCaseComment = await CaseComment.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true })
+      const getCaseJson = getCase.toObject()
+      getCaseJson.caseDocs = getCaseDoc
+      getCaseJson.processSteps = getCaseStatus
+      getCaseJson.caseCommit = getCaseComment
+
+      return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
 
    } catch (error) {
       console.log("updateAdminCase in error:", error);
@@ -987,6 +1005,7 @@ export const adminEditClient = async (req, res, next) => {
             "profile.about": req.body.about,
             "profile.kycPhoto":req?.body?.kycPhoto,
             "profile.kycAadhaar":req?.body?.kycAadhaar,
+            "profile.kycAadhaarBack": req?.body?.kycAadhaarBack,
             "profile.kycPan":req?.body?.kycPan
          }
       }, { new: true })
@@ -1037,6 +1056,7 @@ export const adminUpdateParnterProfile = async (req, res) => {
             "profile.about": req.body.about,
             "profile.kycPhoto":req?.body?.kycPhoto,
             "profile.kycAadhaar":req?.body?.kycAadhaar,
+            "profile.kycAadhaarBack": req?.body?.kycAadhaarBack,
             "profile.kycPan":req?.body?.kycPan
          }
       }, { new: true })
@@ -1243,19 +1263,34 @@ export const adminUpdateCaseById = async (req, res) => {
       const { error } = validateAddClientCase(req.body);
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      req.body.caseDocs = req?.body?.caseDocs?.map(caseFile => {
-         return {
-            docDate: caseFile?.docDate ? caseFile?.docDate : new Date(),
-            docName: caseFile?.docName,
-            docType: caseFile?.docFormat,
-            docFormat: caseFile?.docFormat,
-            docURL: caseFile?.docURL,
-         }
-      })
+      
+      const newDoc = req?.body?.caseDocs?.filter(doc=>doc?.new)
+      const oldDoc = req?.body?.caseDocs?.filter(doc=>!doc?.new)
 
-      console.log("case_id", _id, req.body);
+      // req.body.caseDocs = req?.body?.caseDocs?.map(caseFile => {
+      //    return {
+      //       docDate: caseFile?.docDate ? caseFile?.docDate : new Date(),
+      //       docName: caseFile?.docName,
+      //       docType: caseFile?.docFormat,
+      //       docFormat: caseFile?.docFormat,
+      //       docURL: caseFile?.docURL,
+      //    }
+      // })
 
-      const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body } }, { new: true })
+      // console.log("case_id", _id, req.body);
+
+      const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body,caseDocs:oldDoc } }, { new: true })
+      await Promise.all(newDoc?.map(async (doc) => {
+         const newDoc = new CaseDoc({
+           name: doc?.docName,
+           type: doc?.docType,
+           format: doc?.docFormat,
+           url: doc?.docURL,
+           employeeId: req?.user?._id,
+           caseId: updateCase?._id?.toString(),
+         })
+         return newDoc.save()
+       }))
       return res.status(200).json({ success: true, message: "Successfully update case", data: updateCase });
 
    } catch (error) {
@@ -1472,16 +1507,18 @@ export const adminAddCaseComment = async (req, res) => {
       if (!req?.body?.Comment) return res.status(400).json({ success: false, message: "Case Comment required" })
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
+      const getCase = await Case.findById(req.body._id,)
+      if (!getCase) return res.status(400).json({ success: false, message: "Case not found" })
 
-      const newCommit = {
-         _id: req?.user?._id,
-         role: req?.user?.role,
-         name: req?.user?.fullName,
-         type: req?.user?.role,
-         commit: req?.body?.Comment, Date: new Date()
-      }
-      const updateCase = await Case.findByIdAndUpdate(req.body._id, { $push: { caseCommit: newCommit } }, { new: true })
-      if (!updateCase) return res.status(400).json({ success: false, message: "Case not found" })
+      const newComment = new CaseComment({
+         role:req?.user?.role,
+         name:req?.user?.fullName,
+         type:req?.user?.empType,
+         message:req?.body?.Comment,
+         caseId:getCase?._id?.toString(),
+         adminId:req?.user?._id,
+      })
+      await newComment.save()
 
       return res.status(200).json({ success: true, message: "Successfully add case commit" });
    } catch (error) {
@@ -1542,7 +1579,10 @@ export const adminAddReferenceCaseAndMarge = async (req, res) => {
                }
             }, { new: true })
          await Case.findByIdAndUpdate(getPartnerCase?._id, { $set: { isPartnerReferenceCase: true, } })
-         return res.status(200).json({ success: true, message: "Successfully add case reference ", data: updateAndMergeCase });
+         const doc = await CaseDoc.updateMany({caseId:partnerCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
+         const status = await CaseStatus.updateMany({caseId:partnerCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
+         const comment = await CaseComment.updateMany({caseId:partnerCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
+         return res.status(200).json({ success: true, message: "Successfully add partner case reference ", data: updateAndMergeCase,doc,status,comment,partnerCaseId,clientCaseId });
       }
       if (empSaleId) {
          if (!empSaleId || !empSaleCaseId) return res.status(400).json({ success: false, message: "For add sale reference empSaleId,empSaleCaseId are required" })
@@ -1577,6 +1617,9 @@ export const adminAddReferenceCaseAndMarge = async (req, res) => {
                }
             }, { new: true })
          await Case.findByIdAndUpdate(getEmployeeCase?._id, { $set: { isEmpSaleReferenceCase: true, } })
+         await CaseDoc.updateMany({caseId:empSaleCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
+         await CaseStatus.updateMany({caseId:empSaleCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
+         await CaseComment.updateMany({caseId:empSaleCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
          return res.status(200).json({ success: true, message: "Successfully add case reference ", data: updateAndMergeCase });
       }
 
@@ -1620,6 +1663,9 @@ export const adminRemoveReferenceCase = async (req, res) => {
                   partnerReferenceCaseDetails: {},
                }
             }, { new: true })
+            await CaseDoc.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
+            await CaseStatus.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
+            await CaseComment.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
 
          return res.status(200).json({ success: true, message: "Successfully remove partner reference case" })
       }
@@ -1639,6 +1685,9 @@ export const adminRemoveReferenceCase = async (req, res) => {
                   empSaleReferenceCaseDetails: {},
                }
             }, { new: true })
+            await CaseDoc.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
+            await CaseStatus.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
+            await CaseComment.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
 
          return res.status(200).json({ success: true, message: "Successfully remove employee reference case" })
       }
@@ -1646,6 +1695,59 @@ export const adminRemoveReferenceCase = async (req, res) => {
       return res.status(400).json({ success: false, message: "Not a valid type" })
    } catch (error) {
       console.log("adminRemoveRefenceCase in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
+
+export const adminUnactiveCaseDoc = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+
+      const { _id, status } = req?.query
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid docId" })
+
+      const updateDoc = await CaseDoc.findByIdAndUpdate(_id,{$set:{isActive:status}})
+      if(!updateDoc) return res.status(404).json({ success: false, message: "Case-doc not found" })
+
+      return res.status(200).json({ success: true, message: `Successfully ${status ? "restore":"remove"} case-doc` })
+   } catch (error) {
+      console.log("adminRemoveRefenceCase in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
+
+export const adminAllUnactiveCaseDoc = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const pageItemLimit = req.query.limit ? req.query.limit : 10;
+      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const searchQuery = req.query.search ? req.query.search : "";
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+      
+      const query = getAllCaseDocQuery(searchQuery, startDate, endDate,)
+      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+
+      const getAllCaseDoc = await CaseDoc.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const noOfCaseDoc = await CaseDoc.find(query?.query).count()
+
+      return res.status(200).json({ success: true  , message: `Successfully fetch case-doc`,data:getAllCaseDoc,totalDoc:noOfCaseDoc })
+   } catch (error) {
+      console.log("adminAllUnactiveCaseDoc in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }
@@ -1713,26 +1815,23 @@ export const adminDeleteCaseDocById = async (req, res) => {
       if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
-      const { caseId, docId } = req?.query
-      if (!caseId || !docId) return res.status(400).json({ success: false, message: "caseId and docId are required" })
-      if (!validMongooseId(caseId) || !validMongooseId(docId)) return res.status(400).json({ success: false, message: "Not a valid caseId or docId" })
+      const { _id } = req?.query
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid  docId" })
 
-      const getCase = await Case.findById(caseId);
-      if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
+      const getCase = await CaseDoc.findById(_id);
+      if (!getCase) return res.status(404).json({ success: false, message: "Case-doc not found" })
 
-
-      const filterDocs = getCase?.caseDocs?.filter(doc => doc?._id == docId)?.[0]
-      if (filterDocs && filterDocs?.docURL) {
-         if(filterDocs?.docURL?.includes("https://firebasestorage.googleapis.com/")){
-            const parts = filterDocs?.docURL.split('/');
+      const docUrl = getCase?.url?.toString()
+      if (docUrl) {
+         if(docUrl?.includes("https://firebasestorage.googleapis.com/")){
+            const parts = docUrl.split('/');
             const encodedFilename = parts[parts.length - 1];
             const endParts = encodedFilename?.split("?")?.[0]
             const decodedFilename = decodeURIComponent(endParts);
             if(decodedFilename){
                const file = bucket.file(decodedFilename);
                await file.delete()
-            }
-              
+            } 
           
          }else{
             const setAdminHeaders = {
@@ -1740,7 +1839,7 @@ export const adminDeleteCaseDocById = async (req, res) => {
             };
    
             const requestBody = {
-               files: [filterDocs?.docURL]
+               files: [docUrl]
             };
    
             const docRes = await axios.delete(
@@ -1750,14 +1849,11 @@ export const adminDeleteCaseDocById = async (req, res) => {
                   data: requestBody
                }
             );
-            console.log("docRes", docRes?.data);
          }
       }
 
-
-      const updateCase = await Case.findByIdAndUpdate(caseId, { $pull: { caseDocs: { _id: docId } } }, { new: true })
-
-      return res.status(200).json({ success: true, message: "Successfully case deleted" });
+      await CaseDoc.findByIdAndDelete(_id)
+      return res.status(200).json({ success: true, message: "Successfully case-doc deleted" });
    } catch (error) {
       console.log("adminDeleteCaseDocById in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -2307,9 +2403,9 @@ export const adminUnActiveInvoice = async (req,res)=>{
       console.log("type1",type);
       if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
 
-      const invoice = await Bill.findByIdAndUpdate(_id,{$set:{isActive: type==true ? false : true}}) 
+      const invoice = await Bill.findByIdAndUpdate(_id,{$set:{isActive: type}}) 
 
-      return  res.status(200).json({success: true, message: `Successfully ${type!=true ? "remove" : "restore"} invoice`});
+      return  res.status(200).json({success: true, message: `Successfully ${type?  "restore" : "remove"} invoice`});
    } catch (error) {
       console.log("admin-remove invoice in error:",error);
       return res.status(500).json({success:false,message:"Internal server error",error:error});
@@ -2333,6 +2429,59 @@ export const adminRemoveInvoice = async (req,res)=>{
       return  res.status(200).json({success: true, message: `Successfully delete invoice`});
    } catch (error) {
       console.log("admin-delete invoice in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
+
+export const adminSyncModal = async(req,res)=>{
+   try {
+      const getAllCase = await Case.find({})
+      const superAdmin = await Admin.find({email:process.env.ADMIN_MAIL_ID})
+      
+      await Promise.all(getAllCase?.map(async(myCase)=>{
+        await Promise.all( myCase?.caseDocs?.map(async(doc)=>{
+            const newCaseDoc = new CaseDoc({
+               name:doc?.docName,
+               type:doc?.docType,
+               format:doc?.docFormat,
+               url:doc?.docURL,
+               docDate:doc?.docDate,
+               caseId:myCase?._id?.toString(),
+               adminId:superAdmin?.[0]?._id
+            })
+            return newCaseDoc.save()
+        }))
+
+        await Promise.all(myCase?.processSteps?.map(async(status)=>{
+         const newCaseStatus = new CaseStatus({
+            status:status?.status,
+            remark:status?.remark,
+            consultant:status?.consultant,
+            caseId:myCase?._id?.toString(),
+            date:status?.date,
+            adminId:superAdmin?.[0]?._id
+         })
+         return newCaseStatus.save()
+        }))
+
+        await Promise.all(myCase?.caseCommit?.map(async(comment)=>{
+         const newCaseComment = new CaseComment({
+            name:comment?.name,
+            role:comment?.role,
+            type:comment?.type,
+            message:comment?.commit,
+            caseId:myCase?._id?.toString(),
+            date:comment?.Date,
+            adminId:superAdmin?.[0]?._id
+         })
+         return newCaseComment.save()
+        }))
+      }))
+      
+      return res.status(200).json({success:true,message:"Modal created successfully"});
+   } catch (error) {
+      console.log("adminSyncModal in error:",error);
       return res.status(500).json({success:false,message:"Internal server error",error:error});
    }
 }

@@ -19,6 +19,9 @@ import { validateBankingDetailsBody, validateProfileBody } from "../utils/valida
 // import { getValidateDate } from "../utils/helper.js";
 import { sendAddPartnerRequest } from "../utils/sendMail.js";
 import { firebaseUpload } from "../utils/helper.js";
+import CaseDoc from "../models/caseDoc.js";
+import CaseStatus from "../models/caseStatus.js";
+import CaseComment from "../models/caseComment.js";
 
 
 export const employeeAuthenticate = async(req,res)=>{
@@ -128,11 +131,16 @@ export const changeStatusEmployeeCase = async(req,res)=>{
 
       if(!validMongooseId(req.body._id)) return res.status(400).json({success: false, message:"Not a valid id"})
 
-
-      const updateStatusBody ={date:new Date(),remark:req.body.remark,status:req.body.status,consultant:employee?.fullName}
-      
-      const updateCase = await Case.findByIdAndUpdate(req.body._id, {$push:{processSteps:updateStatusBody},currentStatus:req.body.status},{new:true})
+      const updateCase = await Case.findByIdAndUpdate(req.body._id, {currentStatus:req.body.status},{new:true})
       if(!updateCase) return res.status(404).json({success:false,message:"Case not found"})
+      const addNewStatus = new CaseStatus({
+         remark:req.body.remark,
+         status:req.body.status,
+         consultant:employee?.fullName,
+         employeeId:req?.user?._id,
+         caseId:req.body._id
+      })
+      await addNewStatus.save()
       return res.status(200).json({success:true,message:`Case status change to ${req.body.status}`});
 
    } catch (error) {
@@ -163,19 +171,23 @@ export const employeeUpdateCaseById = async (req, res) => {
       const { error } = validateAddClientCase(req.body);
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      req.body.caseDocs = req?.body?.caseDocs?.map(caseFile => {
-         return {
-            docDate: caseFile?.docDate ? caseFile?.docDate : new Date(),
-            docName: caseFile?.docName,
-            docType: caseFile?.docFormat,
-            docFormat: caseFile?.docFormat,
-            docURL: caseFile?.docURL,
-         }
-      })
+      const newDoc = req?.body?.caseDocs?.filter(doc=>doc?.new)
+      const oldDoc = req?.body?.caseDocs?.filter(doc=>!doc?.new)
 
-      console.log("case_id", _id, req.body);
+      const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body,caseDocs:oldDoc } }, { new: true })
+      if (!updateCase) return res.status(404).json({ success: true, message: "Case not found"});
 
-      const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body } }, { new: true })
+      await Promise.all(newDoc?.map(async (doc) => {
+         const newDoc = new CaseDoc({
+           name: doc?.docName,
+           type: doc?.docType,
+           format: doc?.docFormat,
+           url: doc?.docURL,
+           employeeId: req?.user?._id,
+           caseId: updateCase?._id?.toString(),
+         })
+         return newDoc.save()
+       }))
       return res.status(200).json({ success: true, message: "Successfully update case", data: updateCase });
 
    } catch (error) {
@@ -220,7 +232,8 @@ export const employeeEditClient = async (req, res, next) => {
          "profile.about": req.body.about,
          "profile.kycPhoto":req?.body?.kycPhoto,
          "profile.kycAadhaar":req?.body?.kycAadhaar,
-         "profile.kycPan":req?.body?.kycPan
+         "profile.kycAadhaarBack":req?.body?.kycAadhaarBack,
+         "profile.kycPan":req?.body?.kycPan,
        }
      }, { new: true })
     
@@ -273,7 +286,8 @@ export const employeeEditClient = async (req, res, next) => {
          "profile.about":req.body.about,
          "profile.kycPhoto":req?.body?.kycPhoto,
          "profile.kycAadhaar":req?.body?.kycAadhaar,
-         "profile.kycPan":req?.body?.kycPan
+         "profile.kycPan":req?.body?.kycPan,
+         "profile.kycAadhaarBack":req?.body?.kycAadhaarBack,
        }},{new: true})
 
        if(!updatePatnerDetails) return res.status(400).json({success: true, message: "Partner not found"})
@@ -350,7 +364,7 @@ export const viewAllEmployeeCase = async(req,res)=>{
       const query = getAllCaseQuery(statusType,searchQuery,startDate,endDate,false,false,empId,true,empSaleId)
       if(!query.success) return res.status(400).json({success: false, message: query.message})
 
-      const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
       const noOfCase = await Case.find(query?.query).count()
       return res.status(200).json({success:true,message:"get case data",data:getAllCase,noOfCase:noOfCase});
      
@@ -375,9 +389,16 @@ export const employeeViewCaseByIdBy =async(req,res)=>{
       const {_id} = req.query;
       if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
   
-      const getCase = await Case.findById(_id)
+      const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails")
       if(!getCase) return res.status(404).json({success: false, message:"Case not found"})
-    return res.status(200).json({success:true,message:"get case data",data:getCase});
+      const getCaseDoc = await CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
+      const getCaseStatus = await CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
+      const getCaseComment = await CaseComment.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true })
+      const getCaseJson = getCase.toObject()
+      getCaseJson.caseDocs = getCaseDoc
+      getCaseJson.processSteps = getCaseStatus
+      getCaseJson.caseCommit = getCaseComment
+    return res.status(200).json({success:true,message:"get case data",data:getCaseJson});
      
    } catch (error) {
       console.log("updateAdminCase in error:",error);
@@ -560,14 +581,24 @@ export const employeeAddCaseComment = async (req,res)=>{
       if(!validMongooseId(req.body._id)) return res.status(400).json({success: false, message:"Not a valid id"})
       
 
-      const newCommit = {
-         _id:req?.user?._id,
+      // const newCommit = {
+      //    _id:req?.user?._id,
+      //    role:req?.user?.role,
+      //    name:req?.user?.fullName,
+      //    type:req?.user?.empType,
+      //    commit:req?.body?.Comment,Date:new Date()}      
+      const getCase = await Case.findById(req.body._id)
+      if(!getCase) return res.status(400).json({success: false, message:"Case not found"})
+
+      const newComment = new CaseComment({
          role:req?.user?.role,
          name:req?.user?.fullName,
          type:req?.user?.empType,
-         commit:req?.body?.Comment,Date:new Date()}      
-      const updateCase = await Case.findByIdAndUpdate(req.body._id,{$push:{caseCommit:newCommit}},{new:true})
-      if(!updateCase) return res.status(400).json({success: false, message:"Case not found"})
+         message:req?.body?.Comment,
+         caseId:getCase?._id?.toString(),
+         employeeId:req?.user?._id,
+      })
+      await newComment.save()
 
       return  res.status(200).json({success: true, message: "Successfully add case commit"});
    } catch (error) {
@@ -944,15 +975,32 @@ export const saleEmployeeAddCase = async (req, res) => {
       req.body.empSaleId=employee?._id,
       req.body.empSaleName=employee?.fullName,
       req.body.caseFrom = "sale"
-      req.body.processSteps = [{
-        date: Date.now(),
-        remark: "pending stage.",
-        consultant: "",
-      }]
-      const newAddCase = new Case(req.body)
+      // req.body.processSteps = [{
+      //   date: Date.now(),
+      //   remark: "pending stage.",
+      //   consultant: "",
+      // }]
+      const newAddCase = new Case({...req.body,caseDocs:[]})
       const noOfCase = await Case.count()
       newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
       await newAddCase.save()
+
+      const defaultStatus = new CaseStatus({
+         caseId: newAddCase?._id?.toString()
+       })
+       await defaultStatus.save()
+   
+       await Promise.all(req?.body?.caseDocs?.map(async (doc) => {
+         const newDoc = new CaseDoc({
+           name: doc?.docName,
+           type: doc?.docType,
+           format: doc?.docFormat,
+           url: doc?.docURL,
+           employeeId: req?.user?._id,
+           caseId: newAddCase?._id?.toString(),
+         })
+         return newDoc.save()
+       }))
       return res.status(200).json({ success: true, message: "Successfully add case",data:newAddCase});
 
    } catch (error) {

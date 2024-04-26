@@ -16,6 +16,8 @@ import Bill from "../models/bill.js"
 import Tranaction from "../models/transaction.js";
 import { encrypt } from "./payment.js";
 import { firebaseUpload } from "../utils/helper.js";
+import CaseDoc from "../models/caseDoc.js";
+import CaseStatus from "../models/caseStatus.js";
 
 export const clientUploadImage = async (req, res) => {
   try {
@@ -223,6 +225,7 @@ export const verifyClientEmailOtp = async (req, res) => {
             "profile.about": "",
             "profile.kycPhoto": "",
             "profile.kycAadhar": "",
+            "profile.kycAadhaarBack": "",
             "profile.kycPan": "",
 
           }
@@ -422,7 +425,8 @@ export const updateClientProfile = async (req, res, next) => {
         "profile.pinCode": req.body.pinCode,
         "profile.about": req.body.about,
         "profile.kycPhoto": req.body?.kycPhoto,
-        "profile.kycAadhaar": req.body.kycAadhaar,
+        "profile.kycAadhaar": req.body?.kycAadhaar,
+        "profile.kycAadhaarBack": req?.body?.kycAadhaarBack,
         "profile.kycPan": req.body.kycPan,
       }
     }, { new: true })
@@ -450,17 +454,30 @@ export const addNewClientCase = async (req, res) => {
     req.body.consultantCode = client?.profile?.consultantCode
     req.body.clientId = client?._id
     req.body.caseFrom = "client"
-    req.body.acceptPayment = true
-    req.body.pendingPayment = true
-    req.body.processSteps = [{
-      date: Date.now(),
-      remark: "pending stage.",
-      consultant: "",
-    }]
-    const newAddCase = new Case(req.body)
+    // req.body.acceptPayment = true
+    // req.body.pendingPayment = true
+    req.body.processSteps = []
+    const newAddCase = new Case({ ...req.body, caseDocs: [] })
     const noOfCase = await Case.count()
     newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
     await newAddCase.save()
+    const defaultStatus = new CaseStatus({
+      caseId: newAddCase?._id?.toString()
+    })
+    await defaultStatus.save()
+
+    await Promise.all(req?.body?.caseDocs?.map(async (doc) => {
+      const newDoc = new CaseDoc({
+        name: doc?.docName,
+        type: doc?.docType,
+        format: doc?.docFormat,
+        url: doc?.docURL,
+        clientId: req?.user?._id,
+        caseId: newAddCase?._id?.toString(),
+      })
+      return newDoc.save()
+    }))
+
     return res.status(201).json({ success: true, message: "Successfully add new case", data: newAddCase })
   } catch (error) {
     console.log("addNewCase: ", error);
@@ -525,9 +542,14 @@ export const viewClientCaseById = async (req, res) => {
     //  console.log("query",query?.query);
     const { _id } = req.query;
     if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
-    const getCase = await Case.findById(_id)
+    const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails")
     if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
-    return res.status(200).json({ success: true, message: "get case data", data: getCase });
+    const getCaseDoc = await CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
+    const getCaseStatus = await CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
+    const getCaseJson = getCase.toObject()
+    getCaseJson.caseDocs = getCaseDoc
+    getCaseJson.processSteps = getCaseStatus
+    return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
 
   } catch (error) {
     console.log("get all client case in error:", error);
@@ -556,7 +578,7 @@ export const viewClientAllCase = async (req, res) => {
     if (!query.success) return res.status(400).json({ success: false, message: query.message })
 
     //  console.log("query",query?.query);
-    const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+    const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
     const noOfCase = await Case.find(query?.query).count()
     return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase });
 
@@ -633,8 +655,17 @@ export const clientAddCaseFile = async (req, res) => {
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
     if (!req.body?.docURL) return res.status(400).json({ success: false, message: "Please upload file first" })
 
-    const mycase = await Case.findByIdAndUpdate(_id, { $push: { caseDocs: req.body } }, { new: true })
+    const mycase = await Case.findById(_id)
     if (!mycase) return res.status(404).json({ success: false, message: "Case not found" })
+    const addNewDoc = new CaseDoc({
+      name: req.body.docName,
+      type: req.body.docType,
+      format: req.body.docFormat,
+      url: req.body.docURL,
+      caseId: mycase._id?.toString(),
+      clientId: req?.user?._id
+    })
+    await addNewDoc.save()
 
     return res.status(200).json({ success: true, message: "Successfully add case file" })
 
@@ -766,7 +797,7 @@ export const clientViewAllInvoice = async (req, res) => {
     const startDate = req.query.startDate ? req.query.startDate : "";
     const endDate = req.query.endDate ? req.query.endDate : "";
 
-    const query = getAllInvoiceQuery(searchQuery, startDate, endDate, req?.user?._id,true)
+    const query = getAllInvoiceQuery(searchQuery, startDate, endDate, req?.user?._id, true)
     if (!query.success) return res.status(400).json({ success: false, message: query.message })
     const aggregationPipeline = [
       { $match: query.query }, // Match the documents based on the query

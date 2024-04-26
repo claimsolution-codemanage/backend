@@ -104,6 +104,7 @@ export const validateProfileBody =(body)=>{
       about: Joi.string().allow('').max(200).optional(),
       kycPhoto:Joi.string().allow('').optional(),
       kycAadhaar:Joi.string().allow('').optional(),
+      kycAadhaarBack:Joi.string().allow('').optional(),
       kycPan:Joi.string().allow('').optional(),
   })
   return profileSchema.validate(body)

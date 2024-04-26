@@ -123,6 +123,9 @@ const clientSchema = new mongoose.Schema({
       kycAadhaar: {
          type: String,
       },
+      kycAadhaarBack: {
+         type: String,
+      },
       kycPan: {
          type: String,
       },
