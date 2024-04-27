@@ -137,7 +137,7 @@ router.get("/download/empSalePartnerReport",adminEmpSalePartnerReportDownload)
 
 
 // router.put("/updateModalSchema",adminUpdateModalSchema)
-router.post("/synModal",adminSyncModal)
+// router.post("/synModal",adminSyncModal)
 
 
 
