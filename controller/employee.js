@@ -1010,6 +1010,98 @@ export const saleEmployeeAddCase = async (req, res) => {
    }
 }
 
+
+export const saleEmpViewPartnerReport = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      if(!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      if(employee?.type?.toLowerCase()!="sales"){
+         return res.status(400).json({success: false, message:"Access denied"})
+      }
+
+      if (!validMongooseId(req.query.partnerId)) return res.status(400).json({ success: false, message: "Not a valid partnerId" })
+      const partner = await Partner.findById(req.query.partnerId).select("-password")
+      if (!partner) return res.status(404).json({ success: false, message: "Parnter not found" })
+      const pageItemLimit = req.query.limit ? req.query.limit : 10;
+      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const searchQuery = req.query.search ? req.query.search : "";
+      const statusType = req.query.status ? req.query.status : "";
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+      const type = req?.query?.type ? req.query.type : true
+
+      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, req.query.partnerId, false, false, type)
+      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+      const aggregationPipeline = [
+         { $match: query?.query }, // Match the documents based on the query
+         {
+            $group: {
+               _id: null,
+               totalAmtSum: { $sum: "$claimAmount" }, // Calculate the sum of totalAmt
+               totalResolvedAmt: {
+                  $sum: { $cond: [{ $eq: ["$currentStatus", "Resolve"] }, "$claimAmount", 0] } // Calculate the sum of claimAmount for resolved cases
+               }
+            }
+         }
+      ];
+
+
+      const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const noOfCase = await Case.find(query?.query).count()
+      const aggregateResult = await Case.aggregate(aggregationPipeline);
+
+      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult, user: partner });
+
+   } catch (error) {
+      console.log("updateAdminCase in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+export const empDownloadPartnerReport = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      if(!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      const empSaleId =  req?.user?.empType?.toLowerCase()=="sales" ? req?.user?._id :false
+
+      if (!validMongooseId(req.query.partnerId)) return res.status(400).json({ success: false, message: "Not a valid partnerId" })
+      const partner = await Partner.findById(req.query.partnerId).select("-password")
+      if (!partner) return res.status(404).json({ success: false, message: "Parnter not found" })
+      
+      const searchQuery = req.query.search ? req.query.search : "";
+      const statusType = req.query.status ? req.query.status : "";
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+      const type = req?.query?.type ? req.query.type : true
+
+      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, req.query.partnerId, false, false, type)
+      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+
+      const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
+
+      const excelBuffer = await getDownloadCaseExcel(getAllCase)
+      res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.status(200)
+      res.send(excelBuffer)
+
+   } catch (error) {
+      console.log("updateAdminCase in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+
 export const salesDownloadCaseReport = async (req, res) => {
    try {
       const verify = await authEmployee(req, res)

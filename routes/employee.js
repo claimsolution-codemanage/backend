@@ -7,7 +7,7 @@ employeeCreateInvoice,employeeViewAllInvoice,employeeViewInvoiceById,employeeDow
 employeeEditInvoice,allEmployeeDashboard,employeeUnActiveInvoice,employeeUpdateCaseById,
 employeeEditClient,employeeupdateParnterProfile,employeeUpdatePartnerBankingDetails,
 saleEmployeeAddPartner,saleEmployeeAddCase,employeeUploadImage,employeeUploadAttachment,
-employeeRemoveInvoice,salesDownloadCaseReport
+employeeRemoveInvoice,salesDownloadCaseReport,saleEmpViewPartnerReport,empDownloadPartnerReport
 } from '../controller/employee.js';
 
 
@@ -49,11 +49,17 @@ router.delete("/finance/removeInvoiceById",employeeRemoveInvoice)
 router.post("/addPartner",saleEmployeeAddPartner)
 router.post("/sale/addCase",saleEmployeeAddCase)
 router.get("/sale/downloadCaseReport",salesDownloadCaseReport)
+router.get("/sale/partnerReport",saleEmpViewPartnerReport)
 
 
 // for upload
 router.post("/upload/image",employeeUploadImage)
 router.post("/upload/attachment",employeeUploadAttachment)
+
+
+
+// report
+router.get("/partnerReport",empDownloadPartnerReport)
 
 
 

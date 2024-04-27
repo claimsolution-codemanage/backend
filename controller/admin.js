@@ -1742,7 +1742,7 @@ export const adminAllUnactiveCaseDoc = async (req, res) => {
       const query = getAllCaseDocQuery(searchQuery, startDate, endDate,)
       if (!query.success) return res.status(400).json({ success: false, message: query.message })
 
-      const getAllCaseDoc = await CaseDoc.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const getAllCaseDoc = await CaseDoc.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("caseId");
       const noOfCaseDoc = await CaseDoc.find(query?.query).count()
 
       return res.status(200).json({ success: true  , message: `Successfully fetch case-doc`,data:getAllCaseDoc,totalDoc:noOfCaseDoc })
