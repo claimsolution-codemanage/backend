@@ -7,6 +7,8 @@ export const validateEmployeeSignUp =(body)=>{
    mobileNo: Joi.string().required(),
    type:Joi.string().required("Employee department required"),
    designation:Joi.string().required("Employee designation required"),
+   branchId:Joi.string().required("Employee branch is required"),
+   empId:Joi.string().required("Employee Id is required"),
   })
 
   return bodySchema.validate(body)
@@ -16,8 +18,9 @@ export const validateEmployeeUpdate=(body)=>{
   const bodySchema = Joi.object({
    fullName: Joi.string().required(),
    mobileNo: Joi.string().required(),
-   type:Joi.string().required("Employee department required"),
-   designation:Joi.string().required("Employee designation required"),
+   branchId:Joi.string().required("Employee branch is required"),
+   type:Joi.string().required("Employee department is required"),
+   designation:Joi.string().required("Employee designation is required"),
   })
 
   return bodySchema.validate(body)

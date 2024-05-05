@@ -195,6 +195,10 @@ const partnerSchema = new mongoose.Schema({
       ref:"Employee",
    },
    shareEmployee:{type:Array,default:[]},
+   branchId:{
+      type:String,
+      default:""
+   }
 },{timestamps:true});
 
 partnerSchema.methods.getAuth = function(auth=false){

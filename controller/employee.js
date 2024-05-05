@@ -4,7 +4,7 @@ import Client from "../models/client.js";
 import { validateEmployeeSignIn,validateEmployeeResetPassword,validateUpdateEmployeeCase,validateAddPartner,validateAddEmpCase } from "../utils/validateEmployee.js";
 import { authEmployee, authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
-import { validMongooseId,getAllCaseQuery,getAllPartnerSearchQuery,getAllClientSearchQuery,generatePassword, getDownloadCaseExcel } from "../utils/helper.js";
+import { validMongooseId,getAllCaseQuery,getAllPartnerSearchQuery,getAllClientSearchQuery,generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery } from "../utils/helper.js";
 import { sendForgetPasswordMail } from "../utils/sendMail.js";
 import Jwt from "jsonwebtoken";
 import Case from "../models/case.js";
@@ -67,7 +67,7 @@ export const employeeSignin = async(req,res)=>{
       const {error} = validateEmployeeSignIn(req.body)
       if(error) return res.status(400).json({success:false,message:error.details[0].message})
 
-      const employee  = await Employee.find({email:req.body.email})
+      const employee  = await Employee.find({email:req?.body?.email?.toLowerCase()})
       if(employee.length==0) return res.status(401).json({success: false, message:"Employee account not exists"})
 
       if(!employee?.[0]?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
@@ -356,12 +356,25 @@ export const viewAllEmployeeCase = async(req,res)=>{
       const startDate = req.query.startDate ? req.query.startDate : "";
       const endDate = req.query.endDate ? req.query.endDate : "";
       const caseAccess = ["operation","finance"]
-      const empSaleId =  req?.user?.empType?.toLowerCase()=="sales" ? req?.user?._id :false
+      let empSaleId =  (employee?.type?.toLowerCase()=="sales" || employee?.type?.toLowerCase()=="Sathi Team".toLowerCase()) ? req?.user?._id :false
+      let empId = !caseAccess?.includes(req?.user?.empType?.toLowerCase()) ?  req?.user?._id : false
+      let empBranchId =false
+      console.log("empSaleId",empSaleId);
 
-      // console.log("empSaleId",empSaleId);
+      if(req.query?.empId!="false"){
+         if(!validMongooseId(req.query?.empId)) return res.status(400).json({success:false,message:"Not a valid employee Id"})
+         empSaleId = req.query?.empId
+         empId=false
+      }else if(employee?.type?.toLowerCase()=="branch"){
+         empBranchId = employee?.branchId
+         empSaleId = false
+         empId = false
+      }
 
-      const empId = !caseAccess?.includes(req?.user?.empType?.toLowerCase()) ?  req?.user?._id : false
-      const query = getAllCaseQuery(statusType,searchQuery,startDate,endDate,false,false,empId,true,empSaleId)
+      
+
+      console.log(empBranchId,"empBranchId");
+      const query = getAllCaseQuery(statusType,searchQuery,startDate,endDate,false,false,empId,true,empSaleId,empBranchId)
       if(!query.success) return res.status(400).json({success: false, message: query.message})
 
       const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
@@ -419,12 +432,22 @@ export const employeeViewAllPartner = async(req,res)=>{
 
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo-1)*pageItemLimit :0;
+      const startDate = req.query.startDate
+      const endDate = req.query.endDate
       const searchQuery = req.query.search ? req.query.search : "";
-      const empSaleId =  req?.user?.empType?.toLowerCase()=="sales" ? req?.user?._id :false
+      let empSaleId =  (employee?.type?.toLowerCase()=="sales" || employee?.type?.toLowerCase()=="Sathi Team".toLowerCase() )? req?.user?._id :false
+      let branchId =false
+      if(req.query?.empId!="false"){
+         if(!validMongooseId(req.query?.empId)) return res.status(400).json({success:false,message:"Not a valid employee Id"})
+         empSaleId = req.query?.empId
+      }else if(employee?.type?.toLowerCase()=="branch"){
+         branchId = employee?.branchId
+         empSaleId = false
+      }
 
-   const query = getAllPartnerSearchQuery(searchQuery,true,empSaleId)
+   const query = getAllPartnerSearchQuery(searchQuery,true,empSaleId,startDate,endDate,branchId)
    if(!query.success) return res.status(400).json({success:false,message:query.message})
-   const getAllPartner = await Partner.find(query.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: 1 });
+   const getAllPartner = await Partner.find(query.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
    const noOfPartner = await Partner.find(query.query).count()
     return res.status(200).json({success:true,message:"get partner data",data:getAllPartner,noOfPartner:noOfPartner});
      
@@ -820,7 +843,7 @@ export const allEmployeeDashboard = async (req, res) => {
       if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
       if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
 
-      const empSaleId = employee?.type?.toLowerCase() === "sales" ? req?.user?._id : false;
+      const empSaleId = (employee?.type?.toLowerCase() === "sales" || employee?.type?.toLowerCase()=="Sathi Team".toLowerCase()) ? req?.user?._id : false;
       const filter = empSaleId ? { salesId: empSaleId,isActive:true } : { isActive: true };
       const noOfPartner = await Partner.find(filter).count();
       const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
@@ -919,7 +942,7 @@ export const saleEmployeeAddPartner = async (req, res) => {
       const employee = await Employee.findById(req?.user?._id)
       if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
       if(!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
-      if(employee?.type?.toLowerCase()!="sales"){
+      if(employee?.type?.toLowerCase()!="sales" && employee?.type?.toLowerCase()!="Sathi Team".toLowerCase()){
          return res.status(400).json({success: false, message:"Access denied"})
       }
 
@@ -931,10 +954,11 @@ export const saleEmployeeAddPartner = async (req, res) => {
          return res.status(400).json({ success: true, message: "Partner account already exist",});
       }
 
-      const jwtString = await Jwt.sign({ ...req.body,empId:req?.user?._id},process.env.EMPLOYEE_SECRET_KEY,{expiresIn:'24h'})
+      const jwtString = await Jwt.sign({ ...req.body,empId:req?.user?._id,empBranchId:employee?.branchId?.toLowerCase()},process.env.EMPLOYEE_SECRET_KEY,{expiresIn:'24h'})
       
       const requestLink = `/partner/accept-request/${jwtString}`
       await sendAddPartnerRequest(req.body.email,requestLink)
+      // console.log(requestLink,"requestLink----");
       return res.status(200).json({ success: true, message: "Successfully send add partner request"});
 
    } catch (error) {
@@ -952,7 +976,7 @@ export const saleEmployeeAddCase = async (req, res) => {
       const employee = await Employee.findById(req?.user?._id)
       if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
       if(!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
-      if(employee?.type?.toLowerCase()!="sales"){
+      if(employee?.type?.toLowerCase()!="sales" && employee?.type?.toLowerCase()!="Sathi Team".toLowerCase()){
          return res.status(400).json({success: false, message:"Access denied"})
       }
 
@@ -980,7 +1004,7 @@ export const saleEmployeeAddCase = async (req, res) => {
       //   remark: "pending stage.",
       //   consultant: "",
       // }]
-      const newAddCase = new Case({...req.body,caseDocs:[]})
+      const newAddCase = new Case({...req.body,branchId:employee?.branchId?.toLowerCase(),caseDocs:[]})
       const noOfCase = await Case.count()
       newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
       await newAddCase.save()
@@ -1019,9 +1043,9 @@ export const saleEmpViewPartnerReport = async (req, res) => {
       const employee = await Employee.findById(req?.user?._id)
       if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
       if(!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
-      if(employee?.type?.toLowerCase()!="sales"){
-         return res.status(400).json({success: false, message:"Access denied"})
-      }
+      // if(employee?.type?.toLowerCase()!="sales"){
+      //    return res.status(400).json({success: false, message:"Access denied"})
+      // }
 
       if (!validMongooseId(req.query.partnerId)) return res.status(400).json({ success: false, message: "Not a valid partnerId" })
       const partner = await Partner.findById(req.query.partnerId).select("-password")
@@ -1110,17 +1134,30 @@ export const salesDownloadCaseReport = async (req, res) => {
       const employee = await Employee.findById(req?.user?._id)
       if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
       if(!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
-      const empSaleId =  req?.user?.empType?.toLowerCase()=="sales" ? req?.user?._id :false
 
- 
        // query = ?statusType=&search=&limit=&pageNo
        const searchQuery = req.query.search ? req.query.search : "";
        const statusType = req.query.status ? req.query.status : "";
        const startDate = req.query.startDate ? req.query.startDate : "";
        const endDate = req.query.endDate ? req.query.endDate : "";
        const type = req?.query?.type ? req.query.type : true
+       const caseAccess = ["operation","finance"]
+       let empSaleId =  (employee?.type?.toLowerCase()=="sales" || employee?.type?.toLowerCase()=="Sathi Team".toLowerCase()) ? req?.user?._id :false
+       let empId = !caseAccess?.includes(req?.user?.empType?.toLowerCase()) ?  req?.user?._id : false
+      let empBranchId = false
+       // console.log("empSaleId",empSaleId);
  
-       const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type,empSaleId)
+       if(req.query?.empId!="false"){
+          if(!validMongooseId(req.query?.empId)) return res.status(400).json({success:false,message:"Not a valid employee Id"})
+          empSaleId = req.query?.empId
+          empId=false
+       }else if(employee?.type?.toLowerCase()=="branch"){
+         empBranchId = employee?.branchId
+         empSaleId = false
+         empId = false
+      }
+ 
+       const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, empId, type,empSaleId,empBranchId)
        if (!query.success) return res.status(400).json({ success: false, message: query.message })
        const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
  
@@ -1136,3 +1173,71 @@ export const salesDownloadCaseReport = async (req, res) => {
  
    }
  }
+
+ 
+export const employeeDownloadAllPartner = async(req,res)=>{
+   try {
+      const verify =  await authEmployee(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const employee = await Employee.findById(req?.user?._id)
+      if(!employee) return res.status(401).json({success: false, message:"Employee account not found"})
+      if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
+
+      const startDate = req.query.startDate
+      const endDate = req.query.endDate
+
+      const searchQuery = req.query.search ? req.query.search : "";
+      let empSaleId =  (employee?.type?.toLowerCase()=="sales" || employee?.type?.toLowerCase()=="Sathi Team".toLowerCase()) ? req?.user?._id :false
+      let branchId = false
+      if(req.query?.empId!="false"){
+         if(!validMongooseId(req.query?.empId)) return res.status(400).json({success:false,message:"Not a valid employee Id"})
+         empSaleId = req.query?.empId
+      }else if(employee?.type?.toLowerCase()=="branch"){
+         branchId = employee?.branchId
+         empSaleId = false
+      }
+
+   const query = getAllPartnerSearchQuery(searchQuery,true,empSaleId,startDate,endDate,branchId)
+   if(!query.success) return res.status(400).json({success:false,message:query.message})
+   const getAllPartner = await Partner.find(query.query).select("-password").sort({ createdAt: 1 });
+
+         // Generate Excel buffer
+         const excelBuffer = await getAllPartnerDownloadExcel(getAllPartner,empSaleId);
+         res.setHeader('Content-Disposition', 'attachment; filename="partners.xlsx"')
+         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+         res.status(200)
+         res.send(excelBuffer)
+     
+   } catch (error) {
+      console.log("viewAllPartnerByAdmin in error:",error);
+      res.status(500).json({success:false,message:"Internal server error",error:error});
+      
+   }
+}
+
+export const empViewAllEmployee = async (req, res) => {
+   try {
+      const verify =  await authEmployee(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const employee = await Employee.findById(req?.user?._id)
+      if(!employee) return res.status(401).json({success: false, message:"Employee account not found"})
+      if(!employee?.isActive) return res.status(401).json({success: false, message:"Employee account not active"})
+
+      const searchQuery = req.query.search ? req.query.search : "";
+      const pageItemLimit = req.query.limit ? req.query.limit : 10;
+      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const type = req.query.type ? req.query.type : true;
+      const department = employee?.type?.toLowerCase()=="sales" ? employee?.type : false
+      const query = getAllEmployeeSearchQuery(searchQuery,true,department,employee?._id,employee?.branchId)
+      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const noOfEmployee = await Employee.find(query).count()
+      return res.status(200).json({ success: true, message: "get employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
+
+   } catch (error) {
+      console.log("adminViewAllEmployee in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}

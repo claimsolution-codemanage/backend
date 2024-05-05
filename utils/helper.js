@@ -41,8 +41,8 @@ export const getValidateDate = (date) => {
 }
 
 
-export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, partnerId, clientId, employeeId, type = true, empSaleId = false) => {
- console.log("status",statusType);
+export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, partnerId, clientId, employeeId, type = true, empSaleId = false,branchId=false) => {
+ console.log("status",statusType,branchId);
   if (startDate && endDate) {
     const validStartDate = getValidateDate(startDate)
     if (!validStartDate) return { success: false, message: "start date not formated" }
@@ -61,6 +61,7 @@ export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, par
 
       { currentStatus: { $regex: statusType, $options: "i" } },
       { isActive: type },
+      branchId ?  { branchId: { $regex:branchId, $options: "i" }} : {},
       {
         $or: [
           { name: { $regex: searchQuery, $options: "i" } },
@@ -71,6 +72,8 @@ export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, par
           { mobileNo: { $regex: searchQuery, $options: "i" } },
           { policyType: { $regex: searchQuery, $options: "i" } },
           { caseFrom: { $regex: searchQuery, $options: "i" } },
+          { branchId: { $regex: searchQuery, $options: "i" } },
+
 
 
         ]
@@ -118,7 +121,7 @@ export const getAllCaseDocQuery = (searchQuery, startDate, endDate) => {
  }
 
 
-export const getAllPartnerSearchQuery = (searchQuery, type, empSaleId = false, startDate = "", endDate = "") => {
+export const getAllPartnerSearchQuery = (searchQuery, type, empSaleId = false, startDate = "", endDate = "",branchId=false) => {
   console.log("salesId", empSaleId, startDate, endDate);
   if (startDate && endDate) {
     const validStartDate = getValidateDate(startDate)
@@ -130,6 +133,7 @@ export const getAllPartnerSearchQuery = (searchQuery, type, empSaleId = false, s
     $and: [
       empSaleId ? { shareEmployee: { $in: empSaleId } } : {},
       { isActive: type },
+      branchId ?  { branchId: { $regex:branchId, $options: "i" }} : {},
       {
         $or: [
           { "profile.consultantName": { $regex: searchQuery, $options: "i" } },
@@ -139,6 +143,7 @@ export const getAllPartnerSearchQuery = (searchQuery, type, empSaleId = false, s
           { "profile.primaryEmail": { $regex: searchQuery, $options: "i" } },
           { "profile.aadhaarNo": { $regex: searchQuery, $options: "i" } },
           { "profile.panNo": { $regex: searchQuery, $options: "i" } },
+          { branchId: { $regex: searchQuery, $options: "i" } },
         ]
       },
       startDate && endDate ? {
@@ -187,15 +192,19 @@ export const getAllClientSearchQuery = (searchQuery, type, startDate = "", endDa
   return { success: true, query: query }
 }
 
-export const getAllEmployeeSearchQuery = (searchQuery,type=true) => {
+export const getAllEmployeeSearchQuery = (searchQuery,type=true,department,exclude,branchId) => {
   let query = {
     $and:[
       {isActive:type},
+      department ? {type:{ $regex: department, $options: "i" }} :{},
+      exclude ? {_id:{$ne:exclude}} :{},
+      branchId ? {branchId:{ $regex: branchId, $options: "i" }} :{},
       {
         $or: [
           { fullName: { $regex: searchQuery, $options: "i" } },
           { email: { $regex: searchQuery, $options: "i" } },
           { mobileNo: { $regex: searchQuery, $options: "i" } },
+          { branchId: { $regex: searchQuery, $options: "i" } },
           { type: { $regex: searchQuery, $options: "i" } },
           { designation: { $regex: searchQuery, $options: "i" } },
         ]
@@ -285,6 +294,7 @@ export const getDownloadCaseExcel = async (getAllCase = [],notFrom) => {
   const worksheet = workbook.addWorksheet('Cases');
   // Define Excel columns
   worksheet.columns = [
+    { header: 'Branch ID', key: 'branchId', width: 20 },
     { header: 'Case From', key: 'caseFrom', width: 20 },
     { header: 'File No', key: 'fileNo', width: 30 },
     { header: 'Current Status', key: 'currentStatus', width: 30 },
@@ -307,6 +317,7 @@ export const getDownloadCaseExcel = async (getAllCase = [],notFrom) => {
   // Populate Excel rows with data
   getAllCase.forEach((caseData, index) => {
     worksheet.addRow({
+      branchId: caseData?.branchId,
       caseFrom: caseData?.caseFrom,
       fileNo: caseData?.fileNo,
       currentStatus: caseData?.currentStatus,
@@ -333,11 +344,12 @@ export const getDownloadCaseExcel = async (getAllCase = [],notFrom) => {
   return await workbook.xlsx.writeBuffer();
 }
 
-export const getAllPartnerDownloadExcel = async (getAllPartner = [], type = false) => {
+export const getAllPartnerDownloadExcel = async (getAllPartner = [], empSaleId = false) => {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Cases');
   // Define Excel columns
   worksheet.columns = [
+    { header: 'Branch ID', key: 'branchId', width: 20 },
     { header: 'Type', key: 'type', width: 20 },
     { header: 'Consultant Name', key: 'consultantName', width: 20 },
     { header: 'Consultant Code', key: 'consultantCode', width: 30 },
@@ -367,7 +379,8 @@ export const getAllPartnerDownloadExcel = async (getAllPartner = [], type = fals
   // Populate Excel rows with data
   getAllPartner.forEach((partnerData, index) => {
     worksheet.addRow({
-      type: type ? (partnerData?.shareEmployee?.includes(partnerData?.salesId) ? "Added" : "Shared") : partnerData?.salesId ? "Sales" : "Self",
+      branchId: partnerData?.branchId,
+      type: empSaleId ? (partnerData?.salesId==empSaleId ? "Added" : "Shared") : partnerData?.salesId ? "Sales" : "Self",
       consultantName: partnerData?.profile?.consultantName,
       consultantCode: partnerData?.profile?.consultantCode,
       associateWithUs: partnerData?.profile?.associateWithUs,

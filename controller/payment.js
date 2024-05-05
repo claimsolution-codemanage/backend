@@ -112,7 +112,8 @@ export const paymentWebHook = async (req, res) => {
                        info:obj
                      }
                   },{new:true})
-                  return res?.render("paymentSuccess",{message:"Successfully bill paid",redirectUrl})
+                 return  res.redirect("https://www.claimsolution.in/client/all-invoices")
+                  // return res?.render("paymentSuccess",{message:"Successfully bill paid",redirectUrl})
                }else{
                   return res?.render("paymentFailed",{message:"Transaction bill not found",redirectUrl})
                }

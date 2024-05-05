@@ -80,7 +80,11 @@ const caseSchema = new mongoose.Schema({
       type:{type:String},
       commit:{type:String},
       Date:{type:Date}
-   }]}
+   }]},
+   branchId:{
+      type:String,
+      default:"",
+   }
 
 },{timestamps:true});
 

@@ -61,7 +61,7 @@ export const clientSignUp = async (req, res) => {
 
     const otp = otp6Digit();
     const client = await Client.find({ mobileNo: req.body.mobileNo });
-    const clientWithEmail = await Client.find({ email: req?.body?.email })
+    const clientWithEmail = await Client.find({ email: req?.body?.email?.toLowerCase() })
     const { agreement } = req.body
     if (!agreement) {
       return res.status(400).json({ success: false, message: "Must agree with our service agreement" })
@@ -75,7 +75,7 @@ export const clientSignUp = async (req, res) => {
     if (client.length == 0 && clientWithEmail.length == 0) {
       const newClient = new Client({
         fullName: req.body.fullName,
-        email: req.body.email,
+        email: req?.body?.email?.toLowerCase(),
         mobileNo: req.body.mobileNo,
         password: bcrypePassword,
         emailOTP: { otp: otp, createAt: Date.now() },
@@ -97,7 +97,7 @@ export const clientSignUp = async (req, res) => {
         const updateClient = await Client.findByIdAndUpdate(client[0]?._id, {
           $set: {
             fullName: req.body.fullName,
-            email: req.body.email,
+            email: req?.body?.email?.toLowerCase(),
             mobileNo: req.body.mobileNo,
             password: bcrypePassword,
             emailOTP: { otp: otp, createAt: Date.now() },
@@ -366,7 +366,7 @@ export const clientsignIn = async (req, res) => {
   try {
     const { error } = validateClientSignIn(req.body);
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-    const client = await Client.find({ email: req?.body?.email });
+    const client = await Client.find({ email: req?.body?.email?.toLowerCase() });
     if (client.length == 0) return res.status(404).json({ success: false, message: "invaild email/password" })
     if (!client[0]?.isActive || !client[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Account is not active" })
     // if(!client[0]?.acceptClientTls) return res.status(400).json({success:false,message:"Please accept our TLS first"})

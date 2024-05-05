@@ -7,7 +7,8 @@ employeeCreateInvoice,employeeViewAllInvoice,employeeViewInvoiceById,employeeDow
 employeeEditInvoice,allEmployeeDashboard,employeeUnActiveInvoice,employeeUpdateCaseById,
 employeeEditClient,employeeupdateParnterProfile,employeeUpdatePartnerBankingDetails,
 saleEmployeeAddPartner,saleEmployeeAddCase,employeeUploadImage,employeeUploadAttachment,
-employeeRemoveInvoice,salesDownloadCaseReport,saleEmpViewPartnerReport,empDownloadPartnerReport
+employeeRemoveInvoice,salesDownloadCaseReport,saleEmpViewPartnerReport,empDownloadPartnerReport,
+employeeDownloadAllPartner,empViewAllEmployee
 } from '../controller/employee.js';
 
 
@@ -19,16 +20,19 @@ router.put("/employeeForgetPassword",employeeForgetPassword)
 
 router.get("/all/dashboard",allEmployeeDashboard)
 
+// case
 router.get("/viewAllCase",viewAllEmployeeCase)
 router.get("/viewCaseById",employeeViewCaseByIdBy)
 router.put("/changeCaseStatus",changeStatusEmployeeCase)
 router.put("/addCaseComment",employeeAddCaseComment)
 router.put("/updateCaseById",employeeUpdateCaseById)
 
+// client
 router.get("/viewAllClient",employeeViewAllClient)
 router.get("/viewClientById",employeeViewClientById)
 router.put("/updateClient",employeeEditClient)
 
+// partner
 router.get("/viewAllPartner",employeeViewAllPartner)
 router.get("/viewPartnerById",employeeViewPartnerById)
 router.put("/updatePartnerProfile",employeeupdateParnterProfile)
@@ -60,6 +64,12 @@ router.post("/upload/attachment",employeeUploadAttachment)
 
 // report
 router.get("/partnerReport",empDownloadPartnerReport)
+
+// download
+router.get("/download/allPartner",employeeDownloadAllPartner)
+
+// emphead
+router.get("/head/allEmployee",empViewAllEmployee)
 
 
 

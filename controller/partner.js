@@ -67,7 +67,7 @@ export const signUp = async function (req, res) {
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
     const otp = otp6Digit();
-    const partner = await Partner.find({ email: req.body.email });
+    const partner = await Partner.find({ email: req?.body?.email?.toLowerCase() });
     //  const partnerWithEmail = await Partner.find({email:req.body.email})
     const { agreement } = req.body
     if (!agreement) {
@@ -80,7 +80,7 @@ export const signUp = async function (req, res) {
     if (partner.length == 0) {
       const newPartner = new Partner({
         fullName: req.body.fullName,
-        email: req.body.email,
+        email: req?.body?.email?.toLowerCase(),
         mobileNo: req.body.mobileNo,
         workAssociation: req.body.workAssociation,
         areaOfOperation: req.body.areaOfOperation,
@@ -107,7 +107,7 @@ export const signUp = async function (req, res) {
         const updatePatner = await Partner.findByIdAndUpdate(partner[0]?._id, {
           $set: {
             fullName: req.body.fullName,
-            email: req.body.email,
+            email: req?.body?.email?.toLowerCase(),
             mobileNo: req.body.mobileNo,
             workAssociation: req.body.workAssociation,
             areaOfOperation: req.body.areaOfOperation,
@@ -419,7 +419,7 @@ export const signIn = async (req, res) => {
   try {
     const { error } = validateSignIn(req.body);
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-    const partner = await Partner.find({ email: req?.body?.email });
+    const partner = await Partner.find({ email: req?.body?.email?.toLowerCase() });
     if (partner.length == 0) return res.status(404).json({ success: false, message: "Not register with us" })
     if (!partner[0]?.isActive || !partner[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Account is not active" })
     const validPassword = await bcrypt.compare(req.body.password, partner[0].password,)
@@ -447,8 +447,8 @@ export const signUpWithRequest = async (req, res) => {
       const decode = await jwtDecode(tokenId)
       console.log("decode", decode);
       const bcryptPassword = await bcrypt.hash(password, 10)
-      const { fullName, email, mobileNo, workAssociation, areaOfOperation, empId } = decode
-      if (!email || !mobileNo || !fullName || !workAssociation || !areaOfOperation || !empId) return res.status(400).json({ success: false, message: "Invalid/expired link" })
+      const { fullName, email, mobileNo, workAssociation, areaOfOperation, empId,empBranchId } = decode
+      if (!email || !mobileNo || !fullName || !workAssociation || !areaOfOperation || !empId ||!empBranchId) return res.status(400).json({ success: false, message: "Invalid/expired link" })
       const partner = await Partner.find({ email: email })
       if (partner[0]?.isActive || partner[[0]]?.mobileVerify || partner[0]?.emailVerify) return res.status(400).json({ success: false, message: "Account is already exist" })
       const noOfPartners = await Partner.count()
@@ -504,7 +504,8 @@ export const signUpWithRequest = async (req, res) => {
           upiId: "",
         },
         salesId: empId,
-        shareEmployee: [empId]
+        shareEmployee: [empId],
+        branchId:empBranchId
       })
       await newPartner.save()
       const token = newPartner?.getAuth(true)

@@ -85,12 +85,12 @@ export const adminSignUp = async (req, res) => {
       const bcryptPassword = await bcrypt.hash(systemPassword, 10)
       const newAdmin = new Admin({
          fullName: req.body.fullName,
-         email: req.body.email,
+         email: req?.body?.email?.toLowerCase(),
          mobileNo: req.body.mobileNo,
          password: bcryptPassword,
       })
       try {
-         await sendAdminSigninMail(systemPassword, req.body.email);
+         await sendAdminSigninMail(systemPassword, req?.body?.email?.toLowerCase());
          await newAdmin.save()
          res.status(200).json({ success: true, message: "Credentials send", systemPassword: systemPassword });
       } catch (err) {
@@ -113,7 +113,7 @@ export const adminSignin = async (req, res) => {
       const { error } = validateAdminSignIn(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      const admin = await Admin.find({ email: req.body.email })
+      const admin = await Admin.find({ email: req?.body?.email?.toLowerCase() })
       if (admin.length == 0) return res.status(404).json({ success: false, message: "Admin account not exists" })
 
       if (!admin[0]?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
@@ -440,20 +440,23 @@ export const createEmployeeAccount = async (req, res) => {
       const { error } = validateEmployeeSignUp(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      const existEmployee = await Employee.find({ email: req.body.email })
-      if (existEmployee.length > 0) return res.status(401).json({ success: false, message: "Employee account already exists" })
+      const existEmployee = await Employee.find({ $or:[{email: { $regex:req.body.email, $options: "i" } },{ empId: { $regex:req.body.empId, $options: "i" } }] })
+      if (existEmployee.length > 0) return res.status(401).json({ success: false, message: "Employee account/empId already exists" })
 
       const systemPassword = generatePassword()
       const bcryptPassword = await bcrypt.hash(systemPassword, 10)
       const newEmployee = new Employee({
          fullName: req.body.fullName,
-         email: req.body.email,
+         empId:req.body?.empId,
+         branchId:req.body?.branchId,
+         email: req?.body?.email?.toLowerCase(),
          mobileNo: req.body.mobileNo,
          password: bcryptPassword,
          type: req?.body?.type ? req?.body?.type : "assistant",
       })
       try {
          await sendEmployeeSigninMail(req.body.email, systemPassword);
+         // console.log(systemPassword,"systemPassword---------");
          await newEmployee.save()
          return res.status(200).json({ success: true, message: "Successfully create new Employee", });
       } catch (err) {
@@ -488,6 +491,7 @@ export const adminUpdateEmployeeAccount = async (req, res) => {
          $set: {
             fullName: req.body.fullName,
             type: req.body.type,
+            branchId:req.body?.branchId,
             designation: req.body.designation,
          }
       })
@@ -541,8 +545,9 @@ export const adminViewAllEmployee = async (req, res) => {
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = req.query.search ? req.query.search : "";
       const type = req.query.type ? req.query.type : true;
+      const empType = req.query?.empType ? req.query?.empType :false
 
-      const query = getAllEmployeeSearchQuery(searchQuery,type)
+      const query = getAllEmployeeSearchQuery(searchQuery,type,empType)
       const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
       const noOfEmployee = await Employee.find(query).count()
       return res.status(200).json({ success: true, message: "get employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
@@ -812,7 +817,7 @@ export const adminViewEmpSaleReport = async (req, res) => {
       if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid salesId" })
       const empSale = await Employee.findById(empSaleId).select("-password")
       if (!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
-      if (empSale.type?.toLowerCase() != "sales") return res.status(404).json({ success: false, message: "Employee designation is not sale" })
+      if (empSale.type?.toLowerCase() != "sales" && empSale?.type?.toLowerCase()!="sathi team") return res.status(404).json({ success: false, message: "Employee designation is not sale/sathi team" })
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = req.query.search ? req.query.search : "";
@@ -858,7 +863,7 @@ export const adminViewEmpSalePartnerReport = async (req, res) => {
       if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid salesId" })
       const empSale = await Employee.findById(empSaleId).select("-password")
       if (!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
-      if (empSale.type?.toLowerCase() != "sales") return res.status(404).json({ success: false, message: "Employee designation is not sale" })
+      if (empSale.type?.toLowerCase() != "sales" && empSale?.type?.toLowerCase()!="sathi team") return res.status(404).json({ success: false, message: "Employee designation is not sale" })
 
 
       // query = ?statusType=&search=&limit=&pageNo
@@ -2170,7 +2175,7 @@ export const adminEmpSaleReportDownload = async (req, res) => {
       if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid salesId" })
       const empSale = await Employee.findById(empSaleId).select("-password")
       if (!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
-      if (empSale.type?.toLowerCase() != "sales") return res.status(404).json({ success: false, message: "Employee designation is not sale" })
+      if (empSale.type?.toLowerCase() != "sales" && empSale?.type?.toLowerCase()!="sathi team") return res.status(404).json({ success: false, message: "Employee designation is not sale/sathi team" })
       const searchQuery = req.query.search ? req.query.search : "";
       const statusType = req.query.status ? req.query.status : "";
       const startDate = req.query.startDate ? req.query.startDate : "";
@@ -2206,7 +2211,7 @@ export const adminEmpSalePartnerReportDownload = async (req, res) => {
       if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid salesId" })
       const empSale = await Employee.findById(empSaleId).select("-password")
       if (!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
-      if (empSale.type?.toLowerCase() != "sales") return res.status(404).json({ success: false, message: "Employee designation is not sale" })
+      if (empSale.type?.toLowerCase() != "sales" && empSale?.type?.toLowerCase()!="sathi team") return res.status(404).json({ success: false, message: "Employee designation is not sale/sathi team" })
 
       const searchQuery = req.query.search ? req.query.search : "";
       const type = req?.query?.type ? req.query.type : true;
@@ -2217,7 +2222,7 @@ export const adminEmpSalePartnerReportDownload = async (req, res) => {
       if (!query.success) return res.status(400).json({ success: false, message: query?.message })
       const getAllPartner = await Partner.find(query?.query).select("-password").sort({ createdAt: -1 });
       // Generate Excel buffer
-      const excelBuffer = await getAllPartnerDownloadExcel(getAllPartner,true);
+      const excelBuffer = await getAllPartnerDownloadExcel(getAllPartner,empSaleId);
 
       res.setHeader('Content-Disposition', 'attachment; filename="partners.xlsx"')
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
