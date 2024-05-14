@@ -37,7 +37,8 @@ const billSchema = new mongoose.Schema({
     gstAmt:{type:Number,require:true},
     totalAmt:{type:Number,require:true},
     // invoiceDate:{type:String,require:true},
-    billDate:{type:Number,default:new Date().getTime()}
+    billDate:{type:Number,default:new Date().getTime()},
+    branchId:{ type:String, default:""},
 },{timestamps:true});
 
 

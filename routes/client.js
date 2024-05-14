@@ -4,7 +4,7 @@ import {clientSignUp,clientsignIn,verifyClientEmailOtp,updateClientProfile,getCl
     addNewClientCase,viewClientCaseById,viewClientAllCase,clientForgetPassword,clientResetPassword,
     clientMobileNoVerify,clientSendMobileOtpCode,clientAuthenticate,clientAddCaseFile,clientTls,
     acceptClientTerms_Conditions,clientDashboard,clientUpdateCaseById,clientResendOtp,clientViewAllInvoice,clientViewInvoiceById,
-    clientPayInvoiceById,clientUploadImage,clientUploadAttachment
+    clientPayInvoiceById,clientUploadImage,clientUploadAttachment,signUpWithRequest
 } from '../controller/client.js';
 
 
@@ -12,6 +12,7 @@ router.post("/signin", clientsignIn)
 router.post("/signup", clientSignUp)
 router.get("/authenticate",clientAuthenticate)
 router.post("/verifyEmail",verifyClientEmailOtp)
+router.post("/acceptRequest",signUpWithRequest)
 router.post("/sendMobileOtpCode",clientSendMobileOtpCode)
 router.post("/clientMobileNoVerify",clientMobileNoVerify)
 router.get("/getClientProfile", getClientProfile)

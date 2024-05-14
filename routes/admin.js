@@ -14,8 +14,9 @@ adminDownloadAllCase,adminDownloadAllPartner,adminDownloadPartnerReport,
 adminEmpSaleReportDownload,adminEmpSalePartnerReportDownload,adminAllClientDownload,
 adminGetSaleEmployee,adminSharePartnerToSaleEmp,adminGetNormalEmployee,adminRemovePartnerToSaleEmp,
 adminUploadImage,adminUploadAttachment,adminCreateInvoice,adminViewAllInvoice,adminViewInvoiceById,
-adminUnActiveInvoice,adminEditInvoice,adminRemoveInvoice,adminSyncModal,
-adminAllUnactiveCaseDoc,adminUnactiveCaseDoc
+adminUnActiveInvoice,adminEditInvoice,adminRemoveInvoice,
+adminAllUnactiveCaseDoc,adminUnactiveCaseDoc,adminChangeBranch,
+adminEmployeeProfile
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -39,6 +40,7 @@ router.put("/settingDetailsUpdate",adminSettingDetailsUpdate)
 
 // for employee
 router.post("/createEmployeeAccount", createEmployeeAccount)
+router.get("/employee/profile",adminEmployeeProfile)
 router.put("/updateEmployeeAccount", adminUpdateEmployeeAccount)
 router.delete("/deleteEmployeeAccount", adminDeleteEmployeeAccount)
 router.put("/setIsActiveEmployee",adminSetIsActiveEmployee)
@@ -74,6 +76,7 @@ router.put("/addCaseFeeClient",adminAddCaseFeeClient)
 router.put("/updateClientCaseFee",adminUpdateClientCaseFee)
 router.put("/changeCaseIsActive",adminSetIsActiveCase)
 router.put("/addReferenceCaseAndMarge",adminAddReferenceCaseAndMarge)
+router.put("/removeReferenceCase",adminRemoveReferenceCase)
 router.delete("/deleteCaseById",adminDeleteCaseById)
 router.delete("/deleteCaseDocId",adminDeleteCaseDocById)
 
@@ -100,7 +103,6 @@ router.put("/uploadCompanyPartnerTls",uploadCompanyPartnerTls)
 // for job
 router.post("/addJob",adminAddJob)
 router.delete("/deleteJobById",adminDeleteJob)
-router.put("/removeReferenceCase",adminRemoveReferenceCase)
 
 // for complaint
 router.get("/viewAllComplaint",viewAllAdminComplaint)
@@ -133,11 +135,13 @@ router.get("/download/empSaleReport",adminEmpSaleReportDownload)
 router.get("/download/empSalePartnerReport",adminEmpSalePartnerReportDownload)
 
 
+// for change branch
+router.put("/change-branch",adminChangeBranch)
 
 
 
 // router.put("/updateModalSchema",adminUpdateModalSchema)
-// router.post("/synModal",adminSyncModal)
+
 
 
 

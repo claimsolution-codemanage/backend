@@ -10,6 +10,7 @@ const employeeSchema = new mongoose.Schema({
    mobileNo:{type:String,required:"true"},
    password:{type:String,required:"true"},
    type:{type:String,default:"Operation",required:true},
+   referEmpId:{type:mongoose.Schema.ObjectId,ref:"Employee"},
    designation:{type:String,default:"Executive",required:true},
    isActive:{type:"boolean",default:true,required:"true"}
 },{timestamps:true});

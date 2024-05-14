@@ -1,6 +1,6 @@
 import express from 'express';
 const router = express.Router();
-import { employeeResetPassword,employeeSignin,changeStatusEmployeeCase,viewAllEmployeeCase, employeeViewCaseByIdBy,
+import { employeeResetPassword,employeeSignin,empProfile,changeStatusEmployeeCase,viewAllEmployeeCase, employeeViewCaseByIdBy,
 employeeViewAllClient,employeeViewClientById,employeeViewAllPartner,employeeViewPartnerById,employeeForgetPassword,
 employeeAuthenticate,employeeAddCaseComment,employeeResetForgetPassword,
 employeeCreateInvoice,employeeViewAllInvoice,employeeViewInvoiceById,employeeDownloadInvoiceById,
@@ -8,12 +8,15 @@ employeeEditInvoice,allEmployeeDashboard,employeeUnActiveInvoice,employeeUpdateC
 employeeEditClient,employeeupdateParnterProfile,employeeUpdatePartnerBankingDetails,
 saleEmployeeAddPartner,saleEmployeeAddCase,employeeUploadImage,employeeUploadAttachment,
 employeeRemoveInvoice,salesDownloadCaseReport,saleEmpViewPartnerReport,empDownloadPartnerReport,
-employeeDownloadAllPartner,empViewAllEmployee
+employeeDownloadAllPartner,empViewAllEmployee,empAddReferenceCaseAndMarge,empRemoveReferenceCase,
+empChangeBranch,createSathiTeamAcc
 } from '../controller/employee.js';
 
 
 router.post("/signin",employeeSignin)
 router.get("/authenticate",employeeAuthenticate)
+router.get("/profile",empProfile)
+router.post("/addSathiTeamAcc",createSathiTeamAcc)
 router.post("/resetPassword",employeeResetPassword)
 router.put("/resetForgetPassword",employeeResetForgetPassword)
 router.put("/employeeForgetPassword",employeeForgetPassword)
@@ -26,6 +29,9 @@ router.get("/viewCaseById",employeeViewCaseByIdBy)
 router.put("/changeCaseStatus",changeStatusEmployeeCase)
 router.put("/addCaseComment",employeeAddCaseComment)
 router.put("/updateCaseById",employeeUpdateCaseById)
+router.put("/operation/addReferenceCaseAndMarge",empAddReferenceCaseAndMarge)
+router.put("/operation/removeReferenceCase",empRemoveReferenceCase)
+
 
 // client
 router.get("/viewAllClient",employeeViewAllClient)
@@ -70,6 +76,10 @@ router.get("/download/allPartner",employeeDownloadAllPartner)
 
 // emphead
 router.get("/head/allEmployee",empViewAllEmployee)
+
+
+// change branch
+router.put("/operation/change-branch",empChangeBranch)
 
 
 

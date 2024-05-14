@@ -14,6 +14,16 @@ export const validateEmployeeSignUp =(body)=>{
   return bodySchema.validate(body)
 }
 
+export const validateSathiTeamSignUp =(body)=>{
+  const bodySchema = Joi.object({
+   fullName: Joi.string().required(),
+   email: Joi.string().email().required(),
+   mobileNo: Joi.string().required(),
+  })
+
+  return bodySchema.validate(body)
+}
+
 export const validateEmployeeUpdate=(body)=>{
   const bodySchema = Joi.object({
    fullName: Joi.string().required(),
@@ -84,6 +94,9 @@ export const validateAddPartner =(body)=>{
 
 export const validateAddEmpCase =(body)=>{
   const caseSchema = Joi.object({
+      clientEmail:Joi.string().email().allow('').optional(),
+      clientMobileNo:Joi.string().min(10).max(10).allow('').optional(),
+      clientName:Joi.string().allow('').optional(),
       partnerEmail:Joi.string().email().allow('').optional(),
       partnerCode:Joi.string().allow('').optional(),
       name:Joi.string().required(),

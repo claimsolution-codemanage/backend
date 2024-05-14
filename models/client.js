@@ -130,6 +130,14 @@ const clientSchema = new mongoose.Schema({
          type: String,
       },
    },
+   salesId:{
+      type:mongoose.Schema.ObjectId,
+      ref:"Employee",
+   },
+   branchId:{
+      type:String,
+      default:""
+   },
 
 },{timestamps:true});
 

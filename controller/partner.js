@@ -4,7 +4,7 @@ import {
   validateAddCase
 
 } from "../utils/validatePatner.js";
-import { otp6Digit, getAllCaseQuery, getDownloadCaseExcel } from "../utils/helper.js";
+import { otp6Digit, getAllCaseQuery, getDownloadCaseExcel, partnerGetDownloadCaseExcel } from "../utils/helper.js";
 import { sendOTPMail, sendForgetPasswordMail } from '../utils/sendMail.js'
 import { authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
@@ -231,7 +231,7 @@ export const verifyEmailOtp = async (req, res, next) => {
             profile: {
               profilePhoto: "",
               consultantName: partner?.fullName,
-              consultantCode: `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfPartners}`,
+              consultantCode: `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfPartners+1}`,
               associateWithUs: today,
               primaryEmail: partner?.email,
               alternateEmail: "",
@@ -470,7 +470,7 @@ export const signUpWithRequest = async (req, res) => {
         profile: {
           profilePhoto: "",
           consultantName: fullName,
-          consultantCode: `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfPartners}`,
+          consultantCode: `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfPartners+1}`,
           associateWithUs: today,
           primaryEmail: email,
           alternateEmail: "",
@@ -786,7 +786,7 @@ export const addNewCase = async (req, res) => {
     //   }
     // })
 
-    const newAddCase = new Case({...req.body,caseDocs:[]})
+    const newAddCase = new Case({...req.body,caseDocs:[],branchId:partner?.branchId})
     const noOfCase = await Case.count()
     newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
     await newAddCase.save()
@@ -1114,7 +1114,7 @@ export const partnerDownloadReport = async (req, res) => {
       if (!query.success) return res.status(400).json({ success: false, message: query.message })
       const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
 
-      const excelBuffer = await getDownloadCaseExcel(getAllCase)
+      const excelBuffer = await partnerGetDownloadCaseExcel(getAllCase)
       res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.status(200)

@@ -109,6 +109,24 @@ export const sendAddPartnerRequest = (email,link) => {
 	});
 };
 
+export const sendAddClientRequest = (email,link) => {
+	const mailOptions = {
+		from: process.env.GMAIL_USER,
+		to: email,
+		subject: "Client request",
+		html: addClientMail_HTML_TEMPLATE(link),
+	};
+	return new Promise((resolve, reject) => {
+		transport.sendMail(mailOptions, (error, info) => {
+			if (error) {
+				reject({ nodemailerError: error });
+			} else {
+				resolve({ nodemailerError: "" });
+			}
+		});
+	});
+};
+
 
 export const sendAccountTerm_ConditonsMail = (email,as,pdfBytes) => {
 	console.log("mail option",email,as);
@@ -502,6 +520,64 @@ const OTPMail_HTML_TEMPLATE = (email, otp,type) => {
 				 <div class="email-body">
 				 <p>Hi, You getting this mail to join claim solution as partner.</p>
 				 <p>To accept partner request <a href=${process.env.FRONTEND_URL+link}>Click here.</a></p>
+				 <p>For more information  <a href="${process.env.FRONTEND_URL}">${process.env.FRONTEND_URL_Base}</a></p>
+				 </div>
+				 <div class="email-footer">
+					<a href="www.claimsolution.in">www.claimsolution.in</a>
+				 </div>
+			  </div>
+			</div>
+		 </body>
+	  </html>
+	`;
+ }
+
+ const  addClientMail_HTML_TEMPLATE=(link)=>{
+	return `
+	  <!DOCTYPE html>
+	  <html>
+		 <head>
+			<meta charset="utf-8">
+			<title>Client Request</title>
+			<style>
+			  .container {
+				 width: 100%;
+				 height: 100%;
+				 padding: 20px;
+				 background-color: #f4f4f4;
+			  }
+			  .email {
+				 width: 80%;
+				 margin: 0 auto;
+				 background-color: #fff;
+				 padding: 20px;
+			  }
+			  .email-header {
+				 background-color: #333;
+				 color: #fff;
+				 padding: 20px;
+				 text-align: center;
+			  }
+			  .email-body {
+				 padding: 20px;
+			  }
+			  .email-footer {
+				 background-color: #333;
+				 color: #fff;
+				 padding: 20px;
+				 text-align: center;
+			  }
+			</style>
+		 </head>
+		 <body>
+			<div class="container">
+			  <div class="email">
+				 <div class="email-header">
+					<h1>Request to add as client</h1>
+				 </div>
+				 <div class="email-body">
+				 <p>Hi, You getting this mail to join claim solution as client.</p>
+				 <p>To accept client request <a href=${process.env.FRONTEND_URL+link}>Click here.</a></p>
 				 <p>For more information  <a href="${process.env.FRONTEND_URL}">${process.env.FRONTEND_URL_Base}</a></p>
 				 </div>
 				 <div class="email-footer">

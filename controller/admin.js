@@ -5,7 +5,7 @@ import {
    validateEditAdminCaseStatus,validateAdminSharePartner,validateAdminRemovePartner,
 } from "../utils/validateAdmin.js";
 import bcrypt from 'bcrypt';
-import { generatePassword, getAllCaseDocQuery, getAllInvoiceQuery } from "../utils/helper.js";
+import { generatePassword, getAllCaseDocQuery, getAllInvoiceQuery, getValidateDate } from "../utils/helper.js";
 import { sendAdminSigninMail, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import { authAdmin } from "../middleware/authentication.js";
 import Employee from "../models/employee.js";
@@ -453,6 +453,7 @@ export const createEmployeeAccount = async (req, res) => {
          mobileNo: req.body.mobileNo,
          password: bcryptPassword,
          type: req?.body?.type ? req?.body?.type : "assistant",
+         designation:req?.body?.designation ? req?.body?.designation : "executive"
       })
       try {
          await sendEmployeeSigninMail(req.body.email, systemPassword);
@@ -471,6 +472,30 @@ export const createEmployeeAccount = async (req, res) => {
 
    }
 }
+
+export const adminEmployeeProfile = async (req,res)=>{
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const {_id} = req.query;
+      if(!validMongooseId(_id)) return res.status(400).json({status:false,message:"Not a valid Id"})
+
+      const getEmp = await Employee.findById(_id).select("-password")
+      if(!getEmp) return res.status(400).json({success:false,message:"Employee account not found"})
+      
+      return res.status(200).json({success:true,data:getEmp})
+
+   } catch (error) {
+      console.log("adminEmployeeProfile in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
 
 export const adminUpdateEmployeeAccount = async (req, res) => {
    try {
@@ -817,7 +842,6 @@ export const adminViewEmpSaleReport = async (req, res) => {
       if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid salesId" })
       const empSale = await Employee.findById(empSaleId).select("-password")
       if (!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
-      if (empSale.type?.toLowerCase() != "sales" && empSale?.type?.toLowerCase()!="sathi team") return res.status(404).json({ success: false, message: "Employee designation is not sale/sathi team" })
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = req.query.search ? req.query.search : "";
@@ -826,22 +850,177 @@ export const adminViewEmpSaleReport = async (req, res) => {
       const endDate = req.query.endDate ? req.query.endDate : "";
       const type = req?.query?.type ? req.query.type : true
 
-      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type, empSaleId)
-      if (!query.success) return res.status(400).json({ success: false, message: query.message })
-      const aggregationPipeline = [
-         { $match: query?.query }, // Match the documents based on the query
-         {
-            $group: {
-               _id: null,
-               totalAmtSum: { $sum: "$claimAmount" }
-            }
-         }
-      ];
 
-      const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
-      const noOfCase = await Case.find(query?.query).count()
-      const aggregateResult = await Case.aggregate(aggregationPipeline);
-      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult, user: empSale });
+         const caseAccess = ["operation", "finance", "branch"]
+         if (caseAccess?.includes(empSale?.type?.toLowerCase())) {
+            empBranchId = empSale?.branchId
+            branchWise = true
+            const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, true, false, empSale?.branchId)
+            if (!query.success) return res.status(400).json({ success: false, message: query.message })
+            const aggregationPipeline = [
+                  { $match: query?.query }, // Match the documents based on the query
+                  {
+                     $group: {
+                        _id: null,
+                        totalAmtSum: { $sum: "$claimAmount" }
+                     }
+                  }
+               ];
+   
+            const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
+            const noOfCase = await Case.find(query?.query).count()
+            const aggregateResult = await Case.aggregate(aggregationPipeline);
+            return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult, user: empSale });
+      
+         } else {
+            let extactMatchQuery = [
+               { referEmpId: empSale?._id },
+               { _id: empSale?._id }
+            ]
+   
+            if((empSale?.type?.toLowerCase()=="sales" && empSale?.designation?.toLowerCase()=="manager")){
+               extactMatchQuery.push({ type: { $regex: "sales", $options: "i" } })
+               extactMatchQuery.push({ type: { $regex: "sathi team", $options: "i" } })
+            }
+            const extractType = await Employee.aggregate([
+               {
+                  $match: {
+                     $or: [
+                      ...extactMatchQuery
+                     ]
+                  }
+               },
+               {
+                  $group: {
+                     _id: null,
+                     shareEmp: { $push: "$_id" },
+                  }
+               },
+               {
+                  $lookup: {
+                     from: "partners",
+                     let: { shareEmp: "$shareEmp" },
+                     pipeline: [
+                        {
+                           $match: {
+                              $expr: {
+                                 $or: [
+                                    { $in: ["$salesId", "$$shareEmp"] },
+                                    { $in: ["$shareEmployee", "$$shareEmp"] }
+                                 ]
+                              }
+                           }
+                        }
+                     ],
+                     as: "partners"
+                  }
+               },
+               {
+                  $lookup: {
+                     from: "clients",
+                     let: { shareEmp: "$shareEmp" },
+                     pipeline: [
+                        {
+                           $match: {
+                              $expr: {
+                                 $or: [
+                                    { $in: ["$salesId", "$$shareEmp"] },
+   
+                                 ]
+                              }
+                           }
+                        }
+                     ],
+                     as: "allClients"
+                  }
+               },
+               {
+                  $project: {
+                     shareEmp: 1,
+                     _id: 0,
+                     allClients: {
+                        $map: {
+                           input: "$allClients",
+                           as: "allClients",
+                           in: "$$allClients._id"
+                        }
+                     },
+                     allPartners: {
+                        $map: {
+                           input: "$partners",
+                           as: "partner",
+                           in: "$$partner._id"
+                        }
+                     }
+                  }
+               },
+               {
+                  $project: {
+                     shareEmp: { $map: { input: "$shareEmp", as: "id", in: { $toString: "$$id" } } },
+                     allPartners: { $map: { input: "$allPartners", as: "id", in: { $toString: "$$id" } } },
+                     allClients: { $map: { input: "$allClients", as: "id", in: { $toString: "$$id" } } }
+                  }
+               }
+   
+            ])
+   
+            if (startDate && endDate) {
+               const validStartDate = getValidateDate(startDate)
+               if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+               const validEndDate = getValidateDate(endDate)
+               if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+            }
+   
+            let query = {
+               $and: [
+                  { isPartnerReferenceCase: false },
+                  { isEmpSaleReferenceCase: false },
+                  { currentStatus: { $regex: statusType, $options: "i" } },
+                  { isActive: true },
+                  { branchId: { $regex: empSale?.branchId, $options: "i" } },
+                  {
+                     $or: [
+                        { empSaleId: { $in: extractType?.[0]?.shareEmp } },
+                        { partnerId: { $in: extractType?.[0]?.allPartners } },
+                        { clientId: { $in: extractType?.[0]?.allClients } },
+                     ]
+                  },
+                  {
+                     $or: [
+                        { name: { $regex: searchQuery, $options: "i" } },
+                        { partnerName: { $regex: searchQuery, $options: "i" } },
+                        { consultantCode: { $regex: searchQuery, $options: "i" } },
+                        { fileNo: { $regex: searchQuery, $options: "i" } },
+                        { email: { $regex: searchQuery, $options: "i" } },
+                        { mobileNo: { $regex: searchQuery, $options: "i" } },
+                        { policyType: { $regex: searchQuery, $options: "i" } },
+                        { caseFrom: { $regex: searchQuery, $options: "i" } },
+                        { branchId: { $regex: searchQuery, $options: "i" } },
+                     ]
+                  },
+                  startDate && endDate ? {
+                     createdAt: {
+                        $gte: new Date(startDate).setHours(0, 0, 0, 0),
+                        $lte: new Date(endDate).setHours(23, 59, 59, 999)
+                     }
+                  } : {}
+               ]
+            };
+            const getAllCase = await Case.find(query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
+            const noOfCase = await Case.find(query).count()
+            const aggregationPipeline = [
+               { $match: query }, // Match the documents based on the query
+               {
+                  $group: {
+                     _id: null,
+                     totalAmtSum: { $sum: "$claimAmount" }
+                  }
+               }
+            ];
+            const aggregateResult = await Case.aggregate(aggregationPipeline);
+            return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult, user: empSale });
+
+         }
 
    } catch (error) {
       console.log("updateAdminCase in error:", error);
@@ -863,7 +1042,6 @@ export const adminViewEmpSalePartnerReport = async (req, res) => {
       if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid salesId" })
       const empSale = await Employee.findById(empSaleId).select("-password")
       if (!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
-      if (empSale.type?.toLowerCase() != "sales" && empSale?.type?.toLowerCase()!="sathi team") return res.status(404).json({ success: false, message: "Employee designation is not sale" })
 
 
       // query = ?statusType=&search=&limit=&pageNo
@@ -874,11 +1052,100 @@ export const adminViewEmpSalePartnerReport = async (req, res) => {
       const startDate = req.query.startDate ? req.query.startDate : "";
       const endDate = req.query.endDate ? req.query.endDate : "";
 
-      const query = getAllPartnerSearchQuery(searchQuery, type, empSaleId, startDate, endDate)
-      if (!query.success) return res.status(400).json({ success: false, message: query?.message })
-      const getAllPartner = await Partner.find(query?.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
-      const noOfPartner = await Partner.find(query?.query).count()
-      return res.status(200).json({ success: true, message: "get partner data", data: getAllPartner, noOfPartner: noOfPartner });
+      const caseAccess = ["operation", "finance", "branch"]
+
+      if (caseAccess?.includes(empSale?.type?.toLowerCase())) {
+         const query = getAllPartnerSearchQuery(searchQuery, type, false, startDate, endDate,empSale?.branchId)
+         if (!query.success) return res.status(400).json({ success: false, message: query?.message })
+         const getAllPartner = await Partner.find(query?.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+         const noOfPartner = await Partner.find(query?.query).count()
+         return res.status(200).json({ success: true, message: "get partner data", data: getAllPartner, noOfPartner: noOfPartner });
+   
+      } else {
+         let extactMatchQuery = [
+            { referEmpId: empSale?._id },
+            { _id: empSale?._id }
+         ]
+
+         if((empSale?.type?.toLowerCase()=="sales" && empSale?.designation?.toLowerCase()=="manager")){
+            extactMatchQuery.push({ type: { $regex: "sales", $options: "i" } })
+            extactMatchQuery.push({ type: { $regex: "sathi team", $options: "i" } })
+         }
+         const extractType = await Employee.aggregate([
+            {
+               $match: {
+                  $or: [
+                   ...extactMatchQuery
+                  ]
+               }
+            },
+            {
+               $group: {
+                  _id: null,
+                  shareEmp: { $push: "$_id" },
+                  shareEmpId: { $push: "$_id" },
+               }
+            },
+            {
+               $project: {
+                  shareEmp: 1,
+                  shareEmpId:1,
+                  _id: 0,
+               }
+            },
+            {
+               $project: {
+                  shareEmpId:1,
+                  shareEmp: { $map: { input: "$shareEmp", as: "id", in: { $toString: "$$id" } } },
+               }
+            }
+
+         ])
+
+         if (startDate && endDate) {
+            const validStartDate = getValidateDate(startDate)
+            if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+            const validEndDate = getValidateDate(endDate)
+            if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+         }
+
+      
+         let query = {
+            $and: [
+               { isActive: true },
+               { branchId: { $regex: empSale?.branchId, $options: "i" } },
+               {
+                  $or: [
+                     { salesId : { $in: extractType?.[0]?.shareEmpId } },
+                     { shareEmployee : { $in: extractType?.[0]?.shareEmp } },
+                     // { partnerId: { $in: extractType?.[0]?.allPartners } },
+                  ]
+               },
+               {
+                  $or: [
+                     { "profile.consultantName": { $regex: searchQuery, $options: "i" } },
+                     { "profile.workAssociation": { $regex: searchQuery, $options: "i" } },
+                     { "profile.consultantCode": { $regex: searchQuery, $options: "i" } },
+                     { "profile.primaryMobileNo": { $regex: searchQuery, $options: "i" } },
+                     { "profile.primaryEmail": { $regex: searchQuery, $options: "i" } },
+                     { "profile.aadhaarNo": { $regex: searchQuery, $options: "i" } },
+                     { "profile.panNo": { $regex: searchQuery, $options: "i" } },
+                     { branchId: { $regex: searchQuery, $options: "i" } },
+                  ]
+               },
+               startDate && endDate ? {
+                  createdAt: {
+                     $gte: new Date(startDate).setHours(0, 0, 0, 0),
+                     $lte: new Date(endDate).setHours(23, 59, 59, 999)
+                  }
+               } : {}
+            ]
+         };
+         const getAllPartner = await Partner.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+         const noOfPartner = await Partner.find(query).count()
+         return res.status(200).json({ success: true, message: "get partner data", data: getAllPartner, noOfPartner: noOfPartner });
+      }
+
 
    } catch (error) {
       console.log("viewAllPartnerByAdmin in error:", error);
@@ -901,7 +1168,7 @@ export const viewCaseByIdByAdmin = async (req, res) => {
       const { _id } = req.query;
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-      const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails")
+      const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit")
       if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
       const getCaseDoc = await CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
       const getCaseStatus = await CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
@@ -1559,6 +1826,8 @@ export const adminAddReferenceCaseAndMarge = async (req, res) => {
 
 
          const getClientCase = await Case.findById(clientCaseId)
+         if(getPartnerCase?.branchId?.toLowerCase()!=getClientCase?.branchId?.toLowerCase()) return res.status(404).json({ success: false, message: "Case must be from same branch" })
+
          if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
          console.log(getPartnerCase?.policyNo?.toLowerCase(), getClientCase?.policyNo?.toLowerCase(), getPartnerCase?.email?.toLowerCase(), getClientCase?.email?.toLowerCase());
 
@@ -1603,6 +1872,8 @@ export const adminAddReferenceCaseAndMarge = async (req, res) => {
 
          const getClientCase = await Case.findById(clientCaseId)
          if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
+
+            if(getEmployeeCase?.branchId?.toLowerCase()!=getClientCase?.branchId?.toLowerCase()) return res.status(404).json({ success: false, message: "Case must be from same branch" })
 
          if (getEmployeeCase?.policyNo?.toLowerCase() != getClientCase?.policyNo?.toLowerCase() || getEmployeeCase?.email?.toLowerCase() != getClientCase?.email?.toLowerCase()) {
             return res.status(404).json({ success: false, message: "sale-employee and client must have same policyNo and emailId" })
@@ -2175,22 +2446,165 @@ export const adminEmpSaleReportDownload = async (req, res) => {
       if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid salesId" })
       const empSale = await Employee.findById(empSaleId).select("-password")
       if (!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
-      if (empSale.type?.toLowerCase() != "sales" && empSale?.type?.toLowerCase()!="sathi team") return res.status(404).json({ success: false, message: "Employee designation is not sale/sathi team" })
       const searchQuery = req.query.search ? req.query.search : "";
       const statusType = req.query.status ? req.query.status : "";
       const startDate = req.query.startDate ? req.query.startDate : "";
       const endDate = req.query.endDate ? req.query.endDate : "";
       const type = req?.query?.type ? req.query.type : true
 
-      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type, empSaleId)
-      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+      const caseAccess = ["operation", "finance", "branch"]
+      if (caseAccess?.includes(empSale?.type?.toLowerCase())) {
+         empBranchId = empSale?.branchId
+         branchWise = true
+         const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, true, false, empSale?.branchId)
+         if (!query.success) return res.status(400).json({ success: false, message: query.message })
+       const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
+         const excelBuffer = await getDownloadCaseExcel(getAllCase,empSale?._id?.toString())
+         res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
+         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+         res.status(200)
+         res.send(excelBuffer)
+      } else {
+         let extactMatchQuery = [
+            { referEmpId: empSale?._id },
+            { _id: empSale?._id }
+         ]
 
-      const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
-      const excelBuffer = await getDownloadCaseExcel(getAllCase)
-      res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.status(200)
-      res.send(excelBuffer)
+         if((empSale?.type?.toLowerCase()=="sales" && empSale?.designation?.toLowerCase()=="manager")){
+            extactMatchQuery.push({ type: { $regex: "sales", $options: "i" } })
+            extactMatchQuery.push({ type: { $regex: "sathi team", $options: "i" } })
+         }
+         const extractType = await Employee.aggregate([
+            {
+               $match: {
+                  $or: [
+                   ...extactMatchQuery
+                  ]
+               }
+            },
+            {
+               $group: {
+                  _id: null,
+                  shareEmp: { $push: "$_id" },
+               }
+            },
+            {
+               $lookup: {
+                  from: "partners",
+                  let: { shareEmp: "$shareEmp" },
+                  pipeline: [
+                     {
+                        $match: {
+                           $expr: {
+                              $or: [
+                                 { $in: ["$salesId", "$$shareEmp"] },
+                                 { $in: ["$shareEmployee", "$$shareEmp"] }
+                              ]
+                           }
+                        }
+                     }
+                  ],
+                  as: "partners"
+               }
+            },
+            {
+               $lookup: {
+                  from: "clients",
+                  let: { shareEmp: "$shareEmp" },
+                  pipeline: [
+                     {
+                        $match: {
+                           $expr: {
+                              $or: [
+                                 { $in: ["$salesId", "$$shareEmp"] },
+
+                              ]
+                           }
+                        }
+                     }
+                  ],
+                  as: "allClients"
+               }
+            },
+            {
+               $project: {
+                  shareEmp: 1,
+                  _id: 0,
+                  allClients: {
+                     $map: {
+                        input: "$allClients",
+                        as: "allClients",
+                        in: "$$allClients._id"
+                     }
+                  },
+                  allPartners: {
+                     $map: {
+                        input: "$partners",
+                        as: "partner",
+                        in: "$$partner._id"
+                     }
+                  }
+               }
+            },
+            {
+               $project: {
+                  shareEmp: { $map: { input: "$shareEmp", as: "id", in: { $toString: "$$id" } } },
+                  allPartners: { $map: { input: "$allPartners", as: "id", in: { $toString: "$$id" } } },
+                  allClients: { $map: { input: "$allClients", as: "id", in: { $toString: "$$id" } } }
+               }
+            }
+
+         ])
+
+         if (startDate && endDate) {
+            const validStartDate = getValidateDate(startDate)
+            if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+            const validEndDate = getValidateDate(endDate)
+            if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+         }
+
+         let query = {
+            $and: [
+               { isPartnerReferenceCase: false },
+               { isEmpSaleReferenceCase: false },
+               { currentStatus: { $regex: statusType, $options: "i" } },
+               { isActive: true },
+               { branchId: { $regex: empSale?.branchId, $options: "i" } },
+               {
+                  $or: [
+                     { empSaleId: { $in: extractType?.[0]?.shareEmp } },
+                     { partnerId: { $in: extractType?.[0]?.allPartners } },
+                     { clientId: { $in: extractType?.[0]?.allClients } },
+                  ]
+               },
+               {
+                  $or: [
+                     { name: { $regex: searchQuery, $options: "i" } },
+                     { partnerName: { $regex: searchQuery, $options: "i" } },
+                     { consultantCode: { $regex: searchQuery, $options: "i" } },
+                     { fileNo: { $regex: searchQuery, $options: "i" } },
+                     { email: { $regex: searchQuery, $options: "i" } },
+                     { mobileNo: { $regex: searchQuery, $options: "i" } },
+                     { policyType: { $regex: searchQuery, $options: "i" } },
+                     { caseFrom: { $regex: searchQuery, $options: "i" } },
+                     { branchId: { $regex: searchQuery, $options: "i" } },
+                  ]
+               },
+               startDate && endDate ? {
+                  createdAt: {
+                     $gte: new Date(startDate).setHours(0, 0, 0, 0),
+                     $lte: new Date(endDate).setHours(23, 59, 59, 999)
+                  }
+               } : {}
+            ]
+         };
+         const getAllCase = await Case.find(query).sort({ createdAt: -1 });
+         const excelBuffer = await getDownloadCaseExcel(getAllCase,empSale?._id?.toString())
+         res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
+         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+         res.status(200)
+         res.send(excelBuffer)
+      }
    } catch (error) {
       console.log("adminEmpSaleReportDownload in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -2211,23 +2625,113 @@ export const adminEmpSalePartnerReportDownload = async (req, res) => {
       if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid salesId" })
       const empSale = await Employee.findById(empSaleId).select("-password")
       if (!empSale) return res.status(404).json({ success: false, message: "Employee not found" })
-      if (empSale.type?.toLowerCase() != "sales" && empSale?.type?.toLowerCase()!="sathi team") return res.status(404).json({ success: false, message: "Employee designation is not sale/sathi team" })
-
+ 
       const searchQuery = req.query.search ? req.query.search : "";
       const type = req?.query?.type ? req.query.type : true;
       const startDate = req.query.startDate ? req.query.startDate : "";
       const endDate = req.query.endDate ? req.query.endDate : "";
 
-      const query = getAllPartnerSearchQuery(searchQuery, type, empSaleId, startDate, endDate)
-      if (!query.success) return res.status(400).json({ success: false, message: query?.message })
-      const getAllPartner = await Partner.find(query?.query).select("-password").sort({ createdAt: -1 });
-      // Generate Excel buffer
-      const excelBuffer = await getAllPartnerDownloadExcel(getAllPartner,empSaleId);
+      const caseAccess = ["operation", "finance", "branch"]
 
-      res.setHeader('Content-Disposition', 'attachment; filename="partners.xlsx"')
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.status(200)
-      res.send(excelBuffer)
+      if (caseAccess?.includes(empSale?.type?.toLowerCase())) {
+         const query = getAllPartnerSearchQuery(searchQuery, type, false, startDate, endDate,empSale?.branchId)
+         if (!query.success) return res.status(400).json({ success: false, message: query?.message })
+         const getAllPartner = await Partner.find(query?.query);
+         const excelBuffer = await getAllPartnerDownloadExcel(getAllPartner,empSale?._id?.toString());
+
+         res.setHeader('Content-Disposition', 'attachment; filename="partners.xlsx"')
+         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+         res.status(200)
+         res.send(excelBuffer)
+      } else {
+         let extactMatchQuery = [
+            { referEmpId: empSale?._id },
+            { _id: empSale?._id }
+         ]
+
+         if((empSale?.type?.toLowerCase()=="sales" && empSale?.designation?.toLowerCase()=="manager")){
+            extactMatchQuery.push({ type: { $regex: "sales", $options: "i" } })
+            extactMatchQuery.push({ type: { $regex: "sathi team", $options: "i" } })
+         }
+         const extractType = await Employee.aggregate([
+            {
+               $match: {
+                  $or: [
+                   ...extactMatchQuery
+                  ]
+               }
+            },
+            {
+               $group: {
+                  _id: null,
+                  shareEmp: { $push: "$_id" },
+                  shareEmpId: { $push: "$_id" },
+               }
+            },
+            {
+               $project: {
+                  shareEmp: 1,
+                  shareEmpId:1,
+                  _id: 0,
+               }
+            },
+            {
+               $project: {
+                  shareEmpId:1,
+                  shareEmp: { $map: { input: "$shareEmp", as: "id", in: { $toString: "$$id" } } },
+               }
+            }
+
+         ])
+
+         if (startDate && endDate) {
+            const validStartDate = getValidateDate(startDate)
+            if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+            const validEndDate = getValidateDate(endDate)
+            if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+         }
+
+      
+         let query = {
+            $and: [
+               { isActive: true },
+               { branchId: { $regex: empSale?.branchId, $options: "i" } },
+               {
+                  $or: [
+                     { salesId : { $in: extractType?.[0]?.shareEmpId } },
+                     { shareEmployee : { $in: extractType?.[0]?.shareEmp } },
+                     // { partnerId: { $in: extractType?.[0]?.allPartners } },
+                  ]
+               },
+               {
+                  $or: [
+                     { "profile.consultantName": { $regex: searchQuery, $options: "i" } },
+                     { "profile.workAssociation": { $regex: searchQuery, $options: "i" } },
+                     { "profile.consultantCode": { $regex: searchQuery, $options: "i" } },
+                     { "profile.primaryMobileNo": { $regex: searchQuery, $options: "i" } },
+                     { "profile.primaryEmail": { $regex: searchQuery, $options: "i" } },
+                     { "profile.aadhaarNo": { $regex: searchQuery, $options: "i" } },
+                     { "profile.panNo": { $regex: searchQuery, $options: "i" } },
+                     { branchId: { $regex: searchQuery, $options: "i" } },
+                  ]
+               },
+               startDate && endDate ? {
+                  createdAt: {
+                     $gte: new Date(startDate).setHours(0, 0, 0, 0),
+                     $lte: new Date(endDate).setHours(23, 59, 59, 999)
+                  }
+               } : {}
+            ]
+         };
+         const getAllPartner = await Partner.find(query);
+         const excelBuffer = await getAllPartnerDownloadExcel(getAllPartner,empSale?._id?.toString());
+
+         res.setHeader('Content-Disposition', 'attachment; filename="partners.xlsx"')
+         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+         res.status(200)
+         res.send(excelBuffer)
+   
+      }
 
    } catch (error) {
       console.log("viewAllPartnerByAdmin in error:", error);
@@ -2290,7 +2794,7 @@ export const adminCreateInvoice = async (req,res)=>{
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
       const billCount = await Bill.find({}).count()
-      const newInvoice = new Bill({...req.body,caseId,clientId,invoiceNo:`ACS-${billCount+1}`})
+      const newInvoice = new Bill({...req.body,branchId:getCase?.branchId,caseId,clientId,invoiceNo:`ACS-${billCount+1}`})
       newInvoice.save()
       return  res.status(200).json({success: true, message: "Successfully create invoice",_id:newInvoice?._id});
    } catch (error) {
@@ -2434,6 +2938,42 @@ export const adminRemoveInvoice = async (req,res)=>{
       return  res.status(200).json({success: true, message: `Successfully delete invoice`});
    } catch (error) {
       console.log("admin-delete invoice in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
+export const adminChangeBranch = async (req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const {_id,branchId,type} = req.body;
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+      if(!branchId || !type)  return res.status(400).json({success: false, message:"Required BranchId and type"})
+
+      if(type?.toLowerCase()=="client"){
+         const getClient = await Client?.findById(_id)
+         if(!getClient) return res.status(400).json({success: false, message:"Client account not found"})
+         
+         await Client.findByIdAndUpdate(_id,{branchId})
+         await Case.updateMany({clientId:_id},{branchId})
+         await Bill.updateMany({clientId:_id},{branchId})
+      return  res.status(200).json({success: true, message: `Successfully Change Branch`});
+      }else {
+         const getPartner = await Partner?.findById(_id)
+         if(!getPartner) return res.status(400).json({success: false, message:"Partner account not found"})
+         
+         await Partner.findByIdAndUpdate(_id,{branchId})
+         await Case.updateMany({partnerId:_id},{branchId})
+         return  res.status(200).json({success: true, message: `Successfully Change Branch`});
+      }
+
+   } catch (error) {
+      console.log("adminChangeBranch in error:",error);
       return res.status(500).json({success:false,message:"Internal server error",error:error});
    }
 }

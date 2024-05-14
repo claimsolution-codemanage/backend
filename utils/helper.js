@@ -73,9 +73,6 @@ export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, par
           { policyType: { $regex: searchQuery, $options: "i" } },
           { caseFrom: { $regex: searchQuery, $options: "i" } },
           { branchId: { $regex: searchQuery, $options: "i" } },
-
-
-
         ]
       },
       startDate && endDate ? {
@@ -157,7 +154,7 @@ export const getAllPartnerSearchQuery = (searchQuery, type, empSaleId = false, s
   return { success: true, query: query }
 }
 
-export const getAllClientSearchQuery = (searchQuery, type, startDate = "", endDate = "") => {
+export const getAllClientSearchQuery = (searchQuery, type, startDate = "", endDate = "",branchId=false) => {
   console.log("query", searchQuery, type, startDate, endDate);
 
   if (startDate && endDate) {
@@ -170,6 +167,7 @@ export const getAllClientSearchQuery = (searchQuery, type, startDate = "", endDa
   let query = {
     $and: [
       { isActive: type },
+      branchId ? {branchId:{ $regex: branchId, $options: "i" }} : {} ,
       {
         $or: [
           { "profile.consultantName": { $regex: searchQuery, $options: "i" } },
@@ -179,6 +177,7 @@ export const getAllClientSearchQuery = (searchQuery, type, startDate = "", endDa
           { "profile.primaryEmail": { $regex: searchQuery, $options: "i" } },
           { "profile.aadhaarNo": { $regex: searchQuery, $options: "i" } },
           { "profile.panNo": { $regex: searchQuery, $options: "i" } },
+          { branchId: { $regex: searchQuery, $options: "i" } },
         ]
       },
       startDate && endDate ? {
@@ -248,7 +247,7 @@ export const validateAddComplaint = (body) => {
 }
 
 
-export const getAllInvoiceQuery = (searchQuery,startDate,endDate,clientId=false,type=true) => {
+export const getAllInvoiceQuery = (searchQuery,startDate,endDate,clientId=false,type=true,branchId=false) => {
   console.log("type",searchQuery,startDate,endDate,clientId,type);
   if (startDate && endDate) {
     const validStartDate = getValidateDate(startDate)
@@ -261,6 +260,7 @@ export const getAllInvoiceQuery = (searchQuery,startDate,endDate,clientId=false,
     $and: [
       { isActive: type},
       clientId ? { clientId: clientId } : {},
+      branchId ? { branchId: branchId } : {},
       {
         $or: [
           { "receiver.name": { $regex: searchQuery, $options: "i" } },
@@ -273,6 +273,7 @@ export const getAllInvoiceQuery = (searchQuery,startDate,endDate,clientId=false,
           { "receiver.email": { $regex: searchQuery, $options: "i" } },
           { "receiver.mobileNo": { $regex: searchQuery, $options: "i" } },
           { invoiceNo: { $regex: searchQuery, $options: "i" } },
+          { branchId: { $regex: searchQuery, $options: "i" } },
         ]
       },
       startDate && endDate ? {
@@ -289,12 +290,67 @@ export const getAllInvoiceQuery = (searchQuery,startDate,endDate,clientId=false,
 }
 
 
-export const getDownloadCaseExcel = async (getAllCase = [],notFrom) => {
+export const partnerGetDownloadCaseExcel = async (getAllCase = []) => {
+  console.log("compare",_id);
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Cases');
+  // Define Excel columns
+  worksheet.columns = [
+    { header: 'File No', key: 'fileNo', width: 30 },
+    { header: 'Current Status', key: 'currentStatus', width: 30 },
+    { header: 'Name', key: 'name', width: 30 },
+    { header: 'Father Name', key: 'fatherName', width: 30 },
+    { header: 'Mobile No', key: 'mobileNo', width: 30 },
+    { header: 'Policy Type', key: 'policyType', width: 30 },
+    { header: 'Insurance Company Name', key: 'insuranceCompanyName', width: 30 },
+    { header: 'Complaint Type', key: 'complaintType', width: 30 },
+    { header: 'Policy No', key: 'policyNo', width: 30 },
+    { header: 'Address', key: 'address', width: 30 },
+    { header: 'DOB', key: 'DOB', width: 30 },
+    { header: 'Pin Code', key: 'pinCode', width: 30 },
+    { header: 'claim Amount', key: 'claimAmount', width: 30 },
+    { header: 'City', key: 'city', width: 30 },
+    { header: 'State', key: 'state', width: 30 },
+    { header: 'Problem Statement', key: 'problemStatement', width: 30 },
+  ];
+
+  // Populate Excel rows with data
+  getAllCase.forEach((caseData, index) => {
+    worksheet.addRow({
+      fileNo: caseData?.fileNo,
+      currentStatus: caseData?.currentStatus,
+      name: caseData.name,
+      fatherName: caseData?.fatherName,
+      email: caseData?.email,
+      mobileNo: caseData?.mobileNo,
+      policyType: caseData?.policyType,
+      insuranceCompanyName: caseData?.insuranceCompanyName,
+      complaintType: caseData?.complaintType,
+      policyNo: caseData?.policyNo,
+      address: caseData?.address,
+      DOB: caseData?.DOB,
+      pinCode: caseData?.pinCode,
+      claimAmount: caseData?.claimAmount,
+      city: caseData?.city,
+      state: caseData?.state,
+      problemStatement: caseData?.problemStatement,
+    });
+  });
+
+
+  // Generate Excel buffer
+  return await workbook.xlsx.writeBuffer();
+}
+
+
+export const getDownloadCaseExcel = async (getAllCase = [],_id) => {
+  console.log("compare",_id);
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Cases');
   // Define Excel columns
   worksheet.columns = [
     { header: 'Branch ID', key: 'branchId', width: 20 },
+    { header: 'Type', key: 'type', width: 20 },
     { header: 'Case From', key: 'caseFrom', width: 20 },
     { header: 'File No', key: 'fileNo', width: 30 },
     { header: 'Current Status', key: 'currentStatus', width: 30 },
@@ -318,6 +374,7 @@ export const getDownloadCaseExcel = async (getAllCase = [],notFrom) => {
   getAllCase.forEach((caseData, index) => {
     worksheet.addRow({
       branchId: caseData?.branchId,
+      type: caseData?.empSaleId==_id ? "added" : (!caseData?.empSaleId && caseData?.partnerId ? "partner" : "others"),
       caseFrom: caseData?.caseFrom,
       fileNo: caseData?.fileNo,
       currentStatus: caseData?.currentStatus,
@@ -344,7 +401,7 @@ export const getDownloadCaseExcel = async (getAllCase = [],notFrom) => {
   return await workbook.xlsx.writeBuffer();
 }
 
-export const getAllPartnerDownloadExcel = async (getAllPartner = [], empSaleId = false) => {
+export const getAllPartnerDownloadExcel = async (getAllPartner = [], _id) => {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Cases');
   // Define Excel columns
@@ -380,7 +437,7 @@ export const getAllPartnerDownloadExcel = async (getAllPartner = [], empSaleId =
   getAllPartner.forEach((partnerData, index) => {
     worksheet.addRow({
       branchId: partnerData?.branchId,
-      type: empSaleId ? (partnerData?.salesId==empSaleId ? "Added" : "Shared") : partnerData?.salesId ? "Sales" : "Self",
+      type: partnerData?.salesId==_id ? "Added"  :( partnerData?.shareEmployee?.includes(_id) ? "Shared" : "Other"),
       consultantName: partnerData?.profile?.consultantName,
       consultantCode: partnerData?.profile?.consultantCode,
       associateWithUs: partnerData?.profile?.associateWithUs,

@@ -144,6 +144,77 @@ export const clientSignUp = async (req, res) => {
   }
 }
 
+export const signUpWithRequest = async (req, res) => {
+  try {
+    const { password, agreement, tokenId } = req.body
+    if (!password) return res.status(400).json({ success: true, message: "Password is required" })
+    if (!agreement) return res.status(400).json({ success: true, message: "Must accept our service agreement" })
+    if (!tokenId) return res.status(400).json({ success: true, message: "Invalid/expired link" })
+    try {
+      await jwt.verify(tokenId, process.env.EMPLOYEE_SECRET_KEY)
+      const decode = await jwtDecode(tokenId)
+      console.log("decode", decode);
+      const bcryptPassword = await bcrypt.hash(password, 10)
+      const { clientName, clientEmail, clientMobileNo, empId,empBranchId } = decode
+      if (!clientName || !clientEmail || !clientMobileNo || !empId ||!empBranchId) return res.status(400).json({ success: false, message: "Invalid/expired link" })
+      const client = await Client.find({ email: clientEmail })
+      if (client[0]?.isActive || client[[0]]?.mobileVerify || client[0]?.emailVerify) return res.status(400).json({ success: false, message: "Account is already exist" })
+      const noOfClients = await Client.count()
+      const today = new Date()
+      const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", today)
+      await sendAccountTerm_ConditonsMail(clientEmail, "client", modifiedPdfBytes);
+      const newClient = new Client({
+        fullName: clientName,
+        email: clientEmail?.toLowerCase(),
+        mobileNo: `91${clientMobileNo}`,
+        password: bcryptPassword,
+        emailOTP: { otp: "123456", createAt: Date.now() },
+        acceptClientTls: agreement,
+        emailVerify: true,
+        mobileVerify: true,
+        isActive: true,
+        tlsUrl: `${process?.env?.FRONTEND_URL}/agreement/client.pdf`,
+        "profile.profilePhoto": "",
+        "profile.consultantName": clientName,
+        "profile.consultantCode": `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfClients+1}`,
+        "profile.associateWithUs": today,
+        "profile.fatherName": "",
+        "profile.primaryEmail": clientEmail,
+        "profile.alternateEmail": "",
+        "profile.primaryMobileNo": clientMobileNo,
+        "profile.whatsupNo": "",
+        "profile.alternateMobileNo": "",
+        "profile.panNo": "",
+        "profile.aadhaarNo": "",
+        "profile.dob": "",
+        "profile.gender": "",
+        "profile.address": "",
+        "profile.state": "",
+        "profile.district": "",
+        "profile.city": "",
+        "profile.pinCode": "",
+        "profile.about": "",
+        "profile.kycPhoto": "",
+        "profile.kycAadhar": "",
+        "profile.kycAadhaarBack": "",
+        "profile.kycPan": "",
+        salesId: empId,
+        branchId:empBranchId
+      })
+      await newClient.save()
+      const token = newClient?.getAuth(true)
+      return res.status(200).header("x-auth-token", token)
+        .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully Signup" })
+    } catch (error) {
+      console.log("error", error);
+      return res.status(401).json({ success: false, message: "Invalid/expired link" })
+    }
+  } catch (error) {
+    console.log("signUpWithRequest: ", error);
+    return res.status(500).json({ success: false, message: "Oops, something went wrong", error: error });
+  }
+}
+
 export const clientResendOtp = async (req, res) => {
   try {
     const verify = await authClient(req, res)
@@ -205,7 +276,7 @@ export const verifyClientEmailOtp = async (req, res) => {
             tlsUrl: "",
             "profile.profilePhoto": "",
             "profile.consultantName": client.fullName,
-            "profile.consultantCode": `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfClients}`,
+            "profile.consultantCode": `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfClients+1}`,
             "profile.associateWithUs": today,
             "profile.fatherName": "",
             "profile.primaryEmail": client.email,
@@ -457,7 +528,7 @@ export const addNewClientCase = async (req, res) => {
     // req.body.acceptPayment = true
     // req.body.pendingPayment = true
     req.body.processSteps = []
-    const newAddCase = new Case({ ...req.body, caseDocs: [] })
+    const newAddCase = new Case({ ...req.body, caseDocs: [],branchId:client?.branchId })
     const noOfCase = await Case.count()
     newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
     await newAddCase.save()
