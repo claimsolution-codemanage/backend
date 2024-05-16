@@ -3,10 +3,12 @@ import mongoose from "mongoose";
 const caseSchema = new mongoose.Schema({
    consultantCode:{type:String},
    partnerId:{type:String},
+   partnerCode:{type:String},
    partnerName:{type:String},
    clientId:{type:String},
    empSaleId:{type:String},
    empSaleName:{type:String},
+   empId:{type:String},
    caseFrom:{type:String,required:"true"},
    acceptPayment:{type:Boolean,default:false,required:"true"},
    pendingPayment:{type:Boolean,default:false,required:"true"},

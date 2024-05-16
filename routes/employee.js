@@ -9,7 +9,7 @@ employeeEditClient,employeeupdateParnterProfile,employeeUpdatePartnerBankingDeta
 saleEmployeeAddPartner,saleEmployeeAddCase,employeeUploadImage,employeeUploadAttachment,
 employeeRemoveInvoice,salesDownloadCaseReport,saleEmpViewPartnerReport,empDownloadPartnerReport,
 employeeDownloadAllPartner,empViewAllEmployee,empAddReferenceCaseAndMarge,empRemoveReferenceCase,
-empChangeBranch,createSathiTeamAcc
+empChangeBranch,createSathiTeamAcc,empViewSathiEmployee,empDownloadSathiEmployee
 } from '../controller/employee.js';
 
 
@@ -20,6 +20,9 @@ router.post("/addSathiTeamAcc",createSathiTeamAcc)
 router.post("/resetPassword",employeeResetPassword)
 router.put("/resetForgetPassword",employeeResetForgetPassword)
 router.put("/employeeForgetPassword",employeeForgetPassword)
+router.get("/view/sathiTeam",empViewSathiEmployee)
+router.get("/download/sathiTeam",empDownloadSathiEmployee)
+
 
 router.get("/all/dashboard",allEmployeeDashboard)
 
@@ -76,6 +79,7 @@ router.get("/download/allPartner",employeeDownloadAllPartner)
 
 // emphead
 router.get("/head/allEmployee",empViewAllEmployee)
+
 
 
 // change branch

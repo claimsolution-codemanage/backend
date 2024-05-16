@@ -4,7 +4,7 @@ import Client from "../models/client.js";
 import { validateEmployeeSignIn, validateEmployeeResetPassword, validateUpdateEmployeeCase, validateAddPartner, validateAddEmpCase, validateEmployeeSignUp, validateSathiTeamSignUp } from "../utils/validateEmployee.js";
 import { authEmployee, authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
-import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, getAllClientSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate } from "../utils/helper.js";
+import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, getAllClientSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel } from "../utils/helper.js";
 import { sendAddClientRequest, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import Jwt from "jsonwebtoken";
 import Case from "../models/case.js";
@@ -699,10 +699,12 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
             {
                $set: {
                   partnerId: getPartner?._id?.toString(),
-                  partnerName: getPartner?.fullName,
+                  partnerName: getPartner?.profile?.consultantName,
+                  partnerCode:getPartner?.profile?.consultantCode,
                   partnerReferenceCaseDetails: {
                      referenceId: getPartnerCase?._id?.toString(),
-                     name: getPartner?.fullName,
+                     name: getPartner?.profile?.consultantName,
+                     consultantCode:getPartner?.profile?.consultantCode,
                      referenceDate: new Date(),
                      by: employee?.fullName
                   },
@@ -741,9 +743,11 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
                $set: {
                   empSaleId: getEmployee?._id?.toString(),
                   empSaleName: getEmployee?.fullName,
+                  empId:getEmployee?.empId,
                   empSaleReferenceCaseDetails: {
                      referenceId: getEmployeeCase?._id?.toString(),
                      name: getEmployee?.fullName,
+                     empId:getEmployee?.empId,
                      referenceDate: new Date(),
                      by: employee?.fullName
                   },
@@ -793,6 +797,8 @@ export const empRemoveReferenceCase = async (req, res) => {
                $set: {
                   partnerId: "",
                   partnerName: "",
+                  partnerCode:"",
+                  empId:"",
                   partnerReferenceCaseDetails: {},
                }
             }, { new: true })
@@ -2176,6 +2182,7 @@ export const empViewAllEmployee = async (req, res) => {
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const type = req.query.type ? req.query.type : true;
+      
       const caseAccess = ["operation", "finance", "branch"]
       let department = false
       let query = {}
@@ -2210,6 +2217,118 @@ export const empViewAllEmployee = async (req, res) => {
       const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
       const noOfEmployee = await Employee.find(query).count()
       return res.status(200).json({ success: true, message: "get employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
+
+   } catch (error) {
+      console.log("adminViewAllEmployee in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+export const empViewSathiEmployee = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+
+      const searchQuery = req.query.search ? req.query.search : "";
+      const pageItemLimit = req.query.limit ? req.query.limit : 10;
+      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const empId = req.query.empId 
+
+      if(!validMongooseId(empId)) return res.status(400).json({success:false,message:"Not a valid Id"})
+      const getEmp = await Employee.findById(empId)
+      if(!getEmp) return res.status(400).json({success:false,message:"Employee not found"})
+
+      const caseAccess = ["operation", "finance", "branch"]
+      let query = {}
+      console.log(caseAccess?.includes(getEmp?.type?.toLowerCase()),"----");
+      if (caseAccess?.includes(getEmp?.type?.toLowerCase())) {
+       query = getEmployeeByIdQuery(searchQuery,"sathi team",employee?.branchId)
+      }else{
+         query = {
+            $and:[
+               {isActive:true},
+               getEmp?.designation?.toLowerCase()=="executive" ? { referEmpId : getEmp?._id } : {},
+               {branchId:{ $regex:employee?.branchId, $options: "i" }},
+               { type: { $regex: "sathi team", $options: "i" } },
+               {
+                 $or: [
+                   { fullName: { $regex: searchQuery, $options: "i" } },
+                   { email: { $regex: searchQuery, $options: "i" } },
+                   { mobileNo: { $regex: searchQuery, $options: "i" } },
+                   { branchId: { $regex: searchQuery, $options: "i" } },
+                   { type: { $regex: searchQuery, $options: "i" } },
+                   { designation: { $regex: searchQuery, $options: "i" } },
+                 ]
+               }
+             ]
+         }
+      }
+   
+      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const noOfEmployee = await Employee.find(query).count()
+      return res.status(200).json({ success: true, message: "get employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
+
+   } catch (error) {
+      console.log("adminViewAllEmployee in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+
+export const empDownloadSathiEmployee = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+
+      const searchQuery = req.query.search ? req.query.search : "";
+      const empId = req.query.empId 
+
+      if(!validMongooseId(empId)) return res.status(400).json({success:false,message:"Not a valid Id"})
+      const getEmp = await Employee.findById(empId)
+      if(!getEmp) return res.status(400).json({success:false,message:"Employee not found"})
+
+      const caseAccess = ["operation", "finance", "branch"]
+      let query = {}
+      console.log(caseAccess?.includes(getEmp?.type?.toLowerCase()),"----");
+      if (caseAccess?.includes(getEmp?.type?.toLowerCase())) {
+       query = getEmployeeByIdQuery(searchQuery,"sathi team",employee?.branchId)
+      }else{
+         query = {
+            $and:[
+               {isActive:true},
+               getEmp?.designation?.toLowerCase()=="executive" ? { referEmpId : getEmp?._id } : {},
+               {branchId:{ $regex:employee?.branchId, $options: "i" }},
+               { type: { $regex: "sathi team", $options: "i" } },
+               {
+                 $or: [
+                   { fullName: { $regex: searchQuery, $options: "i" } },
+                   { email: { $regex: searchQuery, $options: "i" } },
+                   { mobileNo: { $regex: searchQuery, $options: "i" } },
+                   { branchId: { $regex: searchQuery, $options: "i" } },
+                   { type: { $regex: searchQuery, $options: "i" } },
+                   { designation: { $regex: searchQuery, $options: "i" } },
+                 ]
+               }
+             ]
+         }
+      }
+   
+      const getAllEmployee = await Employee.find(query).select("-password").sort({ createdAt: -1 });
+      const excelBuffer = await getAllSathiDownloadExcel(JSON.parse(JSON.stringify(getAllEmployee)), getEmp._id?.toString());
+      res.setHeader('Content-Disposition', 'attachment; filename="sathi.xlsx"')
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.status(200)
+      res.send(excelBuffer)
 
    } catch (error) {
       console.log("adminViewAllEmployee in error:", error);

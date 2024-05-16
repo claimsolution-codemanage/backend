@@ -16,7 +16,7 @@ adminGetSaleEmployee,adminSharePartnerToSaleEmp,adminGetNormalEmployee,adminRemo
 adminUploadImage,adminUploadAttachment,adminCreateInvoice,adminViewAllInvoice,adminViewInvoiceById,
 adminUnActiveInvoice,adminEditInvoice,adminRemoveInvoice,
 adminAllUnactiveCaseDoc,adminUnactiveCaseDoc,adminChangeBranch,
-adminEmployeeProfile
+adminEmployeeProfile,adminDownloadEmpSathiEmployee,adminViewEmpSathiEmployee
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -137,6 +137,10 @@ router.get("/download/empSalePartnerReport",adminEmpSalePartnerReportDownload)
 
 // for change branch
 router.put("/change-branch",adminChangeBranch)
+
+// for sathi
+router.get("/viewEmpSathi",adminViewEmpSathiEmployee)
+router.get("/download/empSathi",adminDownloadEmpSathiEmployee)
 
 
 

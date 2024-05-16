@@ -213,6 +213,27 @@ export const getAllEmployeeSearchQuery = (searchQuery,type=true,department,exclu
   return query
 }
 
+export const getEmployeeByIdQuery = (searchQuery,department,branchId) => {
+  let query = {
+    $and:[
+      {isActive:true},
+      department ? {type:{ $regex: department, $options: "i" }} :{},
+      branchId ? {branchId:{ $regex: branchId, $options: "i" }} :{},
+      {
+        $or: [
+          { fullName: { $regex: searchQuery, $options: "i" } },
+          { email: { $regex: searchQuery, $options: "i" } },
+          { mobileNo: { $regex: searchQuery, $options: "i" } },
+          { branchId: { $regex: searchQuery, $options: "i" } },
+          { type: { $regex: searchQuery, $options: "i" } },
+          { designation: { $regex: searchQuery, $options: "i" } },
+        ]
+      }
+    ]
+  };
+  return query
+}
+
 export const validateResetPassword = (body) => {
   const resetPassword = Joi.object({
     password: Joi.string().min(8).required(),
@@ -352,6 +373,8 @@ export const getDownloadCaseExcel = async (getAllCase = [],_id) => {
     { header: 'Branch ID', key: 'branchId', width: 20 },
     { header: 'Type', key: 'type', width: 20 },
     { header: 'Case From', key: 'caseFrom', width: 20 },
+    { header: 'Partner Name', key: 'partnerName', width: 20 },
+    { header: 'Partner Consultant Code', key: 'partnerCode', width: 20 },
     { header: 'File No', key: 'fileNo', width: 30 },
     { header: 'Current Status', key: 'currentStatus', width: 30 },
     { header: 'Name', key: 'name', width: 30 },
@@ -376,6 +399,8 @@ export const getDownloadCaseExcel = async (getAllCase = [],_id) => {
       branchId: caseData?.branchId,
       type: caseData?.empSaleId==_id ? "added" : (!caseData?.empSaleId && caseData?.partnerId ? "partner" : "others"),
       caseFrom: caseData?.caseFrom,
+      partnerName: caseData?.partnerName || "-",
+      partnerCode: caseData?.partnerCode || "-",
       fileNo: caseData?.fileNo,
       currentStatus: caseData?.currentStatus,
       name: caseData.name,
@@ -462,6 +487,44 @@ export const getAllPartnerDownloadExcel = async (getAllPartner = [], _id) => {
       panNo: partnerData?.bankingDetails?.panNo,
       ifscCode: partnerData?.bankingDetails?.ifscCode,
       upiId: partnerData?.bankingDetails?.upiId,
+    });
+  });
+
+
+  // Generate Excel buffer
+  return await workbook.xlsx.writeBuffer();
+}
+
+
+
+export const getAllSathiDownloadExcel = async (getAllSathi = [], _id) => {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Cases');
+  // Define Excel columns
+  worksheet.columns = [
+    { header: 'Date', key: 'date', width: 20 },
+    { header: 'Full Name', key: 'fullName', width: 20 },
+    { header: 'Emp Id', key: 'empId', width: 20 },
+    { header: 'Branch Id', key: 'branchId', width: 20 },
+    { header: 'Email', key: 'email', width: 30 },
+    { header: 'Department', key: 'type', width: 30 },
+    { header: 'Type', key: 'referEmp', width: 30 },
+    { header: 'designation', key: 'designation', width: 30 },
+
+  ];
+
+  // Populate Excel rows with data
+  getAllSathi.forEach((sathi, index) => {
+    worksheet.addRow({
+      date:new Date(sathi?.createdAt).toLocaleDateString(),
+      fullName:sathi?.fullName,
+      empId:sathi?.empId,
+      branchId:sathi?.branchId,
+      email:sathi?.email,
+      mobileNo:sathi?.mobile,
+      type:sathi?.type,
+      referEmp: sathi?.referEmpId==_id ? "Added"  : "Other",
+      designation:sathi?.designation,
     });
   });
 
