@@ -22,6 +22,7 @@ import { firebaseUpload } from "../utils/helper.js";
 import CaseDoc from "../models/caseDoc.js";
 import CaseStatus from "../models/caseStatus.js";
 import CaseComment from "../models/caseComment.js";
+import { validateAdminAddEmployeeToCase } from "../utils/validateAdmin.js";
 
 
 export const employeeAuthenticate = async (req, res) => {
@@ -437,17 +438,19 @@ export const viewAllEmployeeCase = async (req, res) => {
       let branchWise = false
       let findEmp = false
 
+
       //  for specific employee case 
       if(empId){
-         if (!validMongooseId(empId)) return res.status(400).json({ success: false, message: "Not a valid employee Id" })
+         if (!validMongooseId(empId)) return res.status(400).json({ success: false, message: "Not a valid employee Id1" })
          const getEmp = await Employee.findById(empId)
          if (!getEmp) return res.status(400).json({ success: false, message: "Searching employee account not found" })
          findEmp = getEmp
+
       if(caseAccess?.includes(findEmp?.empType?.toLowerCase())){
          console.log("if---");
          empBranchId = getEmp?.branchId
          branchWise = true
-      }else if(findEmp?.type?.toLowerCase()!= "sales" && findEmp?.type?.toLowerCase() != "sathi team"){
+      }else if(findEmp?.type?.toLowerCase()!= "sales" && findEmp?.type?.toLowerCase() != "sathi team" && !empId){
          console.log("else---");
          empId =req.query?.empId
          empBranchId = employee?.branchId
@@ -461,14 +464,14 @@ export const viewAllEmployeeCase = async (req, res) => {
          empId = false
       } else {
          if (employee?.type?.toLowerCase() != "sales" && employee?.type?.toLowerCase() != "sathi team" && !empId) {
-         if (!validMongooseId(req.query?.empId)) return res.status(400).json({ success: false, message: "Not a valid employee Id" })
-            empId =req.query?.empId
-            empBranchId = employee?.branchId
+            empId = employee?._id?.toString()
+            empBranchId = false
             branchWise = true
          } 
       }
+
       if (branchWise) {
-         const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, empId, true, false, empBranchId)
+         const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, empId, true, false,empBranchId)
          if (!query.success) return res.status(400).json({ success: false, message: query.message })
 
          const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
@@ -1384,6 +1387,7 @@ export const allEmployeeDashboard = async (req, res) => {
       let filter = {}
       let extractType = []
       const caseAccess = ["operation", "finance", "branch"]
+      const excludedTypes = ["sales", "operation", "finance","sathi team","branch"];
       const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
       const currentMonth = new Date().getMonth() + 1;
       const allMonths = [];
@@ -1498,22 +1502,36 @@ export const allEmployeeDashboard = async (req, res) => {
 
          ])
 
-      filter = {
+      if(excludedTypes?.includes(employee?.type?.toLowerCase())){
+         filter = {
+               $and: [
+                  {createdAt: { $gte: currentYearStart }},
+                  { isPartnerReferenceCase: false },
+                  { isEmpSaleReferenceCase: false },
+                  { isActive: true },
+                  { branchId: { $regex: employee?.branchId, $options: "i" } },
+                  {
+                     $or: [
+                        // excludedTypes?.includes(employee?.type.toLowerCase()) ? {$in:{addEmployee:[employee?._id?.toString]}} :{},
+                        { empSaleId: { $in: extractType?.[0]?.shareEmp } },
+                        { partnerId: { $in: extractType?.[0]?.allPartners } },
+                        { clientId: { $in: extractType?.[0]?.allClients } },
+                     ]
+                  },
+               ]
+            };
+      }else{
+         filter = {
             $and: [
                {createdAt: { $gte: currentYearStart }},
                { isPartnerReferenceCase: false },
                { isEmpSaleReferenceCase: false },
                { isActive: true },
-               { branchId: { $regex: employee?.branchId, $options: "i" } },
-               {
-                  $or: [
-                     { empSaleId: { $in: extractType?.[0]?.shareEmp } },
-                     { partnerId: { $in: extractType?.[0]?.allPartners } },
-                     { clientId: { $in: extractType?.[0]?.allClients } },
-                  ]
-               },
+               {addEmployee:{$in:[employee?._id?.toString()]}},
+               // { branchId: { $regex: employee?.branchId, $options: "i" } },
             ]
-         };
+         }
+      }
       }
 
       const noOfPartner = await Partner.find(
@@ -1821,15 +1839,16 @@ export const salesDownloadCaseReport = async (req, res) => {
 
       //  for specific employee case 
       if(empId){
-         if (!validMongooseId(empId)) return res.status(400).json({ success: false, message: "Not a valid employee Id" })
+         if (!validMongooseId(empId)) return res.status(400).json({ success: false, message: "Not a valid employee Id1" })
          const getEmp = await Employee.findById(empId)
          if (!getEmp) return res.status(400).json({ success: false, message: "Searching employee account not found" })
          findEmp = getEmp
+
       if(caseAccess?.includes(findEmp?.empType?.toLowerCase())){
          console.log("if---");
          empBranchId = getEmp?.branchId
          branchWise = true
-      }else if(findEmp?.type?.toLowerCase()!= "sales" && findEmp?.type?.toLowerCase() != "sathi team"){
+      }else if(findEmp?.type?.toLowerCase()!= "sales" && findEmp?.type?.toLowerCase() != "sathi team" && !empId){
          console.log("else---");
          empId =req.query?.empId
          empBranchId = employee?.branchId
@@ -1843,12 +1862,25 @@ export const salesDownloadCaseReport = async (req, res) => {
          empId = false
       } else {
          if (employee?.type?.toLowerCase() != "sales" && employee?.type?.toLowerCase() != "sathi team" && !empId) {
-         if (!validMongooseId(req.query?.empId)) return res.status(400).json({ success: false, message: "Not a valid employee Id" })
-            empId =req.query?.empId
-            empBranchId = employee?.branchId
+            empId = employee?._id?.toString()
+            empBranchId = false
             branchWise = true
          } 
       }
+
+      if (caseAccess?.includes(req?.user?.empType?.toLowerCase()) && !empId) {
+         empBranchId = employee?.branchId
+         branchWise = true
+         empId = false
+      } else {
+         if (employee?.type?.toLowerCase() != "sales" && employee?.type?.toLowerCase() != "sathi team" && !empId) {
+            empId = employee?._id?.toString()
+            empBranchId = false
+            branchWise = true
+         } 
+      }
+
+
       if (branchWise) {
          const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, empId, true, false, empBranchId)
          if (!query.success) return res.status(400).json({ success: false, message: query.message })
@@ -2369,6 +2401,72 @@ export const empChangeBranch = async (req, res) => {
 
    } catch (error) {
       console.log("adminChangeBranch in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
+export const empOptGetNormalEmployee = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+
+      // query = ?statusType=&search=&limit=&pageNo
+      const pageItemLimit = req.query.limit ? req.query.limit : 10;
+      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const searchQuery = req.query.search ? req.query.search : "";
+
+      const excludedTypes = ["Sales", "Operation", "Finance","Sathi Team","Branch"];
+      let query = {
+         $and:[
+            { type: { $nin: excludedTypes }},
+            {branchId:{ $regex: employee?.branchId, $options: "i" }},
+            {
+             $or: [
+                  { fullName: { $regex: searchQuery, $options: "i" }},
+                  { email: { $regex: searchQuery, $options: "i" }},
+                  { mobileNo: { $regex: searchQuery, $options: "i" }},
+                  { type: { $regex: searchQuery, $options: "i" }},
+                  { designation: { $regex: searchQuery, $options: "i" }},
+
+              ]
+            }
+         ]
+         };
+      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const noOfEmployee = await Employee.find(query).count()
+      return res.status(200).json({ success: true, message: "get normal employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
+
+   } catch (error) {
+      console.log("empOptGetNormalEmployee in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+export const empOptShareCaseToEmployee = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+
+
+      
+      const { error } = validateAdminAddEmployeeToCase(req.body)
+      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+      const updateCase = req.body?.shareCase?.map(caseShare => Case.findByIdAndUpdate(caseShare, { $push: { addEmployee: { $each: req?.body?.shareEmployee } } }, { new: true }))
+      console.log("updateCase", updateCase);
+      const allUpdateCase = await Promise.all(updateCase)
+      return res.status(200).json({ success: true, message: "Successfully employee add to case" });
+   } catch (error) {
+      console.log("empOptShareCaseToEmployee  in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }

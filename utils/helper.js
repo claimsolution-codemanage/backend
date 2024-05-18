@@ -42,7 +42,7 @@ export const getValidateDate = (date) => {
 
 
 export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, partnerId, clientId, employeeId, type = true, empSaleId = false,branchId=false) => {
- console.log("status",statusType,branchId);
+ console.log("status-----",statusType,branchId,employeeId);
   if (startDate && endDate) {
     const validStartDate = getValidateDate(startDate)
     if (!validStartDate) return { success: false, message: "start date not formated" }
@@ -374,7 +374,7 @@ export const getDownloadCaseExcel = async (getAllCase = [],_id) => {
     { header: 'Type', key: 'type', width: 20 },
     { header: 'Case From', key: 'caseFrom', width: 20 },
     { header: 'Partner Name', key: 'partnerName', width: 20 },
-    { header: 'Partner Consultant Code', key: 'partnerCode', width: 20 },
+    // { header: 'Partner Consultant Code', key: 'partnerCode', width: 20 },
     { header: 'File No', key: 'fileNo', width: 30 },
     { header: 'Current Status', key: 'currentStatus', width: 30 },
     { header: 'Name', key: 'name', width: 30 },
@@ -400,7 +400,7 @@ export const getDownloadCaseExcel = async (getAllCase = [],_id) => {
       type: caseData?.empSaleId==_id ? "added" : (!caseData?.empSaleId && caseData?.partnerId ? "partner" : "others"),
       caseFrom: caseData?.caseFrom,
       partnerName: caseData?.partnerName || "-",
-      partnerCode: caseData?.partnerCode || "-",
+      // partnerCode: caseData?.partnerCode || "-",
       fileNo: caseData?.fileNo,
       currentStatus: caseData?.currentStatus,
       name: caseData.name,

@@ -638,7 +638,7 @@ export const adminGetNormalEmployee = async (req, res) => {
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = req.query.search ? req.query.search : "";
 
-      const excludedTypes = ["Sales", "Operation", "Finance"];
+      const excludedTypes = ["Sales", "Operation", "Finance","Sathi Team","Branch"];
       let query = {
          $and:[
             { type: { $nin: excludedTypes }},
@@ -852,10 +852,14 @@ export const adminViewEmpSaleReport = async (req, res) => {
 
 
          const caseAccess = ["operation", "finance", "branch"]
-         if (caseAccess?.includes(empSale?.type?.toLowerCase())) {
+         const excludedTypes = ["sales", "operation", "finance","sathi team","branch"];
+         const isNormalEmp = !excludedTypes.includes(empSale?.type?.toLowerCase())
+         let empBranchId =false
+         let branchWise = false
+         if (caseAccess?.includes(empSale?.type?.toLowerCase()) || isNormalEmp) {
             empBranchId = empSale?.branchId
             branchWise = true
-            const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, true, false, empSale?.branchId)
+            const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, isNormalEmp && empSale?._id?.toString(), true, false, !isNormalEmp && empSale?.branchId)
             if (!query.success) return res.status(400).json({ success: false, message: query.message })
             const aggregationPipeline = [
                   { $match: query?.query }, // Match the documents based on the query
@@ -2457,12 +2461,16 @@ export const adminEmpSaleReportDownload = async (req, res) => {
       const startDate = req.query.startDate ? req.query.startDate : "";
       const endDate = req.query.endDate ? req.query.endDate : "";
       const type = req?.query?.type ? req.query.type : true
+      const excludedTypes = ["sales", "operation", "finance","sathi team","branch"];
+      const isNormalEmp = !excludedTypes.includes(empSale?.type?.toLowerCase())
+      let empBranchId =false
+      let branchWise = false
 
       const caseAccess = ["operation", "finance", "branch"]
       if (caseAccess?.includes(empSale?.type?.toLowerCase())) {
          empBranchId = empSale?.branchId
          branchWise = true
-         const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, true, false, empSale?.branchId)
+         const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, isNormalEmp && empSale?._id?.toString(), true, false, !isNormalEmp && empSale?.branchId)
          if (!query.success) return res.status(400).json({ success: false, message: query.message })
        const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
          const excelBuffer = await getDownloadCaseExcel(getAllCase,empSale?._id?.toString())

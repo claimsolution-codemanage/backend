@@ -9,7 +9,8 @@ employeeEditClient,employeeupdateParnterProfile,employeeUpdatePartnerBankingDeta
 saleEmployeeAddPartner,saleEmployeeAddCase,employeeUploadImage,employeeUploadAttachment,
 employeeRemoveInvoice,salesDownloadCaseReport,saleEmpViewPartnerReport,empDownloadPartnerReport,
 employeeDownloadAllPartner,empViewAllEmployee,empAddReferenceCaseAndMarge,empRemoveReferenceCase,
-empChangeBranch,createSathiTeamAcc,empViewSathiEmployee,empDownloadSathiEmployee
+empChangeBranch,createSathiTeamAcc,empViewSathiEmployee,empDownloadSathiEmployee,empOptGetNormalEmployee,
+empOptShareCaseToEmployee
 } from '../controller/employee.js';
 
 
@@ -22,6 +23,7 @@ router.put("/resetForgetPassword",employeeResetForgetPassword)
 router.put("/employeeForgetPassword",employeeForgetPassword)
 router.get("/view/sathiTeam",empViewSathiEmployee)
 router.get("/download/sathiTeam",empDownloadSathiEmployee)
+router.get("/operation/normalEmployee",empOptGetNormalEmployee)
 
 
 router.get("/all/dashboard",allEmployeeDashboard)
@@ -69,7 +71,8 @@ router.get("/sale/partnerReport",saleEmpViewPartnerReport)
 router.post("/upload/image",employeeUploadImage)
 router.post("/upload/attachment",employeeUploadAttachment)
 
-
+// for share
+router.put("/operation/shareCase",empOptShareCaseToEmployee)
 
 // report
 router.get("/partnerReport",empDownloadPartnerReport)

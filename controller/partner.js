@@ -774,6 +774,7 @@ export const addNewCase = async (req, res) => {
     req.body.partnerId = partner?._id
     req.body.partnerName = partner?.profile?.consultantName
     req.body.consultantCode = partner?.profile?.consultantCode
+    req.body.partnerCode = partner?.profile?.consultantCode
     req.body.caseFrom = "partner"
     req.body.processSteps = []
     // req.body.caseDocs = req?.body?.caseDocs?.map(caseFile => {
