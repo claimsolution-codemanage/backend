@@ -23,6 +23,7 @@ import CaseDoc from "../models/caseDoc.js";
 import CaseStatus from "../models/caseStatus.js";
 import CaseComment from "../models/caseComment.js";
 import { validateAdminAddEmployeeToCase } from "../utils/validateAdmin.js";
+import { addNewCase } from "./partner.js";
 
 
 export const employeeAuthenticate = async (req, res) => {
@@ -135,12 +136,12 @@ export const createSathiTeamAcc = async (req, res) => {
       const newEmployee = new Employee({
          fullName: req.body.fullName,
          empId: `EMP-${noOfEmployee + 1}`,
-         branchId: employee?.branchId,
-         email: req?.body?.email?.toLowerCase(),
+         branchId: employee?.branchId?.trim(),
+         email: req?.body?.email?.trim()?.toLowerCase(),
          mobileNo: req.body.mobileNo,
          password: bcryptPassword,
          type: "Sathi Team",
-         designation: "executive",
+         designation: "Executive",
          referEmpId: employee?._id
       })
       try {
@@ -437,6 +438,7 @@ export const viewAllEmployeeCase = async (req, res) => {
       let empBranchId = false;
       let branchWise = false
       let findEmp = false
+      let isNormalEmp = false
 
 
       //  for specific employee case 
@@ -446,7 +448,7 @@ export const viewAllEmployeeCase = async (req, res) => {
          if (!getEmp) return res.status(400).json({ success: false, message: "Searching employee account not found" })
          findEmp = getEmp
 
-      if(caseAccess?.includes(findEmp?.empType?.toLowerCase())){
+      if(caseAccess?.includes(findEmp?.type?.toLowerCase())){
          console.log("if---");
          empBranchId = getEmp?.branchId
          branchWise = true
@@ -455,6 +457,7 @@ export const viewAllEmployeeCase = async (req, res) => {
          empId =req.query?.empId
          empBranchId = employee?.branchId
          branchWise = true
+         isNormalEmp = true
       }
       }
 
@@ -471,7 +474,7 @@ export const viewAllEmployeeCase = async (req, res) => {
       }
 
       if (branchWise) {
-         const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, empId, true, false,empBranchId)
+         const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, isNormalEmp && empId, true, false,!isNormalEmp && empBranchId)
          if (!query.success) return res.status(400).json({ success: false, message: query.message })
 
          const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
@@ -685,7 +688,7 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
 
 
          const getClientCase = await Case.findById(clientCaseId)
-         if (getPartnerCase?.branchId?.toLowerCase() != getClientCase?.branchId?.toLowerCase()) return res.status(404).json({ success: false, message: "Case must be from same branch" })
+         if (getPartnerCase?.branchId?.trim()?.toLowerCase()!=getClientCase?.branchId?.trim()?.toLowerCase()) return res.status(404).json({ success: false, message: "Case must be from same branch" })
 
          if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
          console.log(getPartnerCase?.policyNo?.toLowerCase(), getClientCase?.policyNo?.toLowerCase(), getPartnerCase?.email?.toLowerCase(), getClientCase?.email?.toLowerCase());
@@ -698,12 +701,16 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
             return res.status(404).json({ success: false, message: "Case already have the partner case reference" })
          }
 
+
+
          const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
             {
                $set: {
                   partnerId: getPartner?._id?.toString(),
                   partnerName: getPartner?.profile?.consultantName,
                   partnerCode:getPartner?.profile?.consultantCode,
+                  empSaleId: getPartnerCase?.empSaleId || "",
+                  empSaleName: getPartnerCase?.empSaleName || "",
                   partnerReferenceCaseDetails: {
                      referenceId: getPartnerCase?._id?.toString(),
                      name: getPartner?.profile?.consultantName,
@@ -734,7 +741,7 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
          const getClientCase = await Case.findById(clientCaseId)
          if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
 
-         if (getEmployeeCase?.branchId?.toLowerCase() != getClientCase?.branchId?.toLowerCase()) return res.status(404).json({ success: false, message: "Case must be from same branch" })
+         if (getEmployeeCase?.branchId?.trim()?.toLowerCase() != getClientCase?.branchId?.trim()?.toLowerCase()) return res.status(404).json({ success: false, message: "Case must be from same branch" })
 
          if (getEmployeeCase?.policyNo?.toLowerCase() != getClientCase?.policyNo?.toLowerCase() || getEmployeeCase?.email?.toLowerCase() != getClientCase?.email?.toLowerCase()) {
             return res.status(404).json({ success: false, message: "sale-employee and client must have same policyNo and emailId" })
@@ -745,8 +752,11 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
             {
                $set: {
                   empSaleId: getEmployee?._id?.toString(),
-                  empSaleName: getEmployee?.fullName,
+                  empSaleName: `${getEmployee?.fullName} | ${getEmployee?.type} | ${getEmployee?.designation}`,
                   empId:getEmployee?.empId,
+                  partnerId: getEmployeeCase?.partnerId || "",
+                  partnerName: getEmployeeCase?.partnerName || "",
+                  partnerCode:getEmployeeCase?.partnerCode || "",
                   empSaleReferenceCaseDetails: {
                      referenceId: getEmployeeCase?._id?.toString(),
                      name: getEmployee?.fullName,
@@ -859,6 +869,8 @@ export const employeeViewAllPartner = async (req, res) => {
       const endDate = req.query.endDate
       const searchQuery = req.query.search ? req.query.search : ""; 
       const caseAccess = ["operation", "finance", "branch"]
+      const excludedTypes = ["sales", "operation", "finance","sathi team","branch"];
+      let isNormalEmp = false
       let empId = req?.query?.empId=="false" ? false :req?.query?.empId;
       let empBranchId = false;
       let branchWise = false
@@ -871,7 +883,7 @@ export const employeeViewAllPartner = async (req, res) => {
          const getEmp = await Employee.findById(empId)
          if (!getEmp) return res.status(400).json({ success: false, message: "Searching employee account not found" })
          findEmp = getEmp
-      if(caseAccess?.includes(findEmp?.empType?.toLowerCase())){
+      if(caseAccess?.includes(findEmp?.type?.toLowerCase())){
          console.log("if---");
          empBranchId = getEmp?.branchId
          branchWise = true
@@ -880,8 +892,11 @@ export const employeeViewAllPartner = async (req, res) => {
          empId =req.query?.empId
          empBranchId = employee?.branchId
          branchWise = true
+         isNormalEmp =true
       }
       }
+
+      console.log("isNormal",isNormalEmp);
 
       if (caseAccess?.includes(req?.user?.empType?.toLowerCase()) && !empId) {
          empBranchId = employee?.branchId
@@ -897,9 +912,9 @@ export const employeeViewAllPartner = async (req, res) => {
       }
       if (branchWise) {
          console.log("branchWise----");
-         const query = getAllPartnerSearchQuery(searchQuery, true, empId, startDate, endDate, empBranchId)
+         const query = getAllPartnerSearchQuery(searchQuery, true, isNormalEmp && empId, startDate, endDate, !isNormalEmp && empBranchId)
          if (!query.success) return res.status(400).json({ success: false, message: query.message })
-         const getAllPartner = await Partner.find(query.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+         const getAllPartner = await Partner.find(query.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("salesId","fullName type designation");
          const noOfPartner = await Partner.find(query.query).count()
          return res.status(200).json({ success: true, message: "get partner data", data: getAllPartner, noOfPartner: noOfPartner });
 
@@ -985,7 +1000,7 @@ export const employeeViewAllPartner = async (req, res) => {
                } : {}
             ]
          };
-         const getAllPartner = await Partner.find(query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-password");
+         const getAllPartner = await Partner.find(query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-password").populate("salesId","fullName type designation");
          const noOfPartner = await Partner.find(query).count()
          return res.status(200).json({ success: true, message: "get case data", data: getAllPartner, noOfPartner: noOfPartner });
       }
@@ -1630,7 +1645,7 @@ export const saleEmployeeAddPartner = async (req, res) => {
          return res.status(400).json({ success: true, message: "Partner account already exist", });
       }
 
-      const jwtString = await Jwt.sign({ ...req.body, empId: req?.user?._id, empBranchId: employee?.branchId?.toLowerCase() }, process.env.EMPLOYEE_SECRET_KEY, { expiresIn: '24h' })
+      const jwtString = await Jwt.sign({ ...req.body, empId: req?.user?._id, empBranchId: employee?.branchId?.trim()?.toLowerCase() }, process.env.EMPLOYEE_SECRET_KEY, { expiresIn: '24h' })
 
       const requestLink = `/partner/accept-request/${jwtString}`
       await sendAddPartnerRequest(req.body.email,requestLink)
@@ -1659,6 +1674,9 @@ export const saleEmployeeAddCase = async (req, res) => {
       const { error } = validateAddEmpCase(req.body);
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
+      let newClient = false
+      let clientDetails = {}
+
       const { partnerEmail, partnerCode } = req.body
       if (partnerEmail || partnerCode) {
          if (!partnerEmail) return res.status(400).json({ success: false, message: "Partner Email is required" })
@@ -1672,26 +1690,27 @@ export const saleEmployeeAddCase = async (req, res) => {
          }
       }
 
-      req.body.empSaleId = employee?._id,
-         req.body.empSaleName = employee?.fullName,
-         req.body.caseFrom = employee?.type?.toLowerCase()
       if (req.body.clientEmail) {
          if (!req.body.clientName || !req.body.clientMobileNo) return res.status(400).json({ success: false, message: "Client name and mobileNo are required" });
          const isClientExist = await Client.find({ email: req.body.clientEmail })
          if (!(isClientExist?.length > 0 && isClientExist[0]?.emailVerify)) {
-            const jwtString = await Jwt.sign({
-               clientName: req.body.clientName,
-               clientEmail: req.body.clientEmail,
+            newClient = true
+            clientDetails = {
+               clientName: req.body.clientName?.trim(),
+               clientEmail: req.body.clientEmail?.trim(),
                clientMobileNo: req.body.clientMobileNo,
                empId: req?.user?._id,
-               empBranchId: employee?.branchId?.toLowerCase()
-            }, process.env.EMPLOYEE_SECRET_KEY, { expiresIn: '24h' })
-
-            const requestLink = `/client/accept-request/${jwtString}`
-            // console.log(requestLink,"requestLink----------");
-            await sendAddClientRequest(req.body.clientEmail, requestLink)
+               empBranchId: employee?.branchId?.trim()?.toLowerCase()
+            }
+         }else{
+            return res.status(400).json({ success: false, message: "Client account already exist" })
          }
       }
+
+      req.body.empSaleId = employee?._id,
+      req.body.empSaleName = `${employee?.fullName} | ${employee?.type?.toLowerCase()} | ${employee?.designation?.toLowerCase()}`,
+      req.body.caseFrom = "team"
+
       const newAddCase = new Case({ ...req.body, branchId: employee?.branchId?.toLowerCase(), caseDocs: [] })
       const noOfCase = await Case.count()
       newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
@@ -1713,6 +1732,17 @@ export const saleEmployeeAddCase = async (req, res) => {
          })
          return newDoc.save()
       }))
+
+      if(newClient && clientDetails?.clientEmail){
+         const jwtString = await Jwt.sign({
+            ...clientDetails,
+            caseId:newAddCase?._id?.toString(),
+         }, process.env.EMPLOYEE_SECRET_KEY, { expiresIn: '24h' })
+
+         const requestLink = `/client/accept-request/${jwtString}`
+         // console.log(requestLink,"requestLink----------");
+         await sendAddClientRequest(req.body.clientEmail, requestLink)
+      }
 
       return res.status(200).json({ success: true, message: "Successfully add case", data: newAddCase });
 
@@ -1835,6 +1865,7 @@ export const salesDownloadCaseReport = async (req, res) => {
       let empBranchId = false;
       let branchWise = false
       let findEmp = false
+      let isNormalEmp = false
       let getAllCase = []
 
       //  for specific employee case 
@@ -1844,7 +1875,7 @@ export const salesDownloadCaseReport = async (req, res) => {
          if (!getEmp) return res.status(400).json({ success: false, message: "Searching employee account not found" })
          findEmp = getEmp
 
-      if(caseAccess?.includes(findEmp?.empType?.toLowerCase())){
+      if(caseAccess?.includes(findEmp?.type?.toLowerCase())){
          console.log("if---");
          empBranchId = getEmp?.branchId
          branchWise = true
@@ -1853,6 +1884,7 @@ export const salesDownloadCaseReport = async (req, res) => {
          empId =req.query?.empId
          empBranchId = employee?.branchId
          branchWise = true
+         isNormalEmp = true
       }
       }
 
@@ -1882,7 +1914,7 @@ export const salesDownloadCaseReport = async (req, res) => {
 
 
       if (branchWise) {
-         const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, empId, true, false, empBranchId)
+         const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, isNormalEmp && empId, true, false, !isNormalEmp && empBranchId)
          if (!query.success) return res.status(400).json({ success: false, message: query.message })
 
          getAllCase = await Case.find(query?.query).sort({ createdAt: -1 })
@@ -2062,6 +2094,8 @@ export const employeeDownloadAllPartner = async (req, res) => {
       let empBranchId = false;
       let branchWise = false
       let findEmp = false
+      let isNormalEmp = false
+
 
       //  for specific employee case 
       if(empId){
@@ -2069,7 +2103,7 @@ export const employeeDownloadAllPartner = async (req, res) => {
          const getEmp = await Employee.findById(empId)
          if (!getEmp) return res.status(400).json({ success: false, message: "Searching employee account not found" })
          findEmp = getEmp
-      if(caseAccess?.includes(findEmp?.empType?.toLowerCase())){
+      if(caseAccess?.includes(findEmp?.type?.toLowerCase())){
          console.log("if---");
          empBranchId = getEmp?.branchId
          branchWise = true
@@ -2078,6 +2112,7 @@ export const employeeDownloadAllPartner = async (req, res) => {
          empId =req.query?.empId
          empBranchId = employee?.branchId
          branchWise = true
+         isNormalEmp = true
       }
       }
 
@@ -2094,9 +2129,9 @@ export const employeeDownloadAllPartner = async (req, res) => {
          } 
       }
       if (branchWise) {
-         const query = getAllPartnerSearchQuery(searchQuery, true, empId, startDate, endDate, empBranchId)
+         const query = getAllPartnerSearchQuery(searchQuery, true, isNormalEmp && empId, startDate, endDate, !isNormalEmp && empBranchId)
          if (!query.success) return res.status(400).json({ success: false, message: query.message })
-         const getAllPartner = await Partner.find(query?.query).sort({ createdAt: -1 })
+         const getAllPartner = await Partner.find(query?.query).sort({ createdAt: -1 }).populate("salesId","fullName type designation")
          // Generate Excel buffer
          const excelBuffer = await getAllPartnerDownloadExcel(getAllPartner, findEmp?._id?.toString() || employee?._id?.toString());
          res.setHeader('Content-Disposition', 'attachment; filename="partners.xlsx"')
@@ -2185,7 +2220,7 @@ export const employeeDownloadAllPartner = async (req, res) => {
                } : {}
             ]
          };
-         const getAllPartner = await Partner.find(query).sort({ createdAt: -1 })
+         const getAllPartner = await Partner.find(query).sort({ createdAt: -1 }).populate("salesId","fullName type designation")
          // Generate Excel buffer
          const excelBuffer = await getAllPartnerDownloadExcel(getAllPartner, findEmp?._id?.toString() || employee?._id?.toString());
          res.setHeader('Content-Disposition', 'attachment; filename="partners.xlsx"')
@@ -2257,6 +2292,64 @@ export const empViewAllEmployee = async (req, res) => {
    }
 }
 
+export const empDownloadAllEmployee = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+
+      const searchQuery = req.query.search ? req.query.search : "";
+      const pageItemLimit = req.query.limit ? req.query.limit : 10;
+      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const type = req.query.type ? req.query.type : true;
+      
+      const caseAccess = ["operation", "finance", "branch"]
+      let department = false
+      let query = {}
+      if (caseAccess?.includes(req?.user?.empType?.toLowerCase())) {
+       query = getAllEmployeeSearchQuery(searchQuery, true, department,false, employee?.branchId)
+      }else{
+         query = {
+            $and:[
+               {isActive:true},
+               employee?.designation?.toLowerCase()=="executive" ? { referEmpId : { $in: [employee?._id] } } : {},
+               {branchId:{ $regex:employee?.branchId, $options: "i" }},
+               employee?.designation?.toLowerCase()=="manager" ?  {
+                  $or: [
+                    { type: { $regex: "sales", $options: "i" } },
+                    { type: { $regex: "sathi team", $options: "i" } },
+                  ]
+                } : {},
+               {
+                 $or: [
+                   { fullName: { $regex: searchQuery, $options: "i" } },
+                   { email: { $regex: searchQuery, $options: "i" } },
+                   { mobileNo: { $regex: searchQuery, $options: "i" } },
+                   { branchId: { $regex: searchQuery, $options: "i" } },
+                   { type: { $regex: searchQuery, $options: "i" } },
+                   { designation: { $regex: searchQuery, $options: "i" } },
+                 ]
+               }
+             ]
+         }
+      }
+
+      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("referEmpId","fullName type designation");
+      const excelBuffer = await getAllSathiDownloadExcel(JSON.parse(JSON.stringify(getAllEmployee)),"");
+      res.setHeader('Content-Disposition', 'attachment; filename="sathi.xlsx"')
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.status(200)
+      res.send(excelBuffer)
+   } catch (error) {
+      console.log("adminViewAllEmployee in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
 export const empViewSathiEmployee = async (req, res) => {
    try {
       const verify = await authEmployee(req, res)
@@ -2301,7 +2394,7 @@ export const empViewSathiEmployee = async (req, res) => {
          }
       }
    
-      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("referEmpId","fullName type designation");
       const noOfEmployee = await Employee.find(query).count()
       return res.status(200).json({ success: true, message: "get employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
 
@@ -2355,7 +2448,7 @@ export const empDownloadSathiEmployee = async (req, res) => {
          }
       }
    
-      const getAllEmployee = await Employee.find(query).select("-password").sort({ createdAt: -1 });
+      const getAllEmployee = await Employee.find(query).select("-password").sort({ createdAt: -1 }).populate("referEmpId","fullName type designation");
       const excelBuffer = await getAllSathiDownloadExcel(JSON.parse(JSON.stringify(getAllEmployee)), getEmp._id?.toString());
       res.setHeader('Content-Disposition', 'attachment; filename="sathi.xlsx"')
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -2386,16 +2479,16 @@ export const empChangeBranch = async (req, res) => {
          const getClient = await Client?.findById(_id)
          if (!getClient) return res.status(400).json({ success: false, message: "Client account not found" })
 
-         await Client.findByIdAndUpdate(_id, { branchId })
-         await Case.updateMany({ clientId: _id }, { branchId })
-         await Bill.updateMany({ clientId: _id }, { branchId })
+         await Client.findByIdAndUpdate(_id, { branchId:branchId?.trim() })
+         await Case.updateMany({ clientId: _id }, { branchId:branchId?.trim() })
+         await Bill.updateMany({ clientId: _id }, { branchId:branchId?.trim() })
          return res.status(200).json({ success: true, message: `Successfully Change Branch` });
       } else {
          const getPartner = await Partner?.findById(_id)
          if (!getPartner) return res.status(400).json({ success: false, message: "Partner account not found" })
 
-         await Partner.findByIdAndUpdate(_id, { branchId })
-         await Case.updateMany({ partnerId: _id }, { branchId })
+         await Partner.findByIdAndUpdate(_id, { branchId:branchId?.trim() })
+         await Case.updateMany({ partnerId: _id }, { branchId:branchId?.trim() })
          return res.status(200).json({ success: true, message: `Successfully Change Branch` });
       }
 

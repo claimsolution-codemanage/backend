@@ -119,7 +119,7 @@ export const getAllCaseDocQuery = (searchQuery, startDate, endDate) => {
 
 
 export const getAllPartnerSearchQuery = (searchQuery, type, empSaleId = false, startDate = "", endDate = "",branchId=false) => {
-  console.log("salesId", empSaleId, startDate, endDate);
+  console.log("salesId", empSaleId, startDate, endDate,branchId);
   if (startDate && endDate) {
     const validStartDate = getValidateDate(startDate)
     if (!validStartDate) return { success: false, message: "start date not formated" }
@@ -374,6 +374,7 @@ export const getDownloadCaseExcel = async (getAllCase = [],_id) => {
     { header: 'Type', key: 'type', width: 20 },
     { header: 'Case From', key: 'caseFrom', width: 20 },
     { header: 'Partner Name', key: 'partnerName', width: 20 },
+    {header:"Added By",key:"addedBy",width:20},
     // { header: 'Partner Consultant Code', key: 'partnerCode', width: 20 },
     { header: 'File No', key: 'fileNo', width: 30 },
     { header: 'Current Status', key: 'currentStatus', width: 30 },
@@ -400,6 +401,7 @@ export const getDownloadCaseExcel = async (getAllCase = [],_id) => {
       type: caseData?.empSaleId==_id ? "added" : (!caseData?.empSaleId && caseData?.partnerId ? "partner" : "others"),
       caseFrom: caseData?.caseFrom,
       partnerName: caseData?.partnerName || "-",
+      addedBy: caseData?.empSaleName || "-",
       // partnerCode: caseData?.partnerCode || "-",
       fileNo: caseData?.fileNo,
       currentStatus: caseData?.currentStatus,
@@ -432,7 +434,7 @@ export const getAllPartnerDownloadExcel = async (getAllPartner = [], _id) => {
   // Define Excel columns
   worksheet.columns = [
     { header: 'Branch ID', key: 'branchId', width: 20 },
-    { header: 'Type', key: 'type', width: 20 },
+    { header: 'Added by', key: 'addedBy', width: 20 },
     { header: 'Consultant Name', key: 'consultantName', width: 20 },
     { header: 'Consultant Code', key: 'consultantCode', width: 30 },
     { header: 'Associate With Us', key: 'associateWithUs', width: 30 },
@@ -462,7 +464,7 @@ export const getAllPartnerDownloadExcel = async (getAllPartner = [], _id) => {
   getAllPartner.forEach((partnerData, index) => {
     worksheet.addRow({
       branchId: partnerData?.branchId,
-      type: partnerData?.salesId==_id ? "Added"  :( partnerData?.shareEmployee?.includes(_id) ? "Shared" : "Other"),
+      addedBy:(partnerData?.salesId?.type && partnerData?.salesId?.fullName) ? `${partnerData?.salesId?.fullName} | ${partnerData?.salesId?.type} | ${partnerData?.salesId?.designation}` : "-",
       consultantName: partnerData?.profile?.consultantName,
       consultantCode: partnerData?.profile?.consultantCode,
       associateWithUs: partnerData?.profile?.associateWithUs,
@@ -506,9 +508,10 @@ export const getAllSathiDownloadExcel = async (getAllSathi = [], _id) => {
     { header: 'Full Name', key: 'fullName', width: 20 },
     { header: 'Emp Id', key: 'empId', width: 20 },
     { header: 'Branch Id', key: 'branchId', width: 20 },
+    { header: 'Added By', key: 'addedBy', width: 20 },
     { header: 'Email', key: 'email', width: 30 },
+    { header: 'Mobile No', key: 'mobileNo', width: 30 },
     { header: 'Department', key: 'type', width: 30 },
-    { header: 'Type', key: 'referEmp', width: 30 },
     { header: 'designation', key: 'designation', width: 30 },
 
   ];
@@ -520,10 +523,10 @@ export const getAllSathiDownloadExcel = async (getAllSathi = [], _id) => {
       fullName:sathi?.fullName,
       empId:sathi?.empId,
       branchId:sathi?.branchId,
+      addedBy:(sathi?.referEmpId?.fullName && sathi?.referEmpId?.type) ? `${sathi?.referEmpId?.fullName} | ${sathi?.referEmpId?.type} | ${sathi?.referEmpId?.designation}` : "-",
       email:sathi?.email,
-      mobileNo:sathi?.mobile,
+      mobileNo:sathi?.mobileNo,
       type:sathi?.type,
-      referEmp: sathi?.referEmpId==_id ? "Added"  : "Other",
       designation:sathi?.designation,
     });
   });

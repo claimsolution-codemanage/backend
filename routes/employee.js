@@ -10,7 +10,7 @@ saleEmployeeAddPartner,saleEmployeeAddCase,employeeUploadImage,employeeUploadAtt
 employeeRemoveInvoice,salesDownloadCaseReport,saleEmpViewPartnerReport,empDownloadPartnerReport,
 employeeDownloadAllPartner,empViewAllEmployee,empAddReferenceCaseAndMarge,empRemoveReferenceCase,
 empChangeBranch,createSathiTeamAcc,empViewSathiEmployee,empDownloadSathiEmployee,empOptGetNormalEmployee,
-empOptShareCaseToEmployee
+empOptShareCaseToEmployee,empDownloadAllEmployee
 } from '../controller/employee.js';
 
 
@@ -82,6 +82,7 @@ router.get("/download/allPartner",employeeDownloadAllPartner)
 
 // emphead
 router.get("/head/allEmployee",empViewAllEmployee)
+router.get("/download/allEmployee",empDownloadAllEmployee)
 
 
 

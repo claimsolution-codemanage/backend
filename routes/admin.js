@@ -16,7 +16,8 @@ adminGetSaleEmployee,adminSharePartnerToSaleEmp,adminGetNormalEmployee,adminRemo
 adminUploadImage,adminUploadAttachment,adminCreateInvoice,adminViewAllInvoice,adminViewInvoiceById,
 adminUnActiveInvoice,adminEditInvoice,adminRemoveInvoice,
 adminAllUnactiveCaseDoc,adminUnactiveCaseDoc,adminChangeBranch,
-adminEmployeeProfile,adminDownloadEmpSathiEmployee,adminViewEmpSathiEmployee
+adminEmployeeProfile,adminDownloadEmpSathiEmployee,adminViewEmpSathiEmployee,
+adminDownloadAllEmployee
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -130,6 +131,7 @@ router.post("/upload/attachment",adminUploadAttachment)
 router.get("/download/allcase",adminDownloadAllCase)
 router.get("/download/allpartner",adminDownloadAllPartner)
 router.get("/download/allClient",adminAllClientDownload)
+router.get("/download/allEmployee",adminDownloadAllEmployee)
 router.get("/download/partnerReport",adminDownloadPartnerReport)
 router.get("/download/empSaleReport",adminEmpSaleReportDownload)
 router.get("/download/empSalePartnerReport",adminEmpSalePartnerReportDownload)

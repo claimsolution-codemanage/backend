@@ -67,7 +67,7 @@ export const signUp = async function (req, res) {
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
     const otp = otp6Digit();
-    const partner = await Partner.find({ email: req?.body?.email?.toLowerCase() });
+    const partner = await Partner.find({ email: req?.body?.email?.trim()?.toLowerCase() });
     //  const partnerWithEmail = await Partner.find({email:req.body.email})
     const { agreement } = req.body
     if (!agreement) {
@@ -80,7 +80,7 @@ export const signUp = async function (req, res) {
     if (partner.length == 0) {
       const newPartner = new Partner({
         fullName: req.body.fullName,
-        email: req?.body?.email?.toLowerCase(),
+        email: req?.body?.email?.trim()?.toLowerCase(),
         mobileNo: req.body.mobileNo,
         workAssociation: req.body.workAssociation,
         areaOfOperation: req.body.areaOfOperation,
@@ -107,7 +107,7 @@ export const signUp = async function (req, res) {
         const updatePatner = await Partner.findByIdAndUpdate(partner[0]?._id, {
           $set: {
             fullName: req.body.fullName,
-            email: req?.body?.email?.toLowerCase(),
+            email: req?.body?.email?.trim()?.toLowerCase(),
             mobileNo: req.body.mobileNo,
             workAssociation: req.body.workAssociation,
             areaOfOperation: req.body.areaOfOperation,
@@ -457,7 +457,7 @@ export const signUpWithRequest = async (req, res) => {
       await sendAccountTerm_ConditonsMail(email, "partner", modifiedPdfBytes);
       const newPartner = new Partner({
         fullName: fullName,
-        email: email,
+        email: email?.trim()?.toLowerCase(),
         mobileNo: mobileNo,
         workAssociation: workAssociation,
         areaOfOperation: areaOfOperation,
@@ -505,7 +505,7 @@ export const signUpWithRequest = async (req, res) => {
         },
         salesId: empId,
         shareEmployee: [empId],
-        branchId:empBranchId
+        branchId:empBranchId?.trim()
       })
       await newPartner.save()
       const token = newPartner?.getAuth(true)

@@ -61,7 +61,7 @@ export const clientSignUp = async (req, res) => {
 
     const otp = otp6Digit();
     const client = await Client.find({ mobileNo: req.body.mobileNo });
-    const clientWithEmail = await Client.find({ email: req?.body?.email?.toLowerCase() })
+    const clientWithEmail = await Client.find({ email: req?.body?.email?.trim()?.toLowerCase() })
     const { agreement } = req.body
     if (!agreement) {
       return res.status(400).json({ success: false, message: "Must agree with our service agreement" })
@@ -75,7 +75,7 @@ export const clientSignUp = async (req, res) => {
     if (client.length == 0 && clientWithEmail.length == 0) {
       const newClient = new Client({
         fullName: req.body.fullName,
-        email: req?.body?.email?.toLowerCase(),
+        email: req?.body?.email?.trim()?.toLowerCase(),
         mobileNo: req.body.mobileNo,
         password: bcrypePassword,
         emailOTP: { otp: otp, createAt: Date.now() },
@@ -97,7 +97,7 @@ export const clientSignUp = async (req, res) => {
         const updateClient = await Client.findByIdAndUpdate(client[0]?._id, {
           $set: {
             fullName: req.body.fullName,
-            email: req?.body?.email?.toLowerCase(),
+            email: req?.body?.email?.trim()?.toLowerCase(),
             mobileNo: req.body.mobileNo,
             password: bcrypePassword,
             emailOTP: { otp: otp, createAt: Date.now() },
@@ -117,7 +117,7 @@ export const clientSignUp = async (req, res) => {
         const updateClient = await Client.findByIdAndUpdate(clientWithEmail[0]?._id, {
           $set: {
             fullName: req.body.fullName,
-            email: req.body.email,
+            email: req.body.email?.trim()?.toLowerCase(),
             mobileNo: req.body.mobileNo,
             password: bcrypePassword,
             emailOTP: { otp: otp, createAt: Date.now() },
@@ -155,7 +155,7 @@ export const signUpWithRequest = async (req, res) => {
       const decode = await jwtDecode(tokenId)
       console.log("decode", decode);
       const bcryptPassword = await bcrypt.hash(password, 10)
-      const { clientName, clientEmail, clientMobileNo, empId,empBranchId } = decode
+      const { clientName, clientEmail, clientMobileNo, empId,empBranchId,caseId } = decode
       if (!clientName || !clientEmail || !clientMobileNo || !empId ||!empBranchId) return res.status(400).json({ success: false, message: "Invalid/expired link" })
       const client = await Client.find({ email: clientEmail })
       if (client[0]?.isActive || client[[0]]?.mobileVerify || client[0]?.emailVerify) return res.status(400).json({ success: false, message: "Account is already exist" })
@@ -163,9 +163,10 @@ export const signUpWithRequest = async (req, res) => {
       const today = new Date()
       const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", today)
       await sendAccountTerm_ConditonsMail(clientEmail, "client", modifiedPdfBytes);
+      const consultantCode = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfClients+1}`
       const newClient = new Client({
         fullName: clientName,
-        email: clientEmail?.toLowerCase(),
+        email: clientEmail?.trim()?.toLowerCase(),
         mobileNo: `91${clientMobileNo}`,
         password: bcryptPassword,
         emailOTP: { otp: "123456", createAt: Date.now() },
@@ -176,7 +177,7 @@ export const signUpWithRequest = async (req, res) => {
         tlsUrl: `${process?.env?.FRONTEND_URL}/agreement/client.pdf`,
         "profile.profilePhoto": "",
         "profile.consultantName": clientName,
-        "profile.consultantCode": `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfClients+1}`,
+        "profile.consultantCode": consultantCode,
         "profile.associateWithUs": today,
         "profile.fatherName": "",
         "profile.primaryEmail": clientEmail,
@@ -199,9 +200,20 @@ export const signUpWithRequest = async (req, res) => {
         "profile.kycAadhaarBack": "",
         "profile.kycPan": "",
         salesId: empId,
-        branchId:empBranchId
+        branchId:empBranchId?.trim()
       })
       await newClient.save()
+
+      if(caseId){
+        if(validMongooseId(caseId)){
+          const getCase = await Case.findByIdAndUpdate(caseId,{$set:{
+            clientId:newClient?._id?.toString(),
+            caseFrom:"client",
+            consultantCode:consultantCode
+          }})
+        }
+      }
+
       const token = newClient?.getAuth(true)
       return res.status(200).header("x-auth-token", token)
         .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully Signup" })
@@ -437,7 +449,7 @@ export const clientsignIn = async (req, res) => {
   try {
     const { error } = validateClientSignIn(req.body);
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-    const client = await Client.find({ email: req?.body?.email?.toLowerCase() });
+    const client = await Client.find({ email: req?.body?.email?.trim()?.toLowerCase() });
     if (client.length == 0) return res.status(404).json({ success: false, message: "invaild email/password" })
     if (!client[0]?.isActive || !client[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Account is not active" })
     // if(!client[0]?.acceptClientTls) return res.status(400).json({success:false,message:"Please accept our TLS first"})

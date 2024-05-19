@@ -5,7 +5,7 @@ import {
    validateEditAdminCaseStatus,validateAdminSharePartner,validateAdminRemovePartner,
 } from "../utils/validateAdmin.js";
 import bcrypt from 'bcrypt';
-import { generatePassword, getAllCaseDocQuery, getAllInvoiceQuery, getAllSathiDownloadExcel, getValidateDate } from "../utils/helper.js";
+import { generatePassword, getAllCaseDocQuery, getAllInvoiceQuery, getAllSathiDownloadExcel, getEmployeeByIdQuery, getValidateDate } from "../utils/helper.js";
 import { sendAdminSigninMail, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import { authAdmin } from "../middleware/authentication.js";
 import Employee from "../models/employee.js";
@@ -78,14 +78,14 @@ export const adminSignUp = async (req, res) => {
 
       // if(req.body.key!==process.env.ADMIN_SIGNUP_SECRET_KEY) return res.status(400).json({success:false,message:"Unauthorized access"})
 
-      const admin = await Admin.find({ email: req.body.email })
+      const admin = await Admin.find({ email: req.body.email?.trim()?.toLowerCase() })
       if (admin.length > 0) return res.status(401).json({ success: false, message: "Admin account already exists" })
 
       const systemPassword = generatePassword();
       const bcryptPassword = await bcrypt.hash(systemPassword, 10)
       const newAdmin = new Admin({
          fullName: req.body.fullName,
-         email: req?.body?.email?.toLowerCase(),
+         email: req?.body?.email?.trim()?.toLowerCase(),
          mobileNo: req.body.mobileNo,
          password: bcryptPassword,
       })
@@ -113,7 +113,7 @@ export const adminSignin = async (req, res) => {
       const { error } = validateAdminSignIn(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      const admin = await Admin.find({ email: req?.body?.email?.toLowerCase() })
+      const admin = await Admin.find({ email: req?.body?.email?.trim()?.toLowerCase() })
       if (admin.length == 0) return res.status(404).json({ success: false, message: "Admin account not exists" })
 
       if (!admin[0]?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
@@ -446,11 +446,11 @@ export const createEmployeeAccount = async (req, res) => {
       const systemPassword = generatePassword()
       const bcryptPassword = await bcrypt.hash(systemPassword, 10)
       const newEmployee = new Employee({
-         fullName: req.body.fullName,
-         empId:req.body?.empId,
-         branchId:req.body?.branchId,
-         email: req?.body?.email?.toLowerCase(),
-         mobileNo: req.body.mobileNo,
+         fullName: req?.body?.fullName?.trim(),
+         empId:req.body?.empId?.trim(),
+         branchId:req?.body?.branchId?.trim(),
+         email: req?.body?.email?.trim()?.toLowerCase(),
+         mobileNo: req?.body?.mobileNo,
          password: bcryptPassword,
          type: req?.body?.type ? req?.body?.type : "assistant",
          designation:req?.body?.designation ? req?.body?.designation : "executive"
@@ -514,10 +514,10 @@ export const adminUpdateEmployeeAccount = async (req, res) => {
 
       const updateEmployee = await Employee.findByIdAndUpdate(_id, {
          $set: {
-            fullName: req.body.fullName,
-            type: req.body.type,
-            branchId:req.body?.branchId,
-            designation: req.body.designation,
+            fullName: req?.body?.fullName,
+            type: req?.body?.type,
+            branchId:req.body?.branchId?.trim(),
+            designation: req?.body?.designation?.trim(),
          }
       })
       if (!updateEmployee) return res.status(401).json({ success: false, message: "Employee not found" })
@@ -573,10 +573,40 @@ export const adminViewAllEmployee = async (req, res) => {
       const empType = req.query?.empType ? req.query?.empType :false
 
       const query = getAllEmployeeSearchQuery(searchQuery,type,empType)
-      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("referEmpId","fullName type designation");
       const noOfEmployee = await Employee.find(query).count()
       return res.status(200).json({ success: true, message: "get employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
 
+   } catch (error) {
+      console.log("adminViewAllEmployee in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+export const adminDownloadAllEmployee = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      // query = ?statusType=&search=&limit=&pageNo
+      const pageItemLimit = req.query.limit ? req.query.limit : 10;
+      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const searchQuery = req.query.search ? req.query.search : "";
+      const type = req.query.type ? req.query.type : true;
+      const empType = req.query?.empType ? req.query?.empType :false
+
+      const query = getAllEmployeeSearchQuery(searchQuery,type,empType)
+      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("referEmpId","fullName type designation");
+      const excelBuffer = await getAllSathiDownloadExcel(JSON.parse(JSON.stringify(getAllEmployee)),"");
+      res.setHeader('Content-Disposition', 'attachment; filename="sathi.xlsx"')
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.status(200)
+      res.send(excelBuffer)
    } catch (error) {
       console.log("adminViewAllEmployee in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -1061,7 +1091,7 @@ export const adminViewEmpSalePartnerReport = async (req, res) => {
       if (caseAccess?.includes(empSale?.type?.toLowerCase())) {
          const query = getAllPartnerSearchQuery(searchQuery, type, false, startDate, endDate,empSale?.branchId)
          if (!query.success) return res.status(400).json({ success: false, message: query?.message })
-         const getAllPartner = await Partner.find(query?.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+         const getAllPartner = await Partner.find(query?.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("salesId","fullName type designation");
          const noOfPartner = await Partner.find(query?.query).count()
          return res.status(200).json({ success: true, message: "get partner data", data: getAllPartner, noOfPartner: noOfPartner });
    
@@ -1145,7 +1175,7 @@ export const adminViewEmpSalePartnerReport = async (req, res) => {
                } : {}
             ]
          };
-         const getAllPartner = await Partner.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+         const getAllPartner = await Partner.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("salesId","fullName type designation");
          const noOfPartner = await Partner.find(query).count()
          return res.status(200).json({ success: true, message: "get partner data", data: getAllPartner, noOfPartner: noOfPartner });
       }
@@ -1210,7 +1240,7 @@ export const viewAllPartnerByAdmin = async (req, res) => {
 
       const query = getAllPartnerSearchQuery(searchQuery, type, false, startDate, endDate)
       if (!query.success) return res.status(400).json({ success: false, message: query.message })
-      const getAllPartner = await Partner.find(query.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const getAllPartner = await Partner.find(query.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("salesId","fullName type designation");
       const noOfPartner = await Partner.find(query.query).count()
       return res.status(200).json({ success: true, message: "get partner data", data: getAllPartner, noOfPartner: noOfPartner });
 
@@ -1849,6 +1879,8 @@ export const adminAddReferenceCaseAndMarge = async (req, res) => {
                   partnerId: getPartner?._id?.toString(),
                   partnerName: getPartner?.profile?.consultantName,
                   partnerCode:getPartner?.profile?.consultantCode,
+                  empSaleId: getPartnerCase?.empSaleId || "",
+                  empSaleName: getPartnerCase?.empSaleName || "",
                   partnerReferenceCaseDetails: {
                      referenceId: getPartnerCase?._id?.toString(),
                      name: getPartner?.profile?.consultantName,
@@ -1889,8 +1921,11 @@ export const adminAddReferenceCaseAndMarge = async (req, res) => {
             {
                $set: {
                   empSaleId: getEmployee?._id?.toString(),
-                  empSaleName: getEmployee?.fullName,
+                  empSaleName:`${getEmployee?.fullName} | ${getEmployee?.type} | ${getEmployee?.designation}`,
                   empId:getEmployee?.empId,
+                  partnerId: getEmployeeCase?.partnerId || "",
+                  partnerName: getEmployeeCase?.partnerName || "",
+                  partnerCode:getEmployeeCase?.partnerCode || "",
                   empSaleReferenceCaseDetails: {
                      referenceId: getEmployeeCase?._id?.toString(),
                      name: getEmployee?.fullName,
@@ -2392,7 +2427,7 @@ export const adminDownloadAllPartner = async (req, res) => {
 
       const query = getAllPartnerSearchQuery(searchQuery, type, false, startDate, endDate)
       if (!query.success) return res.status(400).json({ success: false, message: query.message })
-      const getAllPartner = await Partner.find(query.query).select("-password").sort({ createdAt: -1 });
+      const getAllPartner = await Partner.find(query.query).select("-password").sort({ createdAt: -1 }).populate("salesId","fullName type designation");
 
       // Generate Excel buffer
       const excelBuffer = await getAllPartnerDownloadExcel(getAllPartner);
@@ -2650,7 +2685,7 @@ export const adminEmpSalePartnerReportDownload = async (req, res) => {
       if (caseAccess?.includes(empSale?.type?.toLowerCase())) {
          const query = getAllPartnerSearchQuery(searchQuery, type, false, startDate, endDate,empSale?.branchId)
          if (!query.success) return res.status(400).json({ success: false, message: query?.message })
-         const getAllPartner = await Partner.find(query?.query);
+         const getAllPartner = await Partner.find(query?.query).populate("salesId","fullName type designation");
          const excelBuffer = await getAllPartnerDownloadExcel(getAllPartner,empSale?._id?.toString());
 
          res.setHeader('Content-Disposition', 'attachment; filename="partners.xlsx"')
@@ -2737,7 +2772,7 @@ export const adminEmpSalePartnerReportDownload = async (req, res) => {
                } : {}
             ]
          };
-         const getAllPartner = await Partner.find(query);
+         const getAllPartner = await Partner.find(query).populate("salesId","fullName type designation");
          const excelBuffer = await getAllPartnerDownloadExcel(getAllPartner,empSale?._id?.toString());
 
          res.setHeader('Content-Disposition', 'attachment; filename="partners.xlsx"')
@@ -2973,16 +3008,16 @@ export const adminChangeBranch = async (req,res)=>{
          const getClient = await Client?.findById(_id)
          if(!getClient) return res.status(400).json({success: false, message:"Client account not found"})
          
-         await Client.findByIdAndUpdate(_id,{branchId})
-         await Case.updateMany({clientId:_id},{branchId})
-         await Bill.updateMany({clientId:_id},{branchId})
+         await Client.findByIdAndUpdate(_id,{branchId:branchId?.trim()})
+         await Case.updateMany({clientId:_id},{branchId:branchId?.trim()})
+         await Bill.updateMany({clientId:_id},{branchId:branchId?.trim()})
       return  res.status(200).json({success: true, message: `Successfully Change Branch`});
       }else {
          const getPartner = await Partner?.findById(_id)
          if(!getPartner) return res.status(400).json({success: false, message:"Partner account not found"})
          
-         await Partner.findByIdAndUpdate(_id,{branchId})
-         await Case.updateMany({partnerId:_id},{branchId})
+         await Partner.findByIdAndUpdate(_id,{branchId:branchId?.trim()})
+         await Case.updateMany({partnerId:_id},{branchId:branchId?.trim()})
          return  res.status(200).json({success: true, message: `Successfully Change Branch`});
       }
 
@@ -3036,7 +3071,7 @@ export const adminViewEmpSathiEmployee = async (req, res) => {
          }
       }
    
-      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("referEmpId","fullName type designation");
       const noOfEmployee = await Employee.find(query).count()
       return res.status(200).json({ success: true, message: "get employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
 
@@ -3091,7 +3126,7 @@ export const adminDownloadEmpSathiEmployee = async (req, res) => {
          }
       }
    
-      const getAllEmployee = await Employee.find(query).select("-password").sort({ createdAt: -1 });
+      const getAllEmployee = await Employee.find(query).select("-password").sort({ createdAt: -1 }).populate("referEmpId","fullName type designation");
       const excelBuffer = await getAllSathiDownloadExcel(JSON.parse(JSON.stringify(getAllEmployee)), getEmp._id?.toString());
       res.setHeader('Content-Disposition', 'attachment; filename="sathi.xlsx"')
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
