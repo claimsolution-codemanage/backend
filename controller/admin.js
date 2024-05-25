@@ -785,8 +785,9 @@ export const viewAllAdminCase = async (req, res) => {
       const startDate = req.query.startDate ? req.query.startDate : "";
       const endDate = req.query.endDate ? req.query.endDate : "";
       const type = req?.query?.type ? req.query.type : true
+      const isReject = req?.query?.isReject=="true" ? {$in:["Reject"]} : {$nin:["Reject"]}
 
-      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type)
+      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type,false,false,isReject)
       if (!query.success) return res.status(400).json({ success: false, message: query.message })
       console.log("query", query?.query);
       const aggregationPipeline = [
@@ -2393,8 +2394,10 @@ export const adminDownloadAllCase = async (req, res) => {
       const startDate = req.query.startDate ? req.query.startDate : "";
       const endDate = req.query.endDate ? req.query.endDate : "";
       const type = req?.query?.type ? req.query.type : true
+      const isReject = req?.query?.isReject=="true" ? {$in:["Reject"]} : {$nin:["Reject"]}
+      
 
-      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type)
+      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type,false,false,isReject)
       if (!query.success) return res.status(400).json({ success: false, message: query.message })
       const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
 

@@ -41,7 +41,7 @@ export const getValidateDate = (date) => {
 }
 
 
-export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, partnerId, clientId, employeeId, type = true, empSaleId = false,branchId=false) => {
+export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, partnerId, clientId, employeeId, type = true, empSaleId = false,branchId=false,isReject=false) => {
  console.log("status-----",statusType,branchId,employeeId);
   if (startDate && endDate) {
     const validStartDate = getValidateDate(startDate)
@@ -58,7 +58,7 @@ export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, par
       empSaleId ? { empSaleId: empSaleId } : {},
       { isPartnerReferenceCase: false },
       { isEmpSaleReferenceCase: false },
-
+      isReject ? { currentStatus: isReject } :{} ,
       { currentStatus: { $regex: statusType, $options: "i" } },
       { isActive: type },
       branchId ?  { branchId: { $regex:branchId, $options: "i" }} : {},
@@ -312,49 +312,57 @@ export const getAllInvoiceQuery = (searchQuery,startDate,endDate,clientId=false,
 
 
 export const partnerGetDownloadCaseExcel = async (getAllCase = []) => {
-  console.log("compare",_id);
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Cases');
   // Define Excel columns
   worksheet.columns = [
-    { header: 'File No', key: 'fileNo', width: 30 },
+    { header: 'SL No.', key: 'sNo', width: 10 },
+    // { header: 'Branch ID', key: 'branchId', width: 20 },
     { header: 'Current Status', key: 'currentStatus', width: 30 },
-    { header: 'Name', key: 'name', width: 30 },
-    { header: 'Father Name', key: 'fatherName', width: 30 },
+    { header: 'Date', key: 'date', width: 20 },
+    { header: 'Case Name', key: 'name', width: 30 },
     { header: 'Mobile No', key: 'mobileNo', width: 30 },
-    { header: 'Policy Type', key: 'policyType', width: 30 },
-    { header: 'Insurance Company Name', key: 'insuranceCompanyName', width: 30 },
-    { header: 'Complaint Type', key: 'complaintType', width: 30 },
+    { header: 'Email Id', key: 'email', width: 30 },
+    { header: 'claim Amount', key: 'claimAmount', width: 30 },
     { header: 'Policy No', key: 'policyNo', width: 30 },
+    { header: 'File No', key: 'fileNo', width: 30 },
+    { header: 'Policy Type', key: 'policyType', width: 30 },
+    { header: 'Complaint Type', key: 'complaintType', width: 30 },
+    { header: 'Father Name', key: 'fatherName', width: 30 },
+    { header: 'Insurance Company Name', key: 'insuranceCompanyName', width: 30 },
     { header: 'Address', key: 'address', width: 30 },
     { header: 'DOB', key: 'DOB', width: 30 },
     { header: 'Pin Code', key: 'pinCode', width: 30 },
-    { header: 'claim Amount', key: 'claimAmount', width: 30 },
     { header: 'City', key: 'city', width: 30 },
     { header: 'State', key: 'state', width: 30 },
     { header: 'Problem Statement', key: 'problemStatement', width: 30 },
+    // { header: 'Partner Consultant Code', key: 'partnerCode', width: 20 },
   ];
 
   // Populate Excel rows with data
   getAllCase.forEach((caseData, index) => {
     worksheet.addRow({
-      fileNo: caseData?.fileNo,
+      sNo: index+1 || "",
+      // branchId: caseData?.branchId,
       currentStatus: caseData?.currentStatus,
+      date: caseData?.createdAt,
       name: caseData.name,
-      fatherName: caseData?.fatherName,
-      email: caseData?.email,
       mobileNo: caseData?.mobileNo,
-      policyType: caseData?.policyType,
-      insuranceCompanyName: caseData?.insuranceCompanyName,
-      complaintType: caseData?.complaintType,
+      email: caseData?.email,
+      claimAmount: caseData?.claimAmount,
       policyNo: caseData?.policyNo,
+      fileNo: caseData?.fileNo,
+      policyType: caseData?.policyType,
+      complaintType: caseData?.complaintType,
+      fatherName: caseData?.fatherName,
+      insuranceCompanyName: caseData?.insuranceCompanyName,
       address: caseData?.address,
       DOB: caseData?.DOB,
       pinCode: caseData?.pinCode,
-      claimAmount: caseData?.claimAmount,
       city: caseData?.city,
       state: caseData?.state,
       problemStatement: caseData?.problemStatement,
+      // partnerCode: caseData?.partnerCode || "-",
     });
   });
 
@@ -370,56 +378,59 @@ export const getDownloadCaseExcel = async (getAllCase = [],_id) => {
   const worksheet = workbook.addWorksheet('Cases');
   // Define Excel columns
   worksheet.columns = [
+    { header: 'SL No.', key: 'sNo', width: 10 },
     { header: 'Branch ID', key: 'branchId', width: 20 },
-    { header: 'Type', key: 'type', width: 20 },
-    { header: 'Case From', key: 'caseFrom', width: 20 },
-    { header: 'Partner Name', key: 'partnerName', width: 20 },
-    {header:"Added By",key:"addedBy",width:20},
-    // { header: 'Partner Consultant Code', key: 'partnerCode', width: 20 },
-    { header: 'File No', key: 'fileNo', width: 30 },
     { header: 'Current Status', key: 'currentStatus', width: 30 },
-    { header: 'Name', key: 'name', width: 30 },
-    { header: 'Father Name', key: 'fatherName', width: 30 },
+    { header: 'Date', key: 'date', width: 20 },
+    { header: 'Case From', key: 'caseFrom', width: 20 },
+    {header:"Team Added By",key:"addedBy",width:20},
+    { header: 'Partner Name', key: 'partnerName', width: 20 },
+    { header: 'Case Name', key: 'name', width: 30 },
     { header: 'Mobile No', key: 'mobileNo', width: 30 },
-    { header: 'Policy Type', key: 'policyType', width: 30 },
-    { header: 'Insurance Company Name', key: 'insuranceCompanyName', width: 30 },
-    { header: 'Complaint Type', key: 'complaintType', width: 30 },
+    { header: 'Email Id', key: 'email', width: 30 },
+    { header: 'claim Amount', key: 'claimAmount', width: 30 },
     { header: 'Policy No', key: 'policyNo', width: 30 },
+    { header: 'File No', key: 'fileNo', width: 30 },
+    { header: 'Policy Type', key: 'policyType', width: 30 },
+    { header: 'Complaint Type', key: 'complaintType', width: 30 },
+    { header: 'Father Name', key: 'fatherName', width: 30 },
+    { header: 'Insurance Company Name', key: 'insuranceCompanyName', width: 30 },
     { header: 'Address', key: 'address', width: 30 },
     { header: 'DOB', key: 'DOB', width: 30 },
     { header: 'Pin Code', key: 'pinCode', width: 30 },
-    { header: 'claim Amount', key: 'claimAmount', width: 30 },
     { header: 'City', key: 'city', width: 30 },
     { header: 'State', key: 'state', width: 30 },
     { header: 'Problem Statement', key: 'problemStatement', width: 30 },
+    // { header: 'Partner Consultant Code', key: 'partnerCode', width: 20 },
   ];
 
   // Populate Excel rows with data
   getAllCase.forEach((caseData, index) => {
     worksheet.addRow({
+      sNo: index+1 || "",
       branchId: caseData?.branchId,
-      type: caseData?.empSaleId==_id ? "added" : (!caseData?.empSaleId && caseData?.partnerId ? "partner" : "others"),
-      caseFrom: caseData?.caseFrom,
-      partnerName: caseData?.partnerName || "-",
-      addedBy: caseData?.empSaleName || "-",
-      // partnerCode: caseData?.partnerCode || "-",
-      fileNo: caseData?.fileNo,
       currentStatus: caseData?.currentStatus,
+      date: caseData?.createdAt,
+      caseFrom: caseData?.caseFrom,
+      addedBy: caseData?.empSaleName || "-",
+      partnerName: caseData?.partnerName || "-",
       name: caseData.name,
-      fatherName: caseData?.fatherName,
-      email: caseData?.email,
       mobileNo: caseData?.mobileNo,
-      policyType: caseData?.policyType,
-      insuranceCompanyName: caseData?.insuranceCompanyName,
-      complaintType: caseData?.complaintType,
+      email: caseData?.email,
+      claimAmount: caseData?.claimAmount,
       policyNo: caseData?.policyNo,
+      fileNo: caseData?.fileNo,
+      policyType: caseData?.policyType,
+      complaintType: caseData?.complaintType,
+      fatherName: caseData?.fatherName,
+      insuranceCompanyName: caseData?.insuranceCompanyName,
       address: caseData?.address,
       DOB: caseData?.DOB,
       pinCode: caseData?.pinCode,
-      claimAmount: caseData?.claimAmount,
       city: caseData?.city,
       state: caseData?.state,
       problemStatement: caseData?.problemStatement,
+      // partnerCode: caseData?.partnerCode || "-",
     });
   });
 
@@ -433,29 +444,32 @@ export const getAllPartnerDownloadExcel = async (getAllPartner = [], _id) => {
   const worksheet = workbook.addWorksheet('Cases');
   // Define Excel columns
   worksheet.columns = [
+    { header: 'SL No', key: 'sNo', width: 10 },
     { header: 'Branch ID', key: 'branchId', width: 20 },
-    { header: 'Added by', key: 'addedBy', width: 20 },
-    { header: 'Consultant Name', key: 'consultantName', width: 20 },
+    { header: 'Team Added by', key: 'addedBy', width: 20 },
+    { header: 'Partner Name', key: 'consultantName', width: 20 },
+    { header: 'Mobile No', key: 'primaryMobileNo', width: 20 },
+    { header: 'Email Id', key: 'primaryEmail', width: 20 },
     { header: 'Consultant Code', key: 'consultantCode', width: 30 },
     { header: 'Associate With Us', key: 'associateWithUs', width: 30 },
     { header: 'Work Association', key: 'workAssociation', width: 30 },
+    { header: 'Area Of Operation', key: 'areaOfOperation', width: 30 },
     { header: 'Alternate Email', key: 'alternateEmail', width: 30 },
     { header: 'Whatsapp No', key: 'whatsappNo', width: 30 },
     { header: 'Alternate MobileNo', key: 'alternateMobileNo', width: 30 },
-    { header: 'PanNo', key: 'panNo', width: 30 },
-    { header: 'AadhaarNo', key: 'aadhaarNo', width: 30 },
+    { header: 'Aadhaar No', key: 'aadhaarNo', width: 30 },
     { header: 'DOB', key: 'dob', width: 30 },
-    { header: 'Area Of Operation', key: 'areaOfOperation', width: 30 },
+    { header: 'Gender', key: 'gender', width: 30 },
     { header: 'State', key: 'state', width: 30 },
     { header: 'District', key: 'district', width: 30 },
     { header: 'City', key: 'city', width: 30 },
     { header: 'PinCode', key: 'pinCode', width: 30 },
     { header: 'About', key: 'about', width: 30 },
     { header: 'Bank Name', key: 'bankName', width: 30 },
-    { header: 'Bank AccountNo', key: 'bankAccountNo', width: 30 },
+    { header: 'Bank Account No', key: 'bankAccountNo', width: 30 },
     { header: 'Bank Branch Name', key: 'bankBranchName', width: 30 },
-    { header: 'GSTNo', key: 'gstNo', width: 30 },
-    { header: 'PANNo', key: 'panNo', width: 30 },
+    { header: 'GST No', key: 'gstNo', width: 30 },
+    { header: 'PAN No', key: 'panNo', width: 30 },
     { header: 'IFSC Code', key: 'ifscCode', width: 30 },
     { header: 'UPI Id', key: 'upiId', width: 30 },
   ];
@@ -463,20 +477,22 @@ export const getAllPartnerDownloadExcel = async (getAllPartner = [], _id) => {
   // Populate Excel rows with data
   getAllPartner.forEach((partnerData, index) => {
     worksheet.addRow({
+      sNo: index+1 || "",
       branchId: partnerData?.branchId,
       addedBy:(partnerData?.salesId?.type && partnerData?.salesId?.fullName) ? `${partnerData?.salesId?.fullName} | ${partnerData?.salesId?.type} | ${partnerData?.salesId?.designation}` : "-",
       consultantName: partnerData?.profile?.consultantName,
+      primaryMobileNo: partnerData?.profile?.primaryMobileNo,
+      primaryEmail: partnerData?.profile?.primaryEmail,
       consultantCode: partnerData?.profile?.consultantCode,
       associateWithUs: partnerData?.profile?.associateWithUs,
       workAssociation: partnerData?.profile?.workAssociation,
+      areaOfOperation: partnerData?.profile?.areaOfOperation,
       alternateEmail: partnerData?.profile?.alternateEmail,
       whatsappNo: partnerData?.profile?.whatsupNo,
       alternateMobileNo: partnerData?.profile?.alternateMobileNo,
-      panNo: partnerData?.profile?.panNo,
       aadhaarNo: partnerData?.profile?.aadhaarNo,
       dob: partnerData?.profile?.dob,
       gender: partnerData?.profile?.gender,
-      areaOfOperation: partnerData?.profile?.areaOfOperation,
       state: partnerData?.profile?.state,
       district: partnerData?.profile?.district,
       city: partnerData?.profile?.city,
@@ -504,28 +520,30 @@ export const getAllSathiDownloadExcel = async (getAllSathi = [], _id) => {
   const worksheet = workbook.addWorksheet('Cases');
   // Define Excel columns
   worksheet.columns = [
-    { header: 'Date', key: 'date', width: 20 },
-    { header: 'Full Name', key: 'fullName', width: 20 },
-    { header: 'Emp Id', key: 'empId', width: 20 },
+    { header: 'SL No', key: 'sNo', width: 10 },
     { header: 'Branch Id', key: 'branchId', width: 20 },
-    { header: 'Added By', key: 'addedBy', width: 20 },
-    { header: 'Email', key: 'email', width: 30 },
+    { header: 'Date', key: 'date', width: 20 },
+    { header: 'Team Added By', key: 'addedBy', width: 20 },
+    { header: 'Employee Name', key: 'fullName', width: 20 },
+    { header: 'Emp Id', key: 'empId', width: 20 },
     { header: 'Mobile No', key: 'mobileNo', width: 30 },
+    { header: 'Email Id', key: 'email', width: 30 },
     { header: 'Department', key: 'type', width: 30 },
-    { header: 'designation', key: 'designation', width: 30 },
+    { header: 'Designation', key: 'designation', width: 30 },
 
   ];
 
   // Populate Excel rows with data
   getAllSathi.forEach((sathi, index) => {
     worksheet.addRow({
+      sNo: index+1 || "-",
+      branchId:sathi?.branchId,
       date:new Date(sathi?.createdAt).toLocaleDateString(),
+      addedBy:(sathi?.referEmpId?.fullName && sathi?.referEmpId?.type) ? `${sathi?.referEmpId?.fullName} | ${sathi?.referEmpId?.type} | ${sathi?.referEmpId?.designation}` : "-",
       fullName:sathi?.fullName,
       empId:sathi?.empId,
-      branchId:sathi?.branchId,
-      addedBy:(sathi?.referEmpId?.fullName && sathi?.referEmpId?.type) ? `${sathi?.referEmpId?.fullName} | ${sathi?.referEmpId?.type} | ${sathi?.referEmpId?.designation}` : "-",
-      email:sathi?.email,
       mobileNo:sathi?.mobileNo,
+      email:sathi?.email,
       type:sathi?.type,
       designation:sathi?.designation,
     });
@@ -541,39 +559,43 @@ export const getAllClientDownloadExcel = async (getAllClient = []) => {
   const worksheet = workbook.addWorksheet('Cases');
   // Define Excel columns
   worksheet.columns = [
-    { header: 'Name', key: 'consultantName', width: 20 },
-    { header: 'Customer Code', key: 'consultantCode', width: 30 },
+    { header: 'SL No', key: 'sNo', width: 10 },
+    { header: 'Branch ID', key: 'branchId', width: 20 },
     { header: 'Associate With Us', key: 'associateWithUs', width: 30 },
-    { header: 'Father Name', key: 'fatherName', width: 30 },
+    { header: 'Client Name', key: 'consultantName', width: 20 },
+    { header: 'Client Code', key: 'consultantCode', width: 30 },
     { header: 'Mobile No', key: 'primaryMobileNo', width: 30 },
-    { header: 'Email', key: 'primaryEmail', width: 30 },
+    { header: 'Email Id', key: 'primaryEmail', width: 30 },
+    { header: 'City', key: 'city', width: 30 },
+    { header: 'State', key: 'state', width: 30 },
+    { header: 'Father Name', key: 'fatherName', width: 30 },
     { header: 'Whatsapp No', key: 'whatsappNo', width: 30 },
     { header: 'DOB', key: 'dob', width: 30 },
     { header: 'Address', key: 'address', width: 30 },
-    { header: 'City', key: 'city', width: 30 },
-    { header: 'State', key: 'state', width: 30 },
-    { header: 'PinCode', key: 'pinCode', width: 30 },
+    { header: 'Pin Code', key: 'pinCode', width: 30 },
     { header: 'About', key: 'about', width: 30 },
   ];
 
   // Populate Excel rows with data
 
   let rowData =
-    getAllClient.forEach((partnerData, index) => {
+    getAllClient.forEach((clientData, index) => {
       worksheet.addRow({
-        consultantName: partnerData?.profile?.consultantName,
-        consultantCode: partnerData?.profile?.consultantCode,
-        associateWithUs: partnerData?.profile?.associateWithUs,
-        fatherName: partnerData?.profile?.fatherName,
-        primaryMobileNo: partnerData?.profile?.primaryMobileNo,
-        primaryEmail: partnerData?.profile?.primaryEmail,
-        whatsappNo: partnerData?.profile?.whatsupNo,
-        dob: partnerData?.profile?.dob,
-        address: partnerData?.profile?.address,
-        city: partnerData?.profile?.city,
-        state: partnerData?.profile?.state,
-        pinCode: partnerData?.profile?.pinCode,
-        about: partnerData?.profile?.about,
+        sNo: index+1 || "",
+        branchId: clientData?.branchId || "-",
+        associateWithUs: clientData?.profile?.associateWithUs,
+        consultantName: clientData?.profile?.consultantName,
+        consultantCode: clientData?.profile?.consultantCode,
+        primaryMobileNo: clientData?.profile?.primaryMobileNo,
+        primaryEmail: clientData?.profile?.primaryEmail,
+        city: clientData?.profile?.city,
+        state: clientData?.profile?.state,
+        fatherName: clientData?.profile?.fatherName,
+        whatsappNo: clientData?.profile?.whatsupNo,
+        dob: clientData?.profile?.dob,
+        address: clientData?.profile?.address,
+        pinCode: clientData?.profile?.pinCode,
+        about: clientData?.profile?.about,
       });
     });
 

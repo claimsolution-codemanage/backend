@@ -663,7 +663,17 @@ export const viewClientAllCase = async (req, res) => {
     //  console.log("query",query?.query);
     const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
     const noOfCase = await Case.find(query?.query).count()
-    return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase });
+    const aggregationPipeline = [
+      { $match: query?.query }, // Match the documents based on the query
+      {
+         $group: {
+            _id: null,
+            totalAmtSum: { $sum: "$claimAmount" }, // Calculate the sum of totalAmt
+         }
+      }
+   ];
+   const aggregateResult = await Case.aggregate(aggregationPipeline);
+    return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase,totalAmt:aggregateResult });
 
   } catch (error) {
     console.log("get all client case in error:", error);

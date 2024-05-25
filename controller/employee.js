@@ -4,7 +4,7 @@ import Client from "../models/client.js";
 import { validateEmployeeSignIn, validateEmployeeResetPassword, validateUpdateEmployeeCase, validateAddPartner, validateAddEmpCase, validateEmployeeSignUp, validateSathiTeamSignUp } from "../utils/validateEmployee.js";
 import { authEmployee, authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
-import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, getAllClientSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel } from "../utils/helper.js";
+import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, getAllClientSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel, getAllClientDownloadExcel } from "../utils/helper.js";
 import { sendAddClientRequest, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import Jwt from "jsonwebtoken";
 import Case from "../models/case.js";
@@ -1063,6 +1063,40 @@ export const employeeViewAllClient = async (req, res) => {
 
    } catch (error) {
       console.log("adminViewAllClient in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+
+export const empClientDownload = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+
+
+      const searchQuery = req.query.search ? req.query.search : "";
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+      const branchId = employee?.branchId
+
+      const query = getAllClientSearchQuery(searchQuery, true, startDate, endDate, branchId)
+      if (!query?.success) return res.status(400).json({ success: false, message: query.message })
+      const getAllClient = await Client.find(query.query).select("-password").sort({ createdAt: 1 });
+
+      // Generate Excel buffer
+      const excelBuffer = await getAllClientDownloadExcel(getAllClient);
+
+      res.setHeader('Content-Disposition', 'attachment; filename="clients.xlsx"')
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.status(200)
+      res.send(excelBuffer)
+   } catch (error) {
+      console.log("adminAllClientDownload in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
 
    }
@@ -2281,7 +2315,7 @@ export const empViewAllEmployee = async (req, res) => {
          }
       }
    
-      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("referEmpId","fullName type designation");
       const noOfEmployee = await Employee.find(query).count()
       return res.status(200).json({ success: true, message: "get employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
 
