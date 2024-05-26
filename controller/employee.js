@@ -135,7 +135,7 @@ export const createSathiTeamAcc = async (req, res) => {
       const bcryptPassword = await bcrypt.hash(systemPassword, 10)
       const newEmployee = new Employee({
          fullName: req.body.fullName,
-         empId: `EMP-${noOfEmployee + 1}`,
+         empId: `ACS-${noOfEmployee + 1}`,
          branchId: employee?.branchId?.trim(),
          email: req?.body?.email?.trim()?.toLowerCase(),
          mobileNo: req.body.mobileNo,
@@ -701,23 +701,40 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
             return res.status(404).json({ success: false, message: "Case already have the partner case reference" })
          }
 
+         let mergeParmeter = {
+            partnerId: getPartner?._id?.toString(),
+            partnerName: getPartner?.profile?.consultantName,
+            partnerCode:getPartner?.profile?.consultantCode,
+            partnerReferenceCaseDetails: {
+               referenceId: getPartnerCase?._id?.toString(),
+               name: getPartner?.profile?.consultantName,
+               consultantCode:getPartner?.profile?.consultantCode,
+               referenceDate: new Date(),
+               by: employee?.fullName
+            },
+         }
 
+         if(getPartnerCase?.empSaleId && getPartnerCase?.empSaleName){
+            mergeParmeter["empSaleId"] = getPartnerCase?.empSaleId
+            mergeParmeter["empSaleName"] = getPartnerCase?.empSaleName
+         }
 
          const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
             {
                $set: {
-                  partnerId: getPartner?._id?.toString(),
-                  partnerName: getPartner?.profile?.consultantName,
-                  partnerCode:getPartner?.profile?.consultantCode,
-                  empSaleId: getPartnerCase?.empSaleId || "",
-                  empSaleName: getPartnerCase?.empSaleName || "",
-                  partnerReferenceCaseDetails: {
-                     referenceId: getPartnerCase?._id?.toString(),
-                     name: getPartner?.profile?.consultantName,
-                     consultantCode:getPartner?.profile?.consultantCode,
-                     referenceDate: new Date(),
-                     by: employee?.fullName
-                  },
+                  ...mergeParmeter
+                  // partnerId: getPartner?._id?.toString(),
+                  // partnerName: getPartner?.profile?.consultantName,
+                  // partnerCode:getPartner?.profile?.consultantCode,
+                  // empSaleId: getPartnerCase?.empSaleId,
+                  // empSaleName: getPartnerCase?.empSaleName || "",
+                  // partnerReferenceCaseDetails: {
+                  //    referenceId: getPartnerCase?._id?.toString(),
+                  //    name: getPartner?.profile?.consultantName,
+                  //    consultantCode:getPartner?.profile?.consultantCode,
+                  //    referenceDate: new Date(),
+                  //    by: employee?.fullName
+                  // },
                }
             }, { new: true })
          await Case.findByIdAndUpdate(getPartnerCase?._id, { $set: { isPartnerReferenceCase: true, } })
@@ -747,23 +764,46 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
             return res.status(404).json({ success: false, message: "sale-employee and client must have same policyNo and emailId" })
          }
 
-         console.log("case---", getEmployeeCase?.policyNo, getClientCase?.policyNo, getEmployeeCase?.email, getClientCase?.email);
+         // console.log("case---", getEmployeeCase?.policyNo, getClientCase?.policyNo, getEmployeeCase?.email, getClientCase?.email);
+         let empMergeParmeter = {
+            empSaleId: getEmployee?._id?.toString(),
+            empSaleName: `${getEmployee?.fullName} | ${getEmployee?.type} | ${getEmployee?.designation}`,
+            empId:getEmployee?.empId,
+            // partnerId: getEmployeeCase?.partnerId || "",
+            // partnerName: getEmployeeCase?.partnerName || "",
+            // partnerCode:getEmployeeCase?.partnerCode || "",
+            empSaleReferenceCaseDetails: {
+               referenceId: getEmployeeCase?._id?.toString(),
+               name: getEmployee?.fullName,
+               empId:getEmployee?.empId,
+               referenceDate: new Date(),
+               by: employee?.fullName
+            },
+         }
+
+         if(getEmployeeCase?.partnerId && getEmployeeCase?.partnerName){
+            empMergeParmeter["partnerId"] = getEmployeeCase?.partnerId
+            empMergeParmeter["partnerName"] = getEmployeeCase?.partnerName
+            empMergeParmeter["partnerCode"] = getEmployeeCase?.partnerCode || ""
+         }
+
          const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
             {
                $set: {
-                  empSaleId: getEmployee?._id?.toString(),
-                  empSaleName: `${getEmployee?.fullName} | ${getEmployee?.type} | ${getEmployee?.designation}`,
-                  empId:getEmployee?.empId,
-                  partnerId: getEmployeeCase?.partnerId || "",
-                  partnerName: getEmployeeCase?.partnerName || "",
-                  partnerCode:getEmployeeCase?.partnerCode || "",
-                  empSaleReferenceCaseDetails: {
-                     referenceId: getEmployeeCase?._id?.toString(),
-                     name: getEmployee?.fullName,
-                     empId:getEmployee?.empId,
-                     referenceDate: new Date(),
-                     by: employee?.fullName
-                  },
+                  ...empMergeParmeter
+                  // empSaleId: getEmployee?._id?.toString(),
+                  // empSaleName: `${getEmployee?.fullName} | ${getEmployee?.type} | ${getEmployee?.designation}`,
+                  // empId:getEmployee?.empId,
+                  // partnerId: getEmployeeCase?.partnerId || "",
+                  // partnerName: getEmployeeCase?.partnerName || "",
+                  // partnerCode:getEmployeeCase?.partnerCode || "",
+                  // empSaleReferenceCaseDetails: {
+                  //    referenceId: getEmployeeCase?._id?.toString(),
+                  //    name: getEmployee?.fullName,
+                  //    empId:getEmployee?.empId,
+                  //    referenceDate: new Date(),
+                  //    by: employee?.fullName
+                  // },
                }
             }, { new: true })
          await Case.findByIdAndUpdate(getEmployeeCase?._id, { $set: { isEmpSaleReferenceCase: true, } })
