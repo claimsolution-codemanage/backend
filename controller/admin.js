@@ -925,41 +925,126 @@ export const adminViewEmpSaleReport = async (req, res) => {
                      ]
                   }
                },
+               // {
+               //    $group: {
+               //       _id: null,
+               //       shareEmp: { $push: "$_id" },
+               //    }
+               // },
+               // {
+               //    $lookup: {
+               //       from: "partners",
+               //       let: { shareEmp: "$shareEmp" },
+               //       pipeline: [
+               //          {
+               //             $match: {
+               //                $expr: {
+               //                   $or: [
+               //                      { $in: ["$salesId", "$$shareEmp"] },
+               //                      { $in: ["$shareEmployee", "$$shareEmp"] }
+               //                   ]
+               //                }
+               //             }
+               //          }
+               //       ],
+               //       as: "partners"
+               //    }
+               // },
+               // {
+               //    $lookup: {
+               //       from: "clients",
+               //       let: { shareEmp: "$shareEmp" },
+               //       pipeline: [
+               //          {
+               //             $match: {
+               //                $expr: {
+               //                   $or: [
+               //                      { $in: ["$salesId", "$$shareEmp"] },
+   
+               //                   ]
+               //                }
+               //             }
+               //          }
+               //       ],
+               //       as: "allClients"
+               //    }
+               // },
+               // {
+               //    $project: {
+               //       shareEmp: 1,
+               //       _id: 0,
+               //       allClients: {
+               //          $map: {
+               //             input: "$allClients",
+               //             as: "allClients",
+               //             in: "$$allClients._id"
+               //          }
+               //       },
+               //       allPartners: {
+               //          $map: {
+               //             input: "$partners",
+               //             as: "partner",
+               //             in: "$$partner._id"
+               //          }
+               //       }
+               //    }
+               // },
+               // {
+               //    $project: {
+               //       shareEmp: { $map: { input: "$shareEmp", as: "id", in: { $toString: "$$id" } } },
+               //       allPartners: { $map: { input: "$allPartners", as: "id", in: { $toString: "$$id" } } },
+               //       allClients: { $map: { input: "$allClients", as: "id", in: { $toString: "$$id" } } }
+               //    }
+               // }
                {
-                  $group: {
-                     _id: null,
-                     shareEmp: { $push: "$_id" },
+                  "$group": {
+                      "_id": null,
+                      "shareEmpStr": { "$push": { "$toString": "$_id" } },
+                      "shareEmpObj": { "$push": "$_id" }
                   }
-               },
-               {
-                  $lookup: {
+              },
+              {
+                  "$lookup": {
                      from: "partners",
-                     let: { shareEmp: "$shareEmp" },
+                     let: { shareEmpStr: "$shareEmpStr", shareEmpObj: "$shareEmpObj" },
                      pipeline: [
-                        {
-                           $match: {
-                              $expr: {
-                                 $or: [
-                                    { $in: ["$salesId", "$$shareEmp"] },
-                                    { $in: ["$shareEmployee", "$$shareEmp"] }
-                                 ]
-                              }
-                           }
-                        }
+                         {
+                             $match: {
+                                 $expr: {
+                                     $or: [
+                                         { $in: ["$salesId", "$$shareEmpObj"] }, // Use ObjectId array for salesId
+                                         {
+                                             $gt: [
+                                                 {
+                                                     $size: {
+                                                         $filter: {
+                                                             input: { $ifNull: ["$shareEmployee", []] }, // Ensure shareEmployee is an array
+                                                             as: "shareEmployeeId",
+                                                             cond: { $in: ["$$shareEmployeeId", "$$shareEmpStr"] }
+                                                         }
+                                                     }
+                                                 },
+                                                 0
+                                             ]
+                                         }
+                                     ]
+                                 }
+                             }
+                         }
                      ],
                      as: "partners"
                   }
-               },
+              },
                {
                   $lookup: {
                      from: "clients",
-                     let: { shareEmp: "$shareEmp" },
+                     let: { shareEmpObj: "$shareEmpObj" },
                      pipeline: [
                         {
                            $match: {
                               $expr: {
                                  $or: [
-                                    { $in: ["$salesId", "$$shareEmp"] },
+                                    { $in: ["$salesId", "$$shareEmpObj"] },
    
                                  ]
                               }
@@ -971,7 +1056,7 @@ export const adminViewEmpSaleReport = async (req, res) => {
                },
                {
                   $project: {
-                     shareEmp: 1,
+                     shareEmpObj: 1,
                      _id: 0,
                      allClients: {
                         $map: {
@@ -991,12 +1076,11 @@ export const adminViewEmpSaleReport = async (req, res) => {
                },
                {
                   $project: {
-                     shareEmp: { $map: { input: "$shareEmp", as: "id", in: { $toString: "$$id" } } },
+                     shareEmp: { $map: { input: "$shareEmpObj", as: "id", in: { $toString: "$$id" } } },
                      allPartners: { $map: { input: "$allPartners", as: "id", in: { $toString: "$$id" } } },
                      allClients: { $map: { input: "$allClients", as: "id", in: { $toString: "$$id" } } }
                   }
                }
-   
             ])
    
             if (startDate && endDate) {
@@ -1144,7 +1228,8 @@ export const adminViewEmpSalePartnerReport = async (req, res) => {
             if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
          }
 
-      
+      console.log("extractType----",extractType);
+
          let query = {
             $and: [
                { isActive: true },
@@ -1752,7 +1837,16 @@ export const adminSharePartnerToSaleEmp = async (req, res) => {
       const { error } = validateAdminSharePartner(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      const updatePartners = req.body?.sharePartners?.map(casePartners => Partner.findByIdAndUpdate(casePartners, { $push: { shareEmployee: { $each: req?.body?.shareEmployee } } }, { new: true }))
+      const updatePartners = req.body?.sharePartners?.map(async(casePartners) =>{
+         const getPartner = await Partner.findById(casePartners)
+         if(getPartner){
+            const filterShareEmp =  req.body.shareEmployee.filter(empId => !getPartner?.shareEmployee?.includes(empId));
+            return Partner.findByIdAndUpdate(casePartners, { $push: { shareEmployee: { $each: filterShareEmp } } }, { new: true })
+         }
+      }
+
+
+         )
       console.log("updatePartners", updatePartners);
       try {
          const allUpdatePartner = await Promise.all(updatePartners)
@@ -2573,41 +2667,126 @@ export const adminEmpSaleReportDownload = async (req, res) => {
                   ]
                }
             },
+            // {
+            //    $group: {
+            //       _id: null,
+            //       shareEmp: { $push: "$_id" },
+            //    }
+            // },
+            // {
+            //    $lookup: {
+            //       from: "partners",
+            //       let: { shareEmp: "$shareEmp" },
+            //       pipeline: [
+            //          {
+            //             $match: {
+            //                $expr: {
+            //                   $or: [
+            //                      { $in: ["$salesId", "$$shareEmp"] },
+            //                      { $in: ["$shareEmployee", "$$shareEmp"] }
+            //                   ]
+            //                }
+            //             }
+            //          }
+            //       ],
+            //       as: "partners"
+            //    }
+            // },
+            // {
+            //    $lookup: {
+            //       from: "clients",
+            //       let: { shareEmp: "$shareEmp" },
+            //       pipeline: [
+            //          {
+            //             $match: {
+            //                $expr: {
+            //                   $or: [
+            //                      { $in: ["$salesId", "$$shareEmp"] },
+
+            //                   ]
+            //                }
+            //             }
+            //          }
+            //       ],
+            //       as: "allClients"
+            //    }
+            // },
+            // {
+            //    $project: {
+            //       shareEmp: 1,
+            //       _id: 0,
+            //       allClients: {
+            //          $map: {
+            //             input: "$allClients",
+            //             as: "allClients",
+            //             in: "$$allClients._id"
+            //          }
+            //       },
+            //       allPartners: {
+            //          $map: {
+            //             input: "$partners",
+            //             as: "partner",
+            //             in: "$$partner._id"
+            //          }
+            //       }
+            //    }
+            // },
+            // {
+            //    $project: {
+            //       shareEmp: { $map: { input: "$shareEmp", as: "id", in: { $toString: "$$id" } } },
+            //       allPartners: { $map: { input: "$allPartners", as: "id", in: { $toString: "$$id" } } },
+            //       allClients: { $map: { input: "$allClients", as: "id", in: { $toString: "$$id" } } }
+            //    }
+            // }
             {
-               $group: {
-                  _id: null,
-                  shareEmp: { $push: "$_id" },
+               "$group": {
+                   "_id": null,
+                   "shareEmpStr": { "$push": { "$toString": "$_id" } },
+                   "shareEmpObj": { "$push": "$_id" }
                }
-            },
-            {
-               $lookup: {
+           },
+           {
+               "$lookup": {
                   from: "partners",
-                  let: { shareEmp: "$shareEmp" },
+                  let: { shareEmpStr: "$shareEmpStr", shareEmpObj: "$shareEmpObj" },
                   pipeline: [
-                     {
-                        $match: {
-                           $expr: {
-                              $or: [
-                                 { $in: ["$salesId", "$$shareEmp"] },
-                                 { $in: ["$shareEmployee", "$$shareEmp"] }
-                              ]
-                           }
-                        }
-                     }
+                      {
+                          $match: {
+                              $expr: {
+                                  $or: [
+                                      { $in: ["$salesId", "$$shareEmpObj"] }, // Use ObjectId array for salesId
+                                      {
+                                          $gt: [
+                                              {
+                                                  $size: {
+                                                      $filter: {
+                                                          input: { $ifNull: ["$shareEmployee", []] }, // Ensure shareEmployee is an array
+                                                          as: "shareEmployeeId",
+                                                          cond: { $in: ["$$shareEmployeeId", "$$shareEmpStr"] }
+                                                      }
+                                                  }
+                                              },
+                                              0
+                                          ]
+                                      }
+                                  ]
+                              }
+                          }
+                      }
                   ],
                   as: "partners"
                }
-            },
+           },
             {
                $lookup: {
                   from: "clients",
-                  let: { shareEmp: "$shareEmp" },
+                  let: { shareEmpObj: "$shareEmpObj" },
                   pipeline: [
                      {
                         $match: {
                            $expr: {
                               $or: [
-                                 { $in: ["$salesId", "$$shareEmp"] },
+                                 { $in: ["$salesId", "$$shareEmpObj"] },
 
                               ]
                            }
@@ -2619,7 +2798,7 @@ export const adminEmpSaleReportDownload = async (req, res) => {
             },
             {
                $project: {
-                  shareEmp: 1,
+                  shareEmpObj: 1,
                   _id: 0,
                   allClients: {
                      $map: {
@@ -2639,12 +2818,11 @@ export const adminEmpSaleReportDownload = async (req, res) => {
             },
             {
                $project: {
-                  shareEmp: { $map: { input: "$shareEmp", as: "id", in: { $toString: "$$id" } } },
+                  shareEmp: { $map: { input: "$shareEmpObj", as: "id", in: { $toString: "$$id" } } },
                   allPartners: { $map: { input: "$allPartners", as: "id", in: { $toString: "$$id" } } },
                   allClients: { $map: { input: "$allClients", as: "id", in: { $toString: "$$id" } } }
                }
             }
-
          ])
 
          if (startDate && endDate) {
@@ -2986,6 +3164,36 @@ export const adminEditInvoice = async (req,res)=>{
 
    } catch (error) {
       console.log("admin-create invoice in error:",error);
+      return res.status(500).json({success:false,message:"Internal server error",error:error});
+   }
+}
+
+export const adminPaidInvoice = async (req,res)=>{
+   try {
+      const verify =  await authAdmin(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const {_id} = req.body;
+      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+
+      const { remark } = req.body
+      if (!remark) return res.status(400).json({ success: false, message: "Remark is required" })
+
+      const getInvoice = await Bill.findById(_id)
+      if(!getInvoice?.isPaid){
+         const invoice = await Bill.findByIdAndUpdate(_id,{$set:{remark:remark,isPaid:true,paidBy:"admin",paidDate: new Date()}}) 
+         return  res.status(200).json({success: true, message: "Successfully paid invoice"});
+      }else{
+         return  res.status(400).json({success: true, message: "Invoice already paid"});
+      }
+
+
+   } catch (error) {
+      console.log("admin-Paid-Invoice in error:",error);
       return res.status(500).json({success:false,message:"Internal server error",error:error});
    }
 }

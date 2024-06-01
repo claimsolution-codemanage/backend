@@ -10,7 +10,8 @@ saleEmployeeAddPartner,saleEmployeeAddCase,employeeUploadImage,employeeUploadAtt
 employeeRemoveInvoice,salesDownloadCaseReport,saleEmpViewPartnerReport,empDownloadPartnerReport,
 employeeDownloadAllPartner,empViewAllEmployee,empAddReferenceCaseAndMarge,empRemoveReferenceCase,
 empChangeBranch,createSathiTeamAcc,empViewSathiEmployee,empDownloadSathiEmployee,empOptGetNormalEmployee,
-empOptShareCaseToEmployee,empDownloadAllEmployee,empClientDownload
+empOptShareCaseToEmployee,empDownloadAllEmployee,empClientDownload,empOpPaidInvoice,empOpGetSaleEmployee,
+empOpSharePartnerToSaleEmp
 } from '../controller/employee.js';
 
 
@@ -24,6 +25,7 @@ router.put("/employeeForgetPassword",employeeForgetPassword)
 router.get("/view/sathiTeam",empViewSathiEmployee)
 router.get("/download/sathiTeam",empDownloadSathiEmployee)
 router.get("/operation/normalEmployee",empOptGetNormalEmployee)
+router.get('/opeation/sale-employee',empOpGetSaleEmployee)
 
 
 router.get("/all/dashboard",allEmployeeDashboard)
@@ -57,6 +59,7 @@ router.post("/finance/createInvoice",employeeCreateInvoice)
 router.get("/finance/viewAllInvoice",employeeViewAllInvoice)
 router.get("/finance/viewInvoiceById",employeeViewInvoiceById)
 router.put("/finance/editInvoiceById",employeeEditInvoice)
+router.put("/finance/paidInvoiceById",empOpPaidInvoice)
 router.put("/finance/unActiveInvoiceById",employeeUnActiveInvoice)
 router.get("/finance/downloadInvoiceById",employeeDownloadInvoiceById)
 router.delete("/finance/removeInvoiceById",employeeRemoveInvoice)
@@ -74,6 +77,7 @@ router.post("/upload/attachment",employeeUploadAttachment)
 
 // for share
 router.put("/operation/shareCase",empOptShareCaseToEmployee)
+router.put("/operation/addSharePartner",empOpSharePartnerToSaleEmp)
 
 // report
 router.get("/partnerReport",empDownloadPartnerReport)

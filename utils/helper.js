@@ -281,7 +281,7 @@ export const getAllInvoiceQuery = (searchQuery,startDate,endDate,clientId=false,
     $and: [
       { isActive: type},
       clientId ? { clientId: clientId } : {},
-      branchId ? { branchId: branchId } : {},
+      branchId ? { branchId: { $regex: branchId, $options: "i" } } : {},
       {
         $or: [
           { "receiver.name": { $regex: searchQuery, $options: "i" } },

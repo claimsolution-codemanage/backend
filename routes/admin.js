@@ -17,7 +17,7 @@ adminUploadImage,adminUploadAttachment,adminCreateInvoice,adminViewAllInvoice,ad
 adminUnActiveInvoice,adminEditInvoice,adminRemoveInvoice,
 adminAllUnactiveCaseDoc,adminUnactiveCaseDoc,adminChangeBranch,
 adminEmployeeProfile,adminDownloadEmpSathiEmployee,adminViewEmpSathiEmployee,
-adminDownloadAllEmployee
+adminDownloadAllEmployee,adminPaidInvoice
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -115,6 +115,7 @@ router.post("/createInvoice",adminCreateInvoice)
 router.get("/viewAllInvoice",adminViewAllInvoice)
 router.get("/viewInvoiceById",adminViewInvoiceById)
 router.put("/editInvoiceById",adminEditInvoice)
+router.put("/paidInvoiceById",adminPaidInvoice)
 router.put("/unActiveInvoiceById",adminUnActiveInvoice)
 router.delete("/deleteInvoice",adminRemoveInvoice)
 
