@@ -137,7 +137,7 @@ export const createSathiTeamAcc = async (req, res) => {
       const bcryptPassword = await bcrypt.hash(systemPassword, 10)
       const newEmployee = new Employee({
          fullName: req.body.fullName,
-         empId: `MTS-24${noOfEmployee<10 &&"0"}${noOfEmployee + 1}`,
+         empId: `STM-24${noOfEmployee<10 &&"0"}${noOfEmployee + 1}`,
          branchId: employee?.branchId?.trim(),
          email: req?.body?.email?.trim()?.toLowerCase(),
          mobileNo: req.body.mobileNo,
