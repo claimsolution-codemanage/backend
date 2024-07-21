@@ -2171,7 +2171,7 @@ export const adminUnactiveCaseDoc = async (req, res) => {
       const updateDoc = await CaseDoc.findByIdAndUpdate(_id,{$set:{isActive:status}})
       if(!updateDoc) return res.status(404).json({ success: false, message: "Case-doc not found" })
 
-      return res.status(200).json({ success: true, message: `Successfully ${status ? "restore":"remove"} case-doc` })
+      return res.status(200).json({ success: true, message: `Successfully ${!status ? "restore":"remove"} case-doc` })
    } catch (error) {
       console.log("adminRemoveRefenceCase in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });

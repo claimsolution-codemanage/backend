@@ -2027,7 +2027,7 @@ export const saleEmployeeAddCase = async (req, res) => {
       const { partnerEmail, partnerCode } = req.body
       if (partnerEmail || partnerCode) {
          if (!partnerEmail) return res.status(400).json({ success: false, message: "Partner Email is required" })
-         const getPartner = await Partner.find({ email: partnerEmail })
+         const getPartner = await Partner.find({ email:  { $regex: partnerEmail, $options: "i" } })
          if (getPartner?.length == 0) {
             return res.status(400).json({ success: false, message: "Partner not found" })
          } else {
@@ -2039,7 +2039,7 @@ export const saleEmployeeAddCase = async (req, res) => {
 
       if (req.body.clientEmail) {
          if (!req.body.clientName || !req.body.clientMobileNo) return res.status(400).json({ success: false, message: "Client name and mobileNo are required" });
-         const isClientExist = await Client.find({ email: req.body.clientEmail })
+         const isClientExist = await Client.find({ email: { $regex:req.body.clientEmail, $options: "i" }  })
          if (!(isClientExist?.length > 0 && isClientExist[0]?.emailVerify)) {
             newClient = true
             clientDetails = {

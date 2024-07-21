@@ -16,6 +16,10 @@ import bodyParser from 'body-parser';
 import ejs from 'ejs'
 import firebaseAdmin from 'firebase-admin';
 import { serviceAccount } from "./firebase/config.js";
+import fs from 'fs'
+import path from 'path'
+
+import { backupMongoDB } from "./utils/helper.js";
 
 firebaseAdmin.initializeApp({
 	credential:firebaseAdmin.credential.cert(serviceAccount),
@@ -77,6 +81,7 @@ app.get("/",async(req,res)=>{
 		res.status(500).json({success:false,message:"Oops something went wrong"})
 	}
 })
+
 
 
 const port = process.env.PORT;

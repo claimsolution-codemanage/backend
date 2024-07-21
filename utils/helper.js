@@ -7,7 +7,9 @@ import fsAsync from 'fs/promises'
 import { getStorage, getDownloadURL } from 'firebase-admin/storage';
 import { bucket } from "../index.js";
 import multer from "multer";
-
+import {exec} from 'child_process'
+import fs from 'fs'
+import path from 'path'
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -670,3 +672,16 @@ export const firebaseUpload = async (req, res, folderPath) => {
     }
   });
 }
+
+export const backupMongoDB = (dbName, backupPath) => {
+  return new Promise((resolve, reject) => {
+    const dumpCommand = `mongodump --db ${dbName} --out ${backupPath} --gzip`;
+    exec(dumpCommand, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Error creating MongoDB dump: ${error}`);
+        return reject(error);
+      }
+      resolve(path.join(backupPath, dbName));
+    });
+  });
+};
