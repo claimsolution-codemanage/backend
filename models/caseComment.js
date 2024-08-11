@@ -27,7 +27,7 @@ const caseCommentSchema = new mongoose.Schema({
         type:mongoose.Schema.ObjectId,
         ref:"Admin"
     },
-    date:{type:Date,default:Date.now()},
+    date:{type:Date,default:new Date()},
     isActive:{type:Boolean,default:true,required:true},
     
 },{timestamps:true});

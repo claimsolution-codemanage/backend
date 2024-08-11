@@ -92,7 +92,7 @@ export const adminSignUp = async (req, res) => {
       try {
          await sendAdminSigninMail(systemPassword, req?.body?.email?.toLowerCase());
          await newAdmin.save()
-         res.status(200).json({ success: true, message: "Credentials send", systemPassword: systemPassword });
+         res.status(200).json({ success: true, message: "Credentials send"});
       } catch (err) {
          console.log("send otp error", err);
          return res.status(400).json({ success: false, message: "Failed to send Credentials" });
@@ -788,23 +788,217 @@ export const viewAllAdminCase = async (req, res) => {
       const isReject = req?.query?.isReject=="true" ? {$in:["Reject"]} : {$nin:["Reject"]}
 
       const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type,false,false,isReject)
-      if (!query.success) return res.status(400).json({ success: false, message: query.message })
-      console.log("query", query?.query);
-      const aggregationPipeline = [
-         { $match: query?.query }, // Match the documents based on the query
+      // if (!query.success) return res.status(400).json({ success: false, message: query.message })
+      // console.log("query", query?.query);
+
+      const matchQuery = []
+
+      
+      if (startDate && endDate) {
+         const validStartDate = getValidateDate(startDate)
+         if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+            const validEndDate = getValidateDate(endDate)
+         if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+      }
+
+      if (startDate && endDate) {
+         const start = new Date(startDate).setHours(0, 0, 0, 0);
+         const end = new Date(endDate).setHours(23, 59, 59, 999);
+         
+         matchQuery.push({
+           createdAt: {
+             $gte: new Date(start),
+             $lte: new Date(end)
+           }
+         });
+      }
+
+      const pipeline = [
          {
-            $group: {
-               _id: null,
-               totalAmtSum: { $sum: "$claimAmount" } // Calculate the sum of totalAmt
+           $match: {
+             $and: [
+               { isPartnerReferenceCase: false },
+               { isEmpSaleReferenceCase: false },
+               { currentStatus: { $regex: statusType, $options: "i" } },
+               { isActive: Boolean(req.query.type == "true" ? true :false) },
+               req?.query?.isReject=="true" ? {currentStatus:{$in:["Reject"]}} : {currentStatus:{$nin:["Reject"]}},
+               ...matchQuery,
+             ]
+           }
+         },
+         {
+            $addFields: {
+              validPartnerIdString: {
+                $cond: {
+                  if: {
+                    $and: [
+                      { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
+                      { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
+                      { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
+                    ]
+                  },
+                  then: "$partnerId",
+                  else: null
+                }
+              }
             }
+          },
+          {
+            $lookup: {
+              from: 'partners',
+              let: { partnerIdString: "$validPartnerIdString" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
+                        { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
+                        { 
+                          $eq: [
+                            "$_id",
+                            { $toObjectId: "$$partnerIdString" }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  $project: {
+                    fullName: 1 // Include only the fullName field
+                  }}
+              ],
+              as: 'partnerDetails'
+            }
+          },
+          {'$unwind':{
+            'path':'$partnerDetails',
+            'preserveNullAndEmptyArrays':true
+          }},
+          {
+            $addFields: {
+              validSaleEmpIdString: {
+                $cond: {
+                  if: {
+                    $and: [
+                      { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
+                      { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
+                      { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
+                    ]
+                  },
+                  then: "$empSaleId",
+                  else: null
+                }
+              }
+            }
+          },
+          {
+            $lookup: {
+              from: 'employees',
+              let: { saleEmpIdString: "$validSaleEmpIdString" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
+                        { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
+                        { 
+                          $eq: [
+                            "$_id",
+                            { $toObjectId: "$$saleEmpIdString" }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  $project: {
+                    fullName: 1, // Include only the fullName field
+                    designation:1,
+                    type:1
+                  }}
+              ],
+              as: 'employeeDetails'
+            }
+          },
+          {'$unwind':{
+            'path':'$employeeDetails',
+            'preserveNullAndEmptyArrays':true
+          }},
+          {'$match':{
+               '$or': [
+                 { name: { $regex: searchQuery, $options: "i" } },
+                 { 'partnerDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                 { 'employeeDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                 { consultantCode: { $regex: searchQuery, $options: "i" } },
+                 { fileNo: { $regex: searchQuery, $options: "i" } },
+                 { email: { $regex: searchQuery, $options: "i" } },
+                 { mobileNo: { $regex: searchQuery, $options: "i" } },
+                 { policyType: { $regex: searchQuery, $options: "i" } },
+                 { caseFrom: { $regex: searchQuery, $options: "i" } },
+                 { branchId: { $regex: searchQuery, $options: "i" } },
+               ]          
+          }},
+          {'$sort':{'createdAt':-1}},
+         {
+           $facet: {
+             cases: [
+               { $sort: { createdAt: -1 } },
+               { $skip: Number(pageNo) },
+               { $limit: Number(pageItemLimit) },
+               { 
+                 $project: {
+                   caseDocs: 0,
+                   processSteps: 0,
+                   addEmployee: 0,
+                   caseCommit: 0,
+                   partnerReferenceCaseDetails: 0
+                 }
+               }
+             ],
+             totalCount: [
+               { $count: "count" }
+             ],
+             totalAmt: [
+               {
+                 $group: {
+                   _id: null,
+                   totalAmtSum: { $sum: "$claimAmount" }
+                 }
+               }
+             ]
+           }
          }
-      ];
+       ];
+       
+       const result = await Case.aggregate(pipeline);
+      //  console.log("result",result?.[0]?.totalAmtSum);
+       
+       const getAllCase = result[0].cases;
+       const noOfCase = result[0].totalCount[0]?.count || 0;
+       const totalAmount = result?.[0]?.totalAmt
+       
+
+      // const aggregationPipeline = [
+      //    { $match: query?.query }, // Match the documents based on the query
+      //    {
+      //       $group: {
+      //          _id: null,
+      //          totalAmtSum: { $sum: "$claimAmount" } // Calculate the sum of totalAmt
+      //       }
+      //    }
+      // ];
       // console.log("query", query);
 
-      const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
-      const noOfCase = await Case.find(query?.query).count()
-      const aggregateResult = await Case.aggregate(aggregationPipeline);
-      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult });
+      // const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
+      // const noOfCase = await Case.find(query?.query).count()
+      
+      // const aggregateResult = await Case.aggregate(aggregationPipeline);
+
+      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: totalAmount });
 
    } catch (error) {
       console.log("updateAdminCase in error:", error);
@@ -832,27 +1026,220 @@ export const adminViewPartnerReport = async (req, res) => {
       const endDate = req.query.endDate ? req.query.endDate : "";
       const type = req?.query?.type ? req.query.type : true
 
-      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, req.query.partnerId, false, false, type)
-      if (!query.success) return res.status(400).json({ success: false, message: query.message })
-      const aggregationPipeline = [
-         { $match: query?.query }, // Match the documents based on the query
+      // const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, req.query.partnerId, false, false, type)
+      // if (!query.success) return res.status(400).json({ success: false, message: query.message })
+      // const aggregationPipeline = [
+      //    { $match: query?.query }, // Match the documents based on the query
+      //    {
+      //       $group: {
+      //          _id: null,
+      //          totalAmtSum: { $sum: "$claimAmount" }, // Calculate the sum of totalAmt
+      //          totalResolvedAmt: {
+      //             $sum: { $cond: [{ $eq: ["$currentStatus", "Resolve"] }, "$claimAmount", 0] } // Calculate the sum of claimAmount for resolved cases
+      //          }
+      //       }
+      //    }
+      // ];
+
+      const matchQuery = []
+
+      
+      if (startDate && endDate) {
+         const validStartDate = getValidateDate(startDate)
+         if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+            const validEndDate = getValidateDate(endDate)
+         if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+      }
+
+      if (startDate && endDate) {
+         const start = new Date(startDate).setHours(0, 0, 0, 0);
+         const end = new Date(endDate).setHours(23, 59, 59, 999);
+         
+         matchQuery.push({
+           createdAt: {
+             $gte: new Date(start),
+             $lte: new Date(end)
+           }
+         });
+      }
+
+      const pipeline = [
          {
-            $group: {
-               _id: null,
-               totalAmtSum: { $sum: "$claimAmount" }, // Calculate the sum of totalAmt
-               totalResolvedAmt: {
-                  $sum: { $cond: [{ $eq: ["$currentStatus", "Resolve"] }, "$claimAmount", 0] } // Calculate the sum of claimAmount for resolved cases
-               }
+           $match: {
+             $and: [
+               { isPartnerReferenceCase: false },
+               { isEmpSaleReferenceCase: false },
+               { currentStatus: { $regex: statusType, $options: "i" } },
+               { partnerId:  req.query.partnerId },
+               ...matchQuery,
+             ]
+           }
+         },
+         {
+            $addFields: {
+              validPartnerIdString: {
+                $cond: {
+                  if: {
+                    $and: [
+                      { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
+                      { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
+                      { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
+                    ]
+                  },
+                  then: "$partnerId",
+                  else: null
+                }
+              }
             }
+          },
+          {
+            $lookup: {
+              from: 'partners',
+              let: { partnerIdString: "$validPartnerIdString" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
+                        { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
+                        { 
+                          $eq: [
+                            "$_id",
+                            { $toObjectId: "$$partnerIdString" }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  $project: {
+                    fullName: 1 // Include only the fullName field
+                  }}
+              ],
+              as: 'partnerDetails'
+            }
+          },
+          {'$unwind':{
+            'path':'$partnerDetails',
+            'preserveNullAndEmptyArrays':true
+          }},
+          {
+            $addFields: {
+              validSaleEmpIdString: {
+                $cond: {
+                  if: {
+                    $and: [
+                      { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
+                      { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
+                      { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
+                    ]
+                  },
+                  then: "$empSaleId",
+                  else: null
+                }
+              }
+            }
+          },
+          {
+            $lookup: {
+              from: 'employees',
+              let: { saleEmpIdString: "$validSaleEmpIdString" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
+                        { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
+                        { 
+                          $eq: [
+                            "$_id",
+                            { $toObjectId: "$$saleEmpIdString" }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  $project: {
+                    fullName: 1, // Include only the fullName field
+                    designation:1,
+                    type:1
+                  }}
+              ],
+              as: 'employeeDetails'
+            }
+          },
+          {'$unwind':{
+            'path':'$employeeDetails',
+            'preserveNullAndEmptyArrays':true
+          }},
+          {'$match':{
+               '$or': [
+                 { name: { $regex: searchQuery, $options: "i" } },
+                 { 'partnerDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                 { 'employeeDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                 { consultantCode: { $regex: searchQuery, $options: "i" } },
+                 { fileNo: { $regex: searchQuery, $options: "i" } },
+                 { email: { $regex: searchQuery, $options: "i" } },
+                 { mobileNo: { $regex: searchQuery, $options: "i" } },
+                 { policyType: { $regex: searchQuery, $options: "i" } },
+                 { caseFrom: { $regex: searchQuery, $options: "i" } },
+                 { branchId: { $regex: searchQuery, $options: "i" } },
+               ]          
+          }},
+          {'$sort':{'createdAt':-1}},
+         {
+           $facet: {
+             cases: [
+               { $sort: { createdAt: -1 } },
+               { $skip: Number(pageNo) },
+               { $limit: Number(pageItemLimit) },
+               { 
+                 $project: {
+                   caseDocs: 0,
+                   processSteps: 0,
+                   addEmployee: 0,
+                   caseCommit: 0,
+                   partnerReferenceCaseDetails: 0
+                 }
+               }
+             ],
+             totalCount: [
+               { $count: "count" }
+             ],
+             totalAmt: [
+               {
+                 $group: {
+                   _id: null,
+                   totalAmtSum: { $sum: "$claimAmount" }, // Calculate the sum of totalAmt
+                   totalResolvedAmt: {
+                      $sum: { $cond: [{ $eq: ["$currentStatus", "Resolve"] }, "$claimAmount", 0] } // Calculate the sum of claimAmount for resolved cases
+                   }
+                 }
+               }
+             ]
+           }
          }
-      ];
+       ];
+       
+       const result = await Case.aggregate(pipeline);
+      //  console.log("result",result?.[0]?.totalAmt);
+       
+       const getAllCase = result[0].cases;
+       const noOfCase = result[0].totalCount[0]?.count || 0;
+       const totalAmount = result?.[0]?.totalAmt
+       
 
 
-      const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
-      const noOfCase = await Case.find(query?.query).count()
-      const aggregateResult = await Case.aggregate(aggregationPipeline);
-      console.log("aggregateResult",aggregateResult);
-      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult, user: partner });
+      // const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      // const noOfCase = await Case.find(query?.query).count()
+      // const aggregateResult = await Case.aggregate(aggregationPipeline);
+      // console.log("aggregateResult",aggregateResult);
+      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: totalAmount, user: partner });
 
    } catch (error) {
       console.log("updateAdminCase in error:", error);
@@ -887,36 +1274,228 @@ export const adminViewEmpSaleReport = async (req, res) => {
          const isNormalEmp = !excludedTypes.includes(empSale?.type?.toLowerCase())
          let empBranchId =false
          let branchWise = false
-         if (caseAccess?.includes(empSale?.type?.toLowerCase()) || isNormalEmp) {
-            empBranchId = empSale?.branchId
-            branchWise = true
-            const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, isNormalEmp && empSale?._id?.toString(), true, false, !isNormalEmp && empSale?.branchId)
-            if (!query.success) return res.status(400).json({ success: false, message: query.message })
-            const aggregationPipeline = [
-                  { $match: query?.query }, // Match the documents based on the query
-                  {
-                     $group: {
-                        _id: null,
-                        totalAmtSum: { $sum: "$claimAmount" }
-                     }
-                  }
-               ];
+         // if (caseAccess?.includes(empSale?.type?.toLowerCase()) || isNormalEmp) {
+         //    empBranchId = empSale?.branchId
+         //    branchWise = true
+         //    const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, isNormalEmp && empSale?._id?.toString(), true, false, !isNormalEmp && empSale?.branchId)
+         //    if (!query.success) return res.status(400).json({ success: false, message: query.message })
+         //    const aggregationPipeline = [
+         //          { $match: query?.query }, // Match the documents based on the query
+         //          {
+         //             $group: {
+         //                _id: null,
+         //                totalAmtSum: { $sum: "$claimAmount" }
+         //             }
+         //          }
+         //       ];
    
-            const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
-            const noOfCase = await Case.find(query?.query).count()
-            const aggregateResult = await Case.aggregate(aggregationPipeline);
-            return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult, user: empSale });
+         //    const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
+         //    const noOfCase = await Case.find(query?.query).count()
+         //    const aggregateResult = await Case.aggregate(aggregationPipeline);
+         //    return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult, user: empSale });
       
+         // } else {
+         //    let extactMatchQuery = [
+         //       { referEmpId: empSale?._id },
+         //       { _id: empSale?._id }
+         //    ]
+   
+         //    if((empSale?.type?.toLowerCase()=="sales" && empSale?.designation?.toLowerCase()=="manager")){
+         //       extactMatchQuery.push({ type: { $regex: "sales", $options: "i" } })
+         //       extactMatchQuery.push({ type: { $regex: "sathi team", $options: "i" } })
+         //    }
+         //    const extractType = await Employee.aggregate([
+         //       {
+         //          $match: {
+         //             $or: [
+         //              ...extactMatchQuery
+         //             ]
+         //          }
+         //       },
+         //       {
+         //          "$group": {
+         //              "_id": null,
+         //              "shareEmpStr": { "$push": { "$toString": "$_id" } },
+         //              "shareEmpObj": { "$push": "$_id" }
+         //          }
+         //      },
+         //      {
+         //          "$lookup": {
+         //             from: "partners",
+         //             let: { shareEmpStr: "$shareEmpStr", shareEmpObj: "$shareEmpObj" },
+         //             pipeline: [
+         //                 {
+         //                     $match: {
+         //                         $expr: {
+         //                             $or: [
+         //                                 { $in: ["$salesId", "$$shareEmpObj"] }, // Use ObjectId array for salesId
+         //                                 {
+         //                                     $gt: [
+         //                                         {
+         //                                             $size: {
+         //                                                 $filter: {
+         //                                                     input: { $ifNull: ["$shareEmployee", []] }, // Ensure shareEmployee is an array
+         //                                                     as: "shareEmployeeId",
+         //                                                     cond: { $in: ["$$shareEmployeeId", "$$shareEmpStr"] }
+         //                                                 }
+         //                                             }
+         //                                         },
+         //                                         0
+         //                                     ]
+         //                                 }
+         //                             ]
+         //                         }
+         //                     }
+         //                 }
+         //             ],
+         //             as: "partners"
+         //          }
+         //      },
+         //       {
+         //          $lookup: {
+         //             from: "clients",
+         //             let: { shareEmpObj: "$shareEmpObj" },
+         //             pipeline: [
+         //                {
+         //                   $match: {
+         //                      $expr: {
+         //                         $or: [
+         //                            { $in: ["$salesId", "$$shareEmpObj"] },
+   
+         //                         ]
+         //                      }
+         //                   }
+         //                }
+         //             ],
+         //             as: "allClients"
+         //          }
+         //       },
+         //       {
+         //          $project: {
+         //             shareEmpObj: 1,
+         //             _id: 0,
+         //             allClients: {
+         //                $map: {
+         //                   input: "$allClients",
+         //                   as: "allClients",
+         //                   in: "$$allClients._id"
+         //                }
+         //             },
+         //             allPartners: {
+         //                $map: {
+         //                   input: "$partners",
+         //                   as: "partner",
+         //                   in: "$$partner._id"
+         //                }
+         //             }
+         //          }
+         //       },
+         //       {
+         //          $project: {
+         //             shareEmp: { $map: { input: "$shareEmpObj", as: "id", in: { $toString: "$$id" } } },
+         //             allPartners: { $map: { input: "$allPartners", as: "id", in: { $toString: "$$id" } } },
+         //             allClients: { $map: { input: "$allClients", as: "id", in: { $toString: "$$id" } } }
+         //          }
+         //       }
+         //    ])
+   
+         //    if (startDate && endDate) {
+         //       const validStartDate = getValidateDate(startDate)
+         //       if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+         //       const validEndDate = getValidateDate(endDate)
+         //       if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+         //    }
+   
+         //    let query = {
+         //       $and: [
+         //          { isPartnerReferenceCase: false },
+         //          { isEmpSaleReferenceCase: false },
+         //          { currentStatus: { $regex: statusType, $options: "i" } },
+         //          { isActive: true },
+         //          { branchId: { $regex: empSale?.branchId, $options: "i" } },
+         //          {
+         //             $or: [
+         //                { empSaleId: { $in: extractType?.[0]?.shareEmp } },
+         //                { partnerId: { $in: extractType?.[0]?.allPartners } },
+         //                { clientId: { $in: extractType?.[0]?.allClients } },
+         //             ]
+         //          },
+         //          {
+         //             $or: [
+         //                { name: { $regex: searchQuery, $options: "i" } },
+         //                { partnerName: { $regex: searchQuery, $options: "i" } },
+         //                { consultantCode: { $regex: searchQuery, $options: "i" } },
+         //                { fileNo: { $regex: searchQuery, $options: "i" } },
+         //                { email: { $regex: searchQuery, $options: "i" } },
+         //                { mobileNo: { $regex: searchQuery, $options: "i" } },
+         //                { policyType: { $regex: searchQuery, $options: "i" } },
+         //                { caseFrom: { $regex: searchQuery, $options: "i" } },
+         //                { branchId: { $regex: searchQuery, $options: "i" } },
+         //             ]
+         //          },
+         //          startDate && endDate ? {
+         //             createdAt: {
+         //                $gte: new Date(startDate).setHours(0, 0, 0, 0),
+         //                $lte: new Date(endDate).setHours(23, 59, 59, 999)
+         //             }
+         //          } : {}
+         //       ]
+         //    };
+         //    const getAllCase = await Case.find(query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
+         //    const noOfCase = await Case.find(query).count()
+         //    const aggregationPipeline = [
+         //       { $match: query }, // Match the documents based on the query
+         //       {
+         //          $group: {
+         //             _id: null,
+         //             totalAmtSum: { $sum: "$claimAmount" }
+         //          }
+         //       }
+         //    ];
+         //    const aggregateResult = await Case.aggregate(aggregationPipeline);
+         //    return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult, user: empSale });
+
+         // }
+
+         const matchQuery = []
+
+         if (startDate && endDate) {
+            const start = new Date(startDate).setHours(0, 0, 0, 0);
+            const end = new Date(endDate).setHours(23, 59, 59, 999);
+            
+            matchQuery.push({
+              createdAt: {
+                $gte: new Date(start),
+                $lte: new Date(end)
+              }
+            });
+         }
+   
+         if (caseAccess?.includes(empSale?.type?.toLowerCase()) || isNormalEmp) {
+            // const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, isNormalEmp && empId, true, false,!isNormalEmp && empBranchId)
+            // if (!query.success) return res.status(400).json({ success: false, message: query.message })
+   
+            // const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
+            // const noOfCase = await Case.find(query?.query).count()
+            // return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase });
+   
+            if(isNormalEmp && empSale?._id){
+               matchQuery.push({ addEmployee: { $in: empSale?._id?.toString() } })
+            }
+   
          } else {
+   
             let extactMatchQuery = [
                { referEmpId: empSale?._id },
                { _id: empSale?._id }
             ]
    
-            if((empSale?.type?.toLowerCase()=="sales" && empSale?.designation?.toLowerCase()=="manager")){
+            if(empSale?.type?.toLowerCase()=="sales" && empSale?.designation?.toLowerCase()=="manager"){
                extactMatchQuery.push({ type: { $regex: "sales", $options: "i" } })
                extactMatchQuery.push({ type: { $regex: "sathi team", $options: "i" } })
             }
+
+            // console.log("extactMatchQuery----",extactMatchQuery);
             const extractType = await Employee.aggregate([
                {
                   $match: {
@@ -925,77 +1504,6 @@ export const adminViewEmpSaleReport = async (req, res) => {
                      ]
                   }
                },
-               // {
-               //    $group: {
-               //       _id: null,
-               //       shareEmp: { $push: "$_id" },
-               //    }
-               // },
-               // {
-               //    $lookup: {
-               //       from: "partners",
-               //       let: { shareEmp: "$shareEmp" },
-               //       pipeline: [
-               //          {
-               //             $match: {
-               //                $expr: {
-               //                   $or: [
-               //                      { $in: ["$salesId", "$$shareEmp"] },
-               //                      { $in: ["$shareEmployee", "$$shareEmp"] }
-               //                   ]
-               //                }
-               //             }
-               //          }
-               //       ],
-               //       as: "partners"
-               //    }
-               // },
-               // {
-               //    $lookup: {
-               //       from: "clients",
-               //       let: { shareEmp: "$shareEmp" },
-               //       pipeline: [
-               //          {
-               //             $match: {
-               //                $expr: {
-               //                   $or: [
-               //                      { $in: ["$salesId", "$$shareEmp"] },
-   
-               //                   ]
-               //                }
-               //             }
-               //          }
-               //       ],
-               //       as: "allClients"
-               //    }
-               // },
-               // {
-               //    $project: {
-               //       shareEmp: 1,
-               //       _id: 0,
-               //       allClients: {
-               //          $map: {
-               //             input: "$allClients",
-               //             as: "allClients",
-               //             in: "$$allClients._id"
-               //          }
-               //       },
-               //       allPartners: {
-               //          $map: {
-               //             input: "$partners",
-               //             as: "partner",
-               //             in: "$$partner._id"
-               //          }
-               //       }
-               //    }
-               // },
-               // {
-               //    $project: {
-               //       shareEmp: { $map: { input: "$shareEmp", as: "id", in: { $toString: "$$id" } } },
-               //       allPartners: { $map: { input: "$allPartners", as: "id", in: { $toString: "$$id" } } },
-               //       allClients: { $map: { input: "$allClients", as: "id", in: { $toString: "$$id" } } }
-               //    }
-               // }
                {
                   "$group": {
                       "_id": null,
@@ -1081,65 +1589,186 @@ export const adminViewEmpSaleReport = async (req, res) => {
                      allClients: { $map: { input: "$allClients", as: "id", in: { $toString: "$$id" } } }
                   }
                }
+   
             ])
    
-            if (startDate && endDate) {
-               const validStartDate = getValidateDate(startDate)
-               if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
-               const validEndDate = getValidateDate(endDate)
-               if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
-            }
-   
-            let query = {
-               $and: [
-                  { isPartnerReferenceCase: false },
-                  { isEmpSaleReferenceCase: false },
-                  { currentStatus: { $regex: statusType, $options: "i" } },
-                  { isActive: true },
-                  { branchId: { $regex: empSale?.branchId, $options: "i" } },
-                  {
-                     $or: [
-                        { empSaleId: { $in: extractType?.[0]?.shareEmp } },
-                        { partnerId: { $in: extractType?.[0]?.allPartners } },
-                        { clientId: { $in: extractType?.[0]?.allClients } },
-                     ]
-                  },
-                  {
-                     $or: [
-                        { name: { $regex: searchQuery, $options: "i" } },
-                        { partnerName: { $regex: searchQuery, $options: "i" } },
-                        { consultantCode: { $regex: searchQuery, $options: "i" } },
-                        { fileNo: { $regex: searchQuery, $options: "i" } },
-                        { email: { $regex: searchQuery, $options: "i" } },
-                        { mobileNo: { $regex: searchQuery, $options: "i" } },
-                        { policyType: { $regex: searchQuery, $options: "i" } },
-                        { caseFrom: { $regex: searchQuery, $options: "i" } },
-                        { branchId: { $regex: searchQuery, $options: "i" } },
-                     ]
-                  },
-                  startDate && endDate ? {
-                     createdAt: {
-                        $gte: new Date(startDate).setHours(0, 0, 0, 0),
-                        $lte: new Date(endDate).setHours(23, 59, 59, 999)
-                     }
-                  } : {}
+            matchQuery.push(                  {
+               $or: [
+                 { empSaleId: { $in: extractType?.[0]?.shareEmp } },
+                 { partnerId: { $in: extractType?.[0]?.allPartners } },
+                 { clientId: { $in: extractType?.[0]?.allClients } },
                ]
-            };
-            const getAllCase = await Case.find(query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
-            const noOfCase = await Case.find(query).count()
-            const aggregationPipeline = [
-               { $match: query }, // Match the documents based on the query
-               {
-                  $group: {
-                     _id: null,
-                     totalAmtSum: { $sum: "$claimAmount" }
-                  }
-               }
-            ];
-            const aggregateResult = await Case.aggregate(aggregationPipeline);
-            return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult, user: empSale });
-
+             },)
          }
+   
+            const pipeline = [
+               {
+                 $match: {
+                   $and: [
+                     { isPartnerReferenceCase: false },
+                     { isEmpSaleReferenceCase: false },
+                     { currentStatus: { $regex: statusType, $options: "i" } },
+                     { isActive: true },
+                     { branchId: { $regex: empSale?.branchId, $options: "i" } },
+                     ...matchQuery,
+                   ]
+                 }
+               },
+               {
+                  $addFields: {
+                    validPartnerIdString: {
+                      $cond: {
+                        if: {
+                          $and: [
+                            { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
+                            { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
+                            { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
+                          ]
+                        },
+                        then: "$partnerId",
+                        else: null
+                      }
+                    }
+                  }
+                },
+                {
+                  $lookup: {
+                    from: 'partners',
+                    let: { partnerIdString: "$validPartnerIdString" },
+                    pipeline: [
+                      {
+                        $match: {
+                          $expr: {
+                            $and: [
+                              { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
+                              { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
+                              { 
+                                $eq: [
+                                  "$_id",
+                                  { $toObjectId: "$$partnerIdString" }
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        $project: {
+                          fullName: 1 // Include only the fullName field
+                        }}
+                    ],
+                    as: 'partnerDetails'
+                  }
+                },
+                {'$unwind':{
+                  'path':'$partnerDetails',
+                  'preserveNullAndEmptyArrays':true
+                }},
+                {
+                  $addFields: {
+                    validSaleEmpIdString: {
+                      $cond: {
+                        if: {
+                          $and: [
+                            { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
+                            { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
+                            { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
+                          ]
+                        },
+                        then: "$empSaleId",
+                        else: null
+                      }
+                    }
+                  }
+                },
+                {
+                  $lookup: {
+                    from: 'employees',
+                    let: { saleEmpIdString: "$validSaleEmpIdString" },
+                    pipeline: [
+                      {
+                        $match: {
+                          $expr: {
+                            $and: [
+                              { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
+                              { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
+                              { 
+                                $eq: [
+                                  "$_id",
+                                  { $toObjectId: "$$saleEmpIdString" }
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        $project: {
+                          fullName: 1, // Include only the fullName field
+                          designation:1,
+                          type:1
+                        }}
+                    ],
+                    as: 'employeeDetails'
+                  }
+                },
+                {'$unwind':{
+                  'path':'$employeeDetails',
+                  'preserveNullAndEmptyArrays':true
+                }},
+                {'$match':{
+                     '$or': [
+                       { name: { $regex: searchQuery, $options: "i" } },
+                       { 'partnerDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                       { 'employeeDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                       { consultantCode: { $regex: searchQuery, $options: "i" } },
+                       { fileNo: { $regex: searchQuery, $options: "i" } },
+                       { email: { $regex: searchQuery, $options: "i" } },
+                       { mobileNo: { $regex: searchQuery, $options: "i" } },
+                       { policyType: { $regex: searchQuery, $options: "i" } },
+                       { caseFrom: { $regex: searchQuery, $options: "i" } },
+                       { branchId: { $regex: searchQuery, $options: "i" } },
+                     ]          
+                }},
+                {'$sort':{'createdAt':-1}},
+               {
+                 $facet: {
+                   cases: [
+                     { $sort: { createdAt: -1 } },
+                     { $skip: Number(pageNo) },
+                     { $limit: Number(pageItemLimit) },
+                     { 
+                       $project: {
+                         caseDocs: 0,
+                         processSteps: 0,
+                         addEmployee: 0,
+                         caseCommit: 0,
+                         partnerReferenceCaseDetails: 0
+                       }
+                     }
+                   ],
+                   totalCount: [
+                     { $count: "count" }
+                   ],
+                   totalAmt: [
+                     {
+                       $group: {
+                         _id: null,
+                         totalAmtSum: { $sum: "$claimAmount" }
+                       }
+                     }
+                   ]
+                 }
+               }
+             ];
+             
+             const result = await Case.aggregate(pipeline);
+            //  console.log("result",result?.[0]?.totalAmtSum);
+             
+             const getAllCase = result[0].cases;
+             const noOfCase = result[0].totalCount[0]?.count || 0;
+             const totalAmount = result?.[0]?.totalAmt
+   return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase,totalAmt: totalAmount  });
 
    } catch (error) {
       console.log("updateAdminCase in error:", error);
@@ -2339,6 +2968,37 @@ export const adminDeletePartnerById = async (req, res) => {
    }
 }
 
+export const adminAddPartnerRefToEmp = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const { partnerId,empEmail } = req?.body
+      if (!partnerId) return res.status(400).json({ success: false, message: "Partner id required" })
+      if (!validMongooseId(partnerId)) return res.status(400).json({ success: false, message: "Not a valid PartnerId" })
+
+      if (!empEmail) return res.status(400).json({ success: false, message: "Employee email is required" })
+
+      const findPartner = await Partner.findById(partnerId)   
+      if (!findPartner) return res.status(404).json({ success: false, message: "Parnter not found" })
+      if(findPartner.salesId) return res.status(404).json({ success: false, message: "Reference already added" })
+
+      const findEmp = await Employee.findOne({email:{ $regex: empEmail, $options: "i" }})
+      if(!findEmp) return res.status(404).json({ success: false, message: "Employee not found" })
+
+      const updatePartner = await Partner.findByIdAndUpdate(partnerId,{salesId:findEmp._id})
+      return res.status(200).json({ success: true, message: "Successfully add employee reference" });
+
+   } catch (error) {
+      console.log("adminAddPartnerRefToEmp in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
 export const adminDeleteClientById = async (req, res) => {
    try {
       const verify = await authAdmin(req, res)
@@ -2530,11 +3190,168 @@ export const adminDownloadAllCase = async (req, res) => {
       const isReject = req?.query?.isReject=="true" ? {$in:["Reject"]} : {$nin:["Reject"]}
       
 
-      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type,false,false,isReject)
-      if (!query.success) return res.status(400).json({ success: false, message: query.message })
-      const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
+      // const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type,false,false,isReject)
+      // if (!query.success) return res.status(400).json({ success: false, message: query.message })
+      // const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
 
-      const excelBuffer = await getDownloadCaseExcel(getAllCase)
+      
+      const matchQuery = []
+
+      
+      if (startDate && endDate) {
+         const validStartDate = getValidateDate(startDate)
+         if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+            const validEndDate = getValidateDate(endDate)
+         if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+      }
+
+      if (startDate && endDate) {
+         const start = new Date(startDate).setHours(0, 0, 0, 0);
+         const end = new Date(endDate).setHours(23, 59, 59, 999);
+         
+         matchQuery.push({
+           createdAt: {
+             $gte: new Date(start),
+             $lte: new Date(end)
+           }
+         });
+      }
+
+      const pipeline = [
+         {
+           $match: {
+             $and: [
+               { isPartnerReferenceCase: false },
+               { isEmpSaleReferenceCase: false },
+               { currentStatus: { $regex: statusType, $options: "i" } },
+               { isActive: Boolean(req.query.type == "true" ? true :false) },
+               req?.query?.isReject=="true" ? {currentStatus:{$in:["Reject"]}} : {currentStatus:{$nin:["Reject"]}},
+               ...matchQuery,
+             ]
+           }
+         },
+         {
+            $addFields: {
+              validPartnerIdString: {
+                $cond: {
+                  if: {
+                    $and: [
+                      { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
+                      { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
+                      { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
+                    ]
+                  },
+                  then: "$partnerId",
+                  else: null
+                }
+              }
+            }
+          },
+          {
+            $lookup: {
+              from: 'partners',
+              let: { partnerIdString: "$validPartnerIdString" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
+                        { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
+                        { 
+                          $eq: [
+                            "$_id",
+                            { $toObjectId: "$$partnerIdString" }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  $project: {
+                    fullName: 1 // Include only the fullName field
+                  }}
+              ],
+              as: 'partnerDetails'
+            }
+          },
+          {'$unwind':{
+            'path':'$partnerDetails',
+            'preserveNullAndEmptyArrays':true
+          }},
+          {
+            $addFields: {
+              validSaleEmpIdString: {
+                $cond: {
+                  if: {
+                    $and: [
+                      { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
+                      { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
+                      { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
+                    ]
+                  },
+                  then: "$empSaleId",
+                  else: null
+                }
+              }
+            }
+          },
+          {
+            $lookup: {
+              from: 'employees',
+              let: { saleEmpIdString: "$validSaleEmpIdString" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
+                        { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
+                        { 
+                          $eq: [
+                            "$_id",
+                            { $toObjectId: "$$saleEmpIdString" }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  $project: {
+                    fullName: 1, // Include only the fullName field
+                    designation:1,
+                    type:1
+                  }}
+              ],
+              as: 'employeeDetails'
+            }
+          },
+          {'$unwind':{
+            'path':'$employeeDetails',
+            'preserveNullAndEmptyArrays':true
+          }},
+          {'$match':{
+               '$or': [
+                 { name: { $regex: searchQuery, $options: "i" } },
+                 { 'partnerDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                 { 'employeeDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                 { consultantCode: { $regex: searchQuery, $options: "i" } },
+                 { fileNo: { $regex: searchQuery, $options: "i" } },
+                 { email: { $regex: searchQuery, $options: "i" } },
+                 { mobileNo: { $regex: searchQuery, $options: "i" } },
+                 { policyType: { $regex: searchQuery, $options: "i" } },
+                 { caseFrom: { $regex: searchQuery, $options: "i" } },
+                 { branchId: { $regex: searchQuery, $options: "i" } },
+               ]          
+          }},
+          {'$sort':{'createdAt':-1}},
+       ];
+       
+       const result = await Case.aggregate(pipeline);
+
+      const excelBuffer = await getDownloadCaseExcel(result)
       res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.status(200)
@@ -2597,12 +3414,167 @@ export const adminDownloadPartnerReport = async (req, res) => {
       const endDate = req.query.endDate ? req.query.endDate : "";
       const type = req?.query?.type ? req.query.type : true
 
-      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, req.query.partnerId, false, false, type)
-      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+      // const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, req.query.partnerId, false, false, type)
+      // if (!query.success) return res.status(400).json({ success: false, message: query.message })
 
-      const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
+      // const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
 
-      const excelBuffer = await getDownloadCaseExcel(getAllCase)
+      const matchQuery = []
+
+      
+      if (startDate && endDate) {
+         const validStartDate = getValidateDate(startDate)
+         if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+            const validEndDate = getValidateDate(endDate)
+         if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+      }
+
+      if (startDate && endDate) {
+         const start = new Date(startDate).setHours(0, 0, 0, 0);
+         const end = new Date(endDate).setHours(23, 59, 59, 999);
+         
+         matchQuery.push({
+           createdAt: {
+             $gte: new Date(start),
+             $lte: new Date(end)
+           }
+         });
+      }
+
+      const pipeline = [
+         {
+           $match: {
+             $and: [
+               { isPartnerReferenceCase: false },
+               { isEmpSaleReferenceCase: false },
+               { currentStatus: { $regex: statusType, $options: "i" } },
+               { partnerId:  req.query.partnerId },
+               ...matchQuery,
+             ]
+           }
+         },
+         {
+            $addFields: {
+              validPartnerIdString: {
+                $cond: {
+                  if: {
+                    $and: [
+                      { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
+                      { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
+                      { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
+                    ]
+                  },
+                  then: "$partnerId",
+                  else: null
+                }
+              }
+            }
+          },
+          {
+            $lookup: {
+              from: 'partners',
+              let: { partnerIdString: "$validPartnerIdString" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
+                        { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
+                        { 
+                          $eq: [
+                            "$_id",
+                            { $toObjectId: "$$partnerIdString" }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  $project: {
+                    fullName: 1 // Include only the fullName field
+                  }}
+              ],
+              as: 'partnerDetails'
+            }
+          },
+          {'$unwind':{
+            'path':'$partnerDetails',
+            'preserveNullAndEmptyArrays':true
+          }},
+          {
+            $addFields: {
+              validSaleEmpIdString: {
+                $cond: {
+                  if: {
+                    $and: [
+                      { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
+                      { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
+                      { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
+                    ]
+                  },
+                  then: "$empSaleId",
+                  else: null
+                }
+              }
+            }
+          },
+          {
+            $lookup: {
+              from: 'employees',
+              let: { saleEmpIdString: "$validSaleEmpIdString" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
+                        { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
+                        { 
+                          $eq: [
+                            "$_id",
+                            { $toObjectId: "$$saleEmpIdString" }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  $project: {
+                    fullName: 1, // Include only the fullName field
+                    designation:1,
+                    type:1
+                  }}
+              ],
+              as: 'employeeDetails'
+            }
+          },
+          {'$unwind':{
+            'path':'$employeeDetails',
+            'preserveNullAndEmptyArrays':true
+          }},
+          {'$match':{
+               '$or': [
+                 { name: { $regex: searchQuery, $options: "i" } },
+                 { 'partnerDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                 { 'employeeDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                 { consultantCode: { $regex: searchQuery, $options: "i" } },
+                 { fileNo: { $regex: searchQuery, $options: "i" } },
+                 { email: { $regex: searchQuery, $options: "i" } },
+                 { mobileNo: { $regex: searchQuery, $options: "i" } },
+                 { policyType: { $regex: searchQuery, $options: "i" } },
+                 { caseFrom: { $regex: searchQuery, $options: "i" } },
+                 { branchId: { $regex: searchQuery, $options: "i" } },
+               ]          
+          }},
+          {'$sort':{'createdAt':-1}},
+       ];
+       
+       const result = await Case.aggregate(pipeline);
+
+      const excelBuffer = await getDownloadCaseExcel(result)
       res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.status(200)
@@ -2638,27 +3610,282 @@ export const adminEmpSaleReportDownload = async (req, res) => {
       let branchWise = false
 
       const caseAccess = ["operation", "finance", "branch"]
-      if (caseAccess?.includes(empSale?.type?.toLowerCase())) {
-         empBranchId = empSale?.branchId
-         branchWise = true
-         const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, isNormalEmp && empSale?._id?.toString(), true, false, !isNormalEmp && empSale?.branchId)
-         if (!query.success) return res.status(400).json({ success: false, message: query.message })
-       const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
-         const excelBuffer = await getDownloadCaseExcel(getAllCase,empSale?._id?.toString())
-         res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
-         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-         res.status(200)
-         res.send(excelBuffer)
+      // if (caseAccess?.includes(empSale?.type?.toLowerCase())) {
+      //    empBranchId = empSale?.branchId
+      //    branchWise = true
+      //    const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, isNormalEmp && empSale?._id?.toString(), true, false, !isNormalEmp && empSale?.branchId)
+      //    if (!query.success) return res.status(400).json({ success: false, message: query.message })
+      //  const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
+      //    const excelBuffer = await getDownloadCaseExcel(getAllCase,empSale?._id?.toString())
+      //    res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
+      //    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      //    res.status(200)
+      //    res.send(excelBuffer)
+      // } else {
+      //    let extactMatchQuery = [
+      //       { referEmpId: empSale?._id },
+      //       { _id: empSale?._id }
+      //    ]
+
+      //    if((empSale?.type?.toLowerCase()=="sales" && empSale?.designation?.toLowerCase()=="manager")){
+      //       extactMatchQuery.push({ type: { $regex: "sales", $options: "i" } })
+      //       extactMatchQuery.push({ type: { $regex: "sathi team", $options: "i" } })
+      //    }
+      //    const extractType = await Employee.aggregate([
+      //       {
+      //          $match: {
+      //             $or: [
+      //              ...extactMatchQuery
+      //             ]
+      //          }
+      //       },
+      //       // {
+      //       //    $group: {
+      //       //       _id: null,
+      //       //       shareEmp: { $push: "$_id" },
+      //       //    }
+      //       // },
+      //       // {
+      //       //    $lookup: {
+      //       //       from: "partners",
+      //       //       let: { shareEmp: "$shareEmp" },
+      //       //       pipeline: [
+      //       //          {
+      //       //             $match: {
+      //       //                $expr: {
+      //       //                   $or: [
+      //       //                      { $in: ["$salesId", "$$shareEmp"] },
+      //       //                      { $in: ["$shareEmployee", "$$shareEmp"] }
+      //       //                   ]
+      //       //                }
+      //       //             }
+      //       //          }
+      //       //       ],
+      //       //       as: "partners"
+      //       //    }
+      //       // },
+      //       // {
+      //       //    $lookup: {
+      //       //       from: "clients",
+      //       //       let: { shareEmp: "$shareEmp" },
+      //       //       pipeline: [
+      //       //          {
+      //       //             $match: {
+      //       //                $expr: {
+      //       //                   $or: [
+      //       //                      { $in: ["$salesId", "$$shareEmp"] },
+
+      //       //                   ]
+      //       //                }
+      //       //             }
+      //       //          }
+      //       //       ],
+      //       //       as: "allClients"
+      //       //    }
+      //       // },
+      //       // {
+      //       //    $project: {
+      //       //       shareEmp: 1,
+      //       //       _id: 0,
+      //       //       allClients: {
+      //       //          $map: {
+      //       //             input: "$allClients",
+      //       //             as: "allClients",
+      //       //             in: "$$allClients._id"
+      //       //          }
+      //       //       },
+      //       //       allPartners: {
+      //       //          $map: {
+      //       //             input: "$partners",
+      //       //             as: "partner",
+      //       //             in: "$$partner._id"
+      //       //          }
+      //       //       }
+      //       //    }
+      //       // },
+      //       // {
+      //       //    $project: {
+      //       //       shareEmp: { $map: { input: "$shareEmp", as: "id", in: { $toString: "$$id" } } },
+      //       //       allPartners: { $map: { input: "$allPartners", as: "id", in: { $toString: "$$id" } } },
+      //       //       allClients: { $map: { input: "$allClients", as: "id", in: { $toString: "$$id" } } }
+      //       //    }
+      //       // }
+      //       {
+      //          "$group": {
+      //              "_id": null,
+      //              "shareEmpStr": { "$push": { "$toString": "$_id" } },
+      //              "shareEmpObj": { "$push": "$_id" }
+      //          }
+      //      },
+      //      {
+      //          "$lookup": {
+      //             from: "partners",
+      //             let: { shareEmpStr: "$shareEmpStr", shareEmpObj: "$shareEmpObj" },
+      //             pipeline: [
+      //                 {
+      //                     $match: {
+      //                         $expr: {
+      //                             $or: [
+      //                                 { $in: ["$salesId", "$$shareEmpObj"] }, // Use ObjectId array for salesId
+      //                                 {
+      //                                     $gt: [
+      //                                         {
+      //                                             $size: {
+      //                                                 $filter: {
+      //                                                     input: { $ifNull: ["$shareEmployee", []] }, // Ensure shareEmployee is an array
+      //                                                     as: "shareEmployeeId",
+      //                                                     cond: { $in: ["$$shareEmployeeId", "$$shareEmpStr"] }
+      //                                                 }
+      //                                             }
+      //                                         },
+      //                                         0
+      //                                     ]
+      //                                 }
+      //                             ]
+      //                         }
+      //                     }
+      //                 }
+      //             ],
+      //             as: "partners"
+      //          }
+      //      },
+      //       {
+      //          $lookup: {
+      //             from: "clients",
+      //             let: { shareEmpObj: "$shareEmpObj" },
+      //             pipeline: [
+      //                {
+      //                   $match: {
+      //                      $expr: {
+      //                         $or: [
+      //                            { $in: ["$salesId", "$$shareEmpObj"] },
+
+      //                         ]
+      //                      }
+      //                   }
+      //                }
+      //             ],
+      //             as: "allClients"
+      //          }
+      //       },
+      //       {
+      //          $project: {
+      //             shareEmpObj: 1,
+      //             _id: 0,
+      //             allClients: {
+      //                $map: {
+      //                   input: "$allClients",
+      //                   as: "allClients",
+      //                   in: "$$allClients._id"
+      //                }
+      //             },
+      //             allPartners: {
+      //                $map: {
+      //                   input: "$partners",
+      //                   as: "partner",
+      //                   in: "$$partner._id"
+      //                }
+      //             }
+      //          }
+      //       },
+      //       {
+      //          $project: {
+      //             shareEmp: { $map: { input: "$shareEmpObj", as: "id", in: { $toString: "$$id" } } },
+      //             allPartners: { $map: { input: "$allPartners", as: "id", in: { $toString: "$$id" } } },
+      //             allClients: { $map: { input: "$allClients", as: "id", in: { $toString: "$$id" } } }
+      //          }
+      //       }
+      //    ])
+
+      //    if (startDate && endDate) {
+      //       const validStartDate = getValidateDate(startDate)
+      //       if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+      //       const validEndDate = getValidateDate(endDate)
+      //       if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+      //    }
+
+      //    let query = {
+      //       $and: [
+      //          { isPartnerReferenceCase: false },
+      //          { isEmpSaleReferenceCase: false },
+      //          { currentStatus: { $regex: statusType, $options: "i" } },
+      //          { isActive: true },
+      //          { branchId: { $regex: empSale?.branchId, $options: "i" } },
+      //          {
+      //             $or: [
+      //                { empSaleId: { $in: extractType?.[0]?.shareEmp } },
+      //                { partnerId: { $in: extractType?.[0]?.allPartners } },
+      //                { clientId: { $in: extractType?.[0]?.allClients } },
+      //             ]
+      //          },
+      //          {
+      //             $or: [
+      //                { name: { $regex: searchQuery, $options: "i" } },
+      //                { partnerName: { $regex: searchQuery, $options: "i" } },
+      //                { consultantCode: { $regex: searchQuery, $options: "i" } },
+      //                { fileNo: { $regex: searchQuery, $options: "i" } },
+      //                { email: { $regex: searchQuery, $options: "i" } },
+      //                { mobileNo: { $regex: searchQuery, $options: "i" } },
+      //                { policyType: { $regex: searchQuery, $options: "i" } },
+      //                { caseFrom: { $regex: searchQuery, $options: "i" } },
+      //                { branchId: { $regex: searchQuery, $options: "i" } },
+      //             ]
+      //          },
+      //          startDate && endDate ? {
+      //             createdAt: {
+      //                $gte: new Date(startDate).setHours(0, 0, 0, 0),
+      //                $lte: new Date(endDate).setHours(23, 59, 59, 999)
+      //             }
+      //          } : {}
+      //       ]
+      //    };
+      //    const getAllCase = await Case.find(query).sort({ createdAt: -1 });
+      //    const excelBuffer = await getDownloadCaseExcel(getAllCase,empSale?._id?.toString())
+      //    res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
+      //    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      //    res.status(200)
+      //    res.send(excelBuffer)
+      // }
+
+      const matchQuery = []
+
+      if (startDate && endDate) {
+         const start = new Date(startDate).setHours(0, 0, 0, 0);
+         const end = new Date(endDate).setHours(23, 59, 59, 999);
+         
+         matchQuery.push({
+           createdAt: {
+             $gte: new Date(start),
+             $lte: new Date(end)
+           }
+         });
+      }
+
+      if (caseAccess?.includes(empSale?.type?.toLowerCase()) || isNormalEmp) {
+         // const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, isNormalEmp && empId, true, false,!isNormalEmp && empBranchId)
+         // if (!query.success) return res.status(400).json({ success: false, message: query.message })
+
+         // const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
+         // const noOfCase = await Case.find(query?.query).count()
+         // return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase });
+
+         if(isNormalEmp && empSale?._id){
+            matchQuery.push({ addEmployee: { $in: empSale?._id?.toString() } })
+         }
+
       } else {
+
          let extactMatchQuery = [
             { referEmpId: empSale?._id },
             { _id: empSale?._id }
          ]
 
-         if((empSale?.type?.toLowerCase()=="sales" && empSale?.designation?.toLowerCase()=="manager")){
+         if(empSale?.type?.toLowerCase()=="sales" && empSale?.designation?.toLowerCase()=="manager"){
             extactMatchQuery.push({ type: { $regex: "sales", $options: "i" } })
             extactMatchQuery.push({ type: { $regex: "sathi team", $options: "i" } })
          }
+
+         // console.log("extactMatchQuery----",extactMatchQuery);
          const extractType = await Employee.aggregate([
             {
                $match: {
@@ -2667,77 +3894,6 @@ export const adminEmpSaleReportDownload = async (req, res) => {
                   ]
                }
             },
-            // {
-            //    $group: {
-            //       _id: null,
-            //       shareEmp: { $push: "$_id" },
-            //    }
-            // },
-            // {
-            //    $lookup: {
-            //       from: "partners",
-            //       let: { shareEmp: "$shareEmp" },
-            //       pipeline: [
-            //          {
-            //             $match: {
-            //                $expr: {
-            //                   $or: [
-            //                      { $in: ["$salesId", "$$shareEmp"] },
-            //                      { $in: ["$shareEmployee", "$$shareEmp"] }
-            //                   ]
-            //                }
-            //             }
-            //          }
-            //       ],
-            //       as: "partners"
-            //    }
-            // },
-            // {
-            //    $lookup: {
-            //       from: "clients",
-            //       let: { shareEmp: "$shareEmp" },
-            //       pipeline: [
-            //          {
-            //             $match: {
-            //                $expr: {
-            //                   $or: [
-            //                      { $in: ["$salesId", "$$shareEmp"] },
-
-            //                   ]
-            //                }
-            //             }
-            //          }
-            //       ],
-            //       as: "allClients"
-            //    }
-            // },
-            // {
-            //    $project: {
-            //       shareEmp: 1,
-            //       _id: 0,
-            //       allClients: {
-            //          $map: {
-            //             input: "$allClients",
-            //             as: "allClients",
-            //             in: "$$allClients._id"
-            //          }
-            //       },
-            //       allPartners: {
-            //          $map: {
-            //             input: "$partners",
-            //             as: "partner",
-            //             in: "$$partner._id"
-            //          }
-            //       }
-            //    }
-            // },
-            // {
-            //    $project: {
-            //       shareEmp: { $map: { input: "$shareEmp", as: "id", in: { $toString: "$$id" } } },
-            //       allPartners: { $map: { input: "$allPartners", as: "id", in: { $toString: "$$id" } } },
-            //       allClients: { $map: { input: "$allClients", as: "id", in: { $toString: "$$id" } } }
-            //    }
-            // }
             {
                "$group": {
                    "_id": null,
@@ -2823,57 +3979,158 @@ export const adminEmpSaleReportDownload = async (req, res) => {
                   allClients: { $map: { input: "$allClients", as: "id", in: { $toString: "$$id" } } }
                }
             }
+
          ])
 
-         if (startDate && endDate) {
-            const validStartDate = getValidateDate(startDate)
-            if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
-            const validEndDate = getValidateDate(endDate)
-            if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
-         }
-
-         let query = {
-            $and: [
-               { isPartnerReferenceCase: false },
-               { isEmpSaleReferenceCase: false },
-               { currentStatus: { $regex: statusType, $options: "i" } },
-               { isActive: true },
-               { branchId: { $regex: empSale?.branchId, $options: "i" } },
-               {
-                  $or: [
-                     { empSaleId: { $in: extractType?.[0]?.shareEmp } },
-                     { partnerId: { $in: extractType?.[0]?.allPartners } },
-                     { clientId: { $in: extractType?.[0]?.allClients } },
-                  ]
-               },
-               {
-                  $or: [
-                     { name: { $regex: searchQuery, $options: "i" } },
-                     { partnerName: { $regex: searchQuery, $options: "i" } },
-                     { consultantCode: { $regex: searchQuery, $options: "i" } },
-                     { fileNo: { $regex: searchQuery, $options: "i" } },
-                     { email: { $regex: searchQuery, $options: "i" } },
-                     { mobileNo: { $regex: searchQuery, $options: "i" } },
-                     { policyType: { $regex: searchQuery, $options: "i" } },
-                     { caseFrom: { $regex: searchQuery, $options: "i" } },
-                     { branchId: { $regex: searchQuery, $options: "i" } },
-                  ]
-               },
-               startDate && endDate ? {
-                  createdAt: {
-                     $gte: new Date(startDate).setHours(0, 0, 0, 0),
-                     $lte: new Date(endDate).setHours(23, 59, 59, 999)
-                  }
-               } : {}
+         matchQuery.push(                  {
+            $or: [
+              { empSaleId: { $in: extractType?.[0]?.shareEmp } },
+              { partnerId: { $in: extractType?.[0]?.allPartners } },
+              { clientId: { $in: extractType?.[0]?.allClients } },
             ]
-         };
-         const getAllCase = await Case.find(query).sort({ createdAt: -1 });
-         const excelBuffer = await getDownloadCaseExcel(getAllCase,empSale?._id?.toString())
-         res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
-         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-         res.status(200)
-         res.send(excelBuffer)
+          },)
       }
+
+         const pipeline = [
+            {
+              $match: {
+                $and: [
+                  { isPartnerReferenceCase: false },
+                  { isEmpSaleReferenceCase: false },
+                  { currentStatus: { $regex: statusType, $options: "i" } },
+                  { isActive: true },
+                  { branchId: { $regex: empSale?.branchId, $options: "i" } },
+                  ...matchQuery,
+                ]
+              }
+            },
+            {
+               $addFields: {
+                 validPartnerIdString: {
+                   $cond: {
+                     if: {
+                       $and: [
+                         { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
+                         { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
+                         { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
+                       ]
+                     },
+                     then: "$partnerId",
+                     else: null
+                   }
+                 }
+               }
+             },
+             {
+               $lookup: {
+                 from: 'partners',
+                 let: { partnerIdString: "$validPartnerIdString" },
+                 pipeline: [
+                   {
+                     $match: {
+                       $expr: {
+                         $and: [
+                           { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
+                           { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
+                           { 
+                             $eq: [
+                               "$_id",
+                               { $toObjectId: "$$partnerIdString" }
+                             ]
+                           }
+                         ]
+                       }
+                     }
+                   },
+                   {
+                     $project: {
+                       fullName: 1 // Include only the fullName field
+                     }}
+                 ],
+                 as: 'partnerDetails'
+               }
+             },
+             {'$unwind':{
+               'path':'$partnerDetails',
+               'preserveNullAndEmptyArrays':true
+             }},
+             {
+               $addFields: {
+                 validSaleEmpIdString: {
+                   $cond: {
+                     if: {
+                       $and: [
+                         { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
+                         { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
+                         { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
+                       ]
+                     },
+                     then: "$empSaleId",
+                     else: null
+                   }
+                 }
+               }
+             },
+             {
+               $lookup: {
+                 from: 'employees',
+                 let: { saleEmpIdString: "$validSaleEmpIdString" },
+                 pipeline: [
+                   {
+                     $match: {
+                       $expr: {
+                         $and: [
+                           { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
+                           { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
+                           { 
+                             $eq: [
+                               "$_id",
+                               { $toObjectId: "$$saleEmpIdString" }
+                             ]
+                           }
+                         ]
+                       }
+                     }
+                   },
+                   {
+                     $project: {
+                       fullName: 1, // Include only the fullName field
+                       designation:1,
+                       type:1
+                     }}
+                 ],
+                 as: 'employeeDetails'
+               }
+             },
+             {'$unwind':{
+               'path':'$employeeDetails',
+               'preserveNullAndEmptyArrays':true
+             }},
+             {'$match':{
+                  '$or': [
+                    { name: { $regex: searchQuery, $options: "i" } },
+                    { 'partnerDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                    { 'employeeDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                    { consultantCode: { $regex: searchQuery, $options: "i" } },
+                    { fileNo: { $regex: searchQuery, $options: "i" } },
+                    { email: { $regex: searchQuery, $options: "i" } },
+                    { mobileNo: { $regex: searchQuery, $options: "i" } },
+                    { policyType: { $regex: searchQuery, $options: "i" } },
+                    { caseFrom: { $regex: searchQuery, $options: "i" } },
+                    { branchId: { $regex: searchQuery, $options: "i" } },
+                  ]          
+             }},
+             {'$sort':{'createdAt':-1}},
+      
+          ];
+          
+          const result = await Case.aggregate(pipeline);
+          const excelBuffer = await getDownloadCaseExcel(result,empSale?._id?.toString())
+             res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
+             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+             res.status(200)
+             res.send(excelBuffer)
+          
    } catch (error) {
       console.log("adminEmpSaleReportDownload in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });

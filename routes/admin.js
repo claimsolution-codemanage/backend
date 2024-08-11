@@ -17,7 +17,7 @@ adminUploadImage,adminUploadAttachment,adminCreateInvoice,adminViewAllInvoice,ad
 adminUnActiveInvoice,adminEditInvoice,adminRemoveInvoice,
 adminAllUnactiveCaseDoc,adminUnactiveCaseDoc,adminChangeBranch,
 adminEmployeeProfile,adminDownloadEmpSathiEmployee,adminViewEmpSathiEmployee,
-adminDownloadAllEmployee,adminPaidInvoice
+adminDownloadAllEmployee,adminPaidInvoice,adminAddPartnerRefToEmp
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -56,6 +56,7 @@ router.put("/updateParnterProfile",adminUpdateParnterProfile)
 router.put("/setPartnerTag",adminSetPartnerTag)
 router.put("/updatePartnerBankingDetails",adminUpdatePartnerBankingDetails)
 router.put("/changePartnerStatus",adminSetIsActivePartner)
+router.put("/addPartnerRefToEmp",adminAddPartnerRefToEmp)
 router.delete("/deletePartnerById",adminDeletePartnerById)
 
 // for client

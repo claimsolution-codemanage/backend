@@ -11,7 +11,7 @@ employeeRemoveInvoice,salesDownloadCaseReport,saleEmpViewPartnerReport,empDownlo
 employeeDownloadAllPartner,empViewAllEmployee,empAddReferenceCaseAndMarge,empRemoveReferenceCase,
 empChangeBranch,createSathiTeamAcc,empViewSathiEmployee,empDownloadSathiEmployee,empOptGetNormalEmployee,
 empOptShareCaseToEmployee,empDownloadAllEmployee,empClientDownload,empOpPaidInvoice,empOpGetSaleEmployee,
-empOpSharePartnerToSaleEmp
+empOpSharePartnerToSaleEmp,empAddPartnerRefToEmp
 } from '../controller/employee.js';
 
 
@@ -51,6 +51,7 @@ router.get("/viewAllPartner",employeeViewAllPartner)
 router.get("/viewPartnerById",employeeViewPartnerById)
 router.put("/updatePartnerProfile",employeeupdateParnterProfile)
 router.put("/updatePartnerBankingDetails",employeeUpdatePartnerBankingDetails)
+router.put("/operation/addPartnerRefToEmp",empAddPartnerRefToEmp)
 
 
 
