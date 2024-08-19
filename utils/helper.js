@@ -193,7 +193,7 @@ export const getAllClientSearchQuery = (searchQuery, type, startDate = "", endDa
   return { success: true, query: query }
 }
 
-export const getAllEmployeeSearchQuery = (searchQuery,type=true,department,exclude,branchId) => {
+export const getAllEmployeeSearchQuery = (searchQuery,type=true,department=false,exclude=false,branchId=false) => {
   let query = {
     $and:[
       {isActive:type},
@@ -308,7 +308,7 @@ export const getAllInvoiceQuery = (searchQuery,startDate,endDate,clientId=false,
     ]
   };
 
-  console.log("my-query", query);
+  // console.log("my-query", query);
   return { success: true, query: query }
 }
 

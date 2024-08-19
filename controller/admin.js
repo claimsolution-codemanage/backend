@@ -566,10 +566,10 @@ export const adminViewAllEmployee = async (req, res) => {
       if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       // query = ?statusType=&search=&limit=&pageNo
-      const pageItemLimit = req.query.limit ? req.query.limit : 10;
-      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
-      const searchQuery = req.query.search ? req.query.search : "";
-      const type = req.query.type ? req.query.type : true;
+      const pageItemLimit = req.query?.limit ? req.query?.limit : 10;
+      const pageNo = req.query?.pageNo ? (req.query?.pageNo - 1) * pageItemLimit : 0;
+      const searchQuery = req.query?.search ? req.query?.search : "";
+      const type = req.query?.type ? req.query?.type : true;
       const empType = req.query?.empType ? req.query?.empType :false
 
       const query = getAllEmployeeSearchQuery(searchQuery,type,empType)
@@ -1480,7 +1480,7 @@ export const adminViewEmpSaleReport = async (req, res) => {
             // return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase });
    
             if(isNormalEmp && empSale?._id){
-               matchQuery.push({ addEmployee: { $in: empSale?._id?.toString() } })
+               matchQuery.push({ addEmployee: { $in: [empSale?._id?.toString()] } })
             }
    
          } else {
@@ -1600,6 +1600,9 @@ export const adminViewEmpSaleReport = async (req, res) => {
                ]
              },)
          }
+
+         // console.log("matchQuery",matchQuery);
+         
    
             const pipeline = [
                {
@@ -2985,7 +2988,7 @@ export const adminAddPartnerRefToEmp = async (req, res) => {
 
       const findPartner = await Partner.findById(partnerId)   
       if (!findPartner) return res.status(404).json({ success: false, message: "Parnter not found" })
-      if(findPartner.salesId) return res.status(404).json({ success: false, message: "Reference already added" })
+     
 
       const findEmp = await Employee.findOne({email:{ $regex: empEmail, $options: "i" }})
       if(!findEmp) return res.status(404).json({ success: false, message: "Employee not found" })
@@ -4470,7 +4473,7 @@ export const adminUnActiveInvoice = async (req,res)=>{
 
       const invoice = await Bill.findByIdAndUpdate(_id,{$set:{isActive: type}}) 
 
-      return  res.status(200).json({success: true, message: `Successfully ${type?  "restore" : "remove"} invoice`});
+      return  res.status(200).json({success: true, message: `Successfully ${type=="true" ? "restore" : "remove"} invoice`});
    } catch (error) {
       console.log("admin-remove invoice in error:",error);
       return res.status(500).json({success:false,message:"Internal server error",error:error});
