@@ -12,6 +12,11 @@ const employeeSchema = new mongoose.Schema({
    type:{type:String,default:"Operation",required:true},
    referEmpId:{type:mongoose.Schema.ObjectId,ref:"Employee"},
    designation:{type:String,default:"Executive",required:true},
+   bankName:{type:String,default:""},
+   bankBranchName:{type:String,default:""},
+   bankAccountNo:{type:String,default:""},
+   panNo:{type:String,default:""},
+   address:{type:String,default:""},
    isActive:{type:"boolean",default:true,required:"true"}
 },{timestamps:true});
 

@@ -100,6 +100,7 @@ export const validateProfileBody =(body)=>{
       state:Joi.string().allow('').optional(),
       district: Joi.string().allow('').optional(),
       city: Joi.string().allow('').optional(),
+      address: Joi.string().allow('').optional(),
       pinCode: Joi.string().allow('').optional(),
       about: Joi.string().allow('').max(200).optional(),
       kycPhoto:Joi.string().allow('').optional(),

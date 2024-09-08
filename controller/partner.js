@@ -18,6 +18,7 @@ import { editServiceAgreement } from "../utils/helper.js";
 import { firebaseUpload } from "../utils/helper.js";
 import CaseDoc from "../models/caseDoc.js";
 import CaseStatus from "../models/caseStatus.js";
+import Statement from "../models/statement.js";
 
 
 
@@ -697,6 +698,7 @@ export const updateProfileDetails = async (req, res) => {
         "profile.gender": req.body.gender,
         "profile.district": req.body.district,
         "profile.city": req.body.city,
+        "profile.address": req.body.address,
         "profile.pinCode": req.body.pinCode,
         "profile.about": req.body.about,
         "profile.kycPhoto":req.body.kycPhoto,
@@ -1124,6 +1126,141 @@ export const partnerDownloadReport = async (req, res) => {
   } catch (error) {
      console.log("updateAdminCase in error:", error);
      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+  }
+}
+
+export const getStatement = async (req, res) => {
+  try {
+     const verify = await authPartner(req, res)
+     if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+     const partner = await Partner.findById(req?.user?._id).select({
+      'bankingDetails.bankName':1,
+      'bankingDetails.bankAccountNo':1,
+      'bankingDetails.bankBranchName':1,
+      'bankingDetails.panNo':1,
+      'bankingDetails.branchId':1,
+      'profile.consultantName':1,
+      'profile.consultantCode':1,
+      'profile.address':1,
+      'branchId':1,
+      'isActive':1,
+   }).populate("salesId","fullName")
+     if (!partner) return res.status(401).json({ success: false, message: "Partner account not found" })
+     
+     if (!partner?.isActive) return res.status(401).json({ success: false, message: "Partner account not active" })
+
+
+
+     const {startDate, endDate, limit, pageNo } = req.query
+     const pageItemLimit = limit ? limit : 10;
+     const page = pageNo ? (pageNo - 1) * pageItemLimit : 0;
+
+
+     if (startDate && endDate) {
+        const validStartDate = getValidateDate(startDate)
+        if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+        const validEndDate = getValidateDate(endDate)
+        if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+     }
+
+     let matchQuery = []
+
+     if (startDate && endDate) {
+        const start = new Date(startDate).setHours(0, 0, 0, 0);
+        const end = new Date(endDate).setHours(23, 59, 59, 999);
+
+        matchQuery.push({
+           createdAt: {
+              $gte: new Date(start),
+              $lte: new Date(end)
+           }
+        });
+     }
+
+     let statementOf = {}
+     statementOf.partner = partner
+     matchQuery.push({
+        partnerId: partner?._id
+     })
+     const allStatement = await Statement.aggregate([
+        {
+           $match: {
+              $and:[
+                 ...matchQuery,
+                 {isActive:true}
+
+              ]
+           }
+        },
+        {
+           $lookup: {
+              from: 'partners',
+              localField: 'partnerId',
+              foreignField: '_id',
+              as: 'partnerDetails',
+              pipeline: [
+                 {
+                    $project: {
+                       'profile.consultantName': 1,
+                       'profile.consultantCode': 1,
+
+                    }
+                 }
+              ]
+           }
+        },
+        {
+           $unwind:{
+              path:'$partnerDetails',
+              preserveNullAndEmptyArrays:true
+           }
+        },
+        {
+           $lookup: {
+              from: 'employees',
+              localField: 'empId',
+              foreignField: '_id',
+              as: 'empDetails',
+              pipeline: [
+                 {
+                    $project: {
+                       'fullName': 1,
+                       'type': 1,
+                    }
+                 }
+              ]
+           }
+        },
+        {
+           $unwind:{
+              path:'$empDetails',
+              preserveNullAndEmptyArrays:true
+           }
+        },
+        { '$sort': { 'createdAt': -1 } },
+        {
+           $facet: {
+              statement: [
+                 { $skip: Number(page) },
+                 { $limit: Number(pageItemLimit) },
+              ],
+              total: [
+                 { $count: "count" }
+              ]
+           }
+        }
+     ])
+
+     const data = allStatement?.[0]?.statement
+     const totalData = allStatement?.[0]?.total?.[0]?.count || 0
+
+     return res.status(200).json({ success: true, message: `Successfully fetch all statement`, data: { data: data,totalData, statementOf } });
+
+  } catch (error) {
+     console.log("createOrUpdateStatement in error:", error);
+     res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
 
   }
 }

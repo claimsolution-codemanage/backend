@@ -34,6 +34,10 @@ import { bucket } from "../index.js";
 import CaseDoc from "../models/caseDoc.js";
 import CaseStatus from "../models/caseStatus.js";
 import CaseComment from "../models/caseComment.js";
+import { validateStatement } from "../utils/helperFunction.js";
+import Statement from "../models/statement.js";
+import {Types} from "mongoose";
+
 
 export const adminAuthenticate = async (req, res) => {
    try {
@@ -514,10 +518,15 @@ export const adminUpdateEmployeeAccount = async (req, res) => {
 
       const updateEmployee = await Employee.findByIdAndUpdate(_id, {
          $set: {
-            fullName: req?.body?.fullName,
+            fullName: req?.body?.fullName?.trim(),
             type: req?.body?.type,
             branchId:req.body?.branchId?.trim(),
             designation: req?.body?.designation?.trim(),
+            bankName:req?.body?.bankName?.trim(),
+            bankBranchName:req?.body?.bankBranchName?.trim(),
+            bankAccountNo:req?.body?.bankAccountNo?.trim(),
+            panNo:req?.body?.panNo?.trim(),
+            address:req?.body?.address?.trim(),
          }
       })
       if (!updateEmployee) return res.status(401).json({ success: false, message: "Employee not found" })
@@ -630,6 +639,7 @@ export const adminGetSaleEmployee = async (req, res) => {
 
       let query = {
          $and:[
+            {isActive:true},
             { type: { $regex: "sales", $options: "i" }},
             {
              $or: [
@@ -671,6 +681,7 @@ export const adminGetNormalEmployee = async (req, res) => {
       const excludedTypes = ["Sales", "Operation", "Finance","Sathi Team","Branch"];
       let query = {
          $and:[
+            {isActive:true},
             { type: { $nin: excludedTypes }},
             {
              $or: [
@@ -2076,6 +2087,7 @@ export const adminUpdateParnterProfile = async (req, res) => {
             "profile.gender": req.body.gender,
             "profile.district": req.body.district,
             "profile.city": req.body.city,
+            "profile.address": req.body.address,
             "profile.pinCode": req.body.pinCode,
             "profile.about": req.body.about,
             "profile.kycPhoto":req?.body?.kycPhoto,
@@ -2993,7 +3005,7 @@ export const adminAddPartnerRefToEmp = async (req, res) => {
       const findEmp = await Employee.findOne({email:{ $regex: empEmail, $options: "i" }})
       if(!findEmp) return res.status(404).json({ success: false, message: "Employee not found" })
 
-      const updatePartner = await Partner.findByIdAndUpdate(partnerId,{salesId:findEmp._id})
+      const updatePartner = await Partner.findByIdAndUpdate(partnerId,{salesId:findEmp?._id})
       return res.status(200).json({ success: true, message: "Successfully add employee reference" });
 
    } catch (error) {
@@ -4698,10 +4710,210 @@ export const adminSyncModal = async(req,res)=>{
         }))
       }))
       
-      return res.status(200).json({success:true,message:"Modal created successfully"});
+      return res.status(200).json({success:true,message:"Modal created successfully",data:{_id:isExistStatement?._id}});
    } catch (error) {
       console.log("adminSyncModal in error:",error);
       return res.status(500).json({success:false,message:"Internal server error",error:error});
    }
 }
 
+export const createOrUpdateStatement = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const { _id } = req.body
+
+      let isExistStatement = {}
+      if (_id) {
+         isExistStatement = await Statement.findById(_id)
+         if (!isExistStatement) {
+            return res.status(400).json({ success: false, message: "Statment is not found" })
+         }
+      } else {
+         isExistStatement = new Statement({ isActive: true })
+      }
+
+      const updateKeys = ["empId", "partnerId", "caseLogin", "policyHolder", "fileNo", "policyNo", "insuranceCompanyName"
+         , "claimAmount", "approvedAmt", "constultancyFee", "TDS", "modeOfLogin", "payableAmt", "utrDetails", "fileUrl", "branchId"]
+
+      updateKeys.forEach(key => {
+         if (req.body[key]) {
+            isExistStatement[key] = req.body[key]
+         }
+      })
+
+      await isExistStatement.save()
+      return res.status(200).json({ success: true, message: `Successfully ${_id ? "update" : "create"} statement` });
+
+   } catch (error) {
+      console.log("createOrUpdateStatement in error:", error);
+      res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
+
+   }
+}
+
+export const getStatement = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const { empId, partnerId, startDate, endDate, limit, pageNo } = req.query
+      const pageItemLimit = limit ? limit : 10;
+      const page = pageNo ? (pageNo - 1) * pageItemLimit : 0;
+
+
+      if (startDate && endDate) {
+         const validStartDate = getValidateDate(startDate)
+         if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+         const validEndDate = getValidateDate(endDate)
+         if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+      }
+
+      let matchQuery = []
+
+      if (startDate && endDate) {
+         const start = new Date(startDate).setHours(0, 0, 0, 0);
+         const end = new Date(endDate).setHours(23, 59, 59, 999);
+
+         matchQuery.push({
+            createdAt: {
+               $gte: new Date(start),
+               $lte: new Date(end)
+            }
+         });
+      }
+
+      let statementOf = {}
+
+      if (empId) {
+         const emp = await Employee.findById(empId).select({
+            'fullName':1,
+            'bankName':1,
+            'bankBranchName':1,
+            'bankAccountNo':1,
+            'panNo':1,
+            'address':1,
+           'branchId':1,
+           'empId':1,
+         })
+         .populate("referEmpId","fullName")
+         if (!emp) {
+            return res.status(400).json({ status: false, message: 'Employee not found' })
+         }
+         statementOf.employee = emp
+         matchQuery.push({
+            empId: new Types.ObjectId(empId)
+         })
+      }
+
+      if (partnerId) {
+         const partner = await Partner.findById(partnerId,).select({
+            'bankingDetails.bankName':1,
+            'bankingDetails.bankAccountNo':1,
+            'bankingDetails.bankBranchName':1,
+            'bankingDetails.panNo':1,
+            'bankingDetails.branchId':1,
+            'profile.consultantName':1,
+            'profile.consultantCode':1,
+            'profile.address':1,
+            'branchId':1,
+         }).populate("salesId","fullName")
+         if (!partner) {
+            return res.status(400).json({ status: false, message: 'Partner not found' })
+         }
+         statementOf.partner = partner
+         matchQuery.push({
+            partnerId: new Types.ObjectId(partnerId)
+         })
+      }
+
+
+      const allStatement = await Statement.aggregate([
+         {
+            $match: {
+               $and:[
+                  ...matchQuery,
+                  {isActive:true}
+
+               ]
+            }
+         },
+         {
+            $lookup: {
+               from: 'partners',
+               localField: 'partnerId',
+               foreignField: '_id',
+               as: 'partnerDetails',
+               pipeline: [
+                  {
+                     $project: {
+                        'profile.consultantName': 1,
+                        'profile.consultantCode': 1,
+
+                     }
+                  }
+               ]
+            }
+         },
+         {
+            $unwind:{
+               path:'$partnerDetails',
+               preserveNullAndEmptyArrays:true
+            }
+         },
+         {
+            $lookup: {
+               from: 'employees',
+               localField: 'empId',
+               foreignField: '_id',
+               as: 'empDetails',
+               pipeline: [
+                  {
+                     $project: {
+                        'fullName': 1,
+                        'type': 1,
+                     }
+                  }
+               ]
+            }
+         },
+         {
+            $unwind:{
+               path:'$empDetails',
+               preserveNullAndEmptyArrays:true
+            }
+         },
+         { '$sort': { 'createdAt': -1 } },
+         {
+            $facet: {
+               statement: [
+                  { $skip: Number(page) },
+                  { $limit: Number(pageItemLimit) },
+               ],
+               total: [
+                  { $count: "count" }
+               ]
+            }
+         }
+      ])
+
+      const data = allStatement?.[0]?.statement
+      const totalData = allStatement?.[0]?.total?.[0]?.count || 0
+
+      return res.status(200).json({ success: true, message: `Successfully fetch all statement`, data: { data: data,totalData, statementOf } });
+
+   } catch (error) {
+      console.log("createOrUpdateStatement in error:", error);
+      res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
+
+   }
+}

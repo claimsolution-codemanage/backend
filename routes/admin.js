@@ -17,7 +17,8 @@ adminUploadImage,adminUploadAttachment,adminCreateInvoice,adminViewAllInvoice,ad
 adminUnActiveInvoice,adminEditInvoice,adminRemoveInvoice,
 adminAllUnactiveCaseDoc,adminUnactiveCaseDoc,adminChangeBranch,
 adminEmployeeProfile,adminDownloadEmpSathiEmployee,adminViewEmpSathiEmployee,
-adminDownloadAllEmployee,adminPaidInvoice,adminAddPartnerRefToEmp
+adminDownloadAllEmployee,adminPaidInvoice,adminAddPartnerRefToEmp,
+createOrUpdateStatement,getStatement
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -146,6 +147,10 @@ router.put("/change-branch",adminChangeBranch)
 router.get("/viewEmpSathi",adminViewEmpSathiEmployee)
 router.get("/download/empSathi",adminDownloadEmpSathiEmployee)
 
+
+// for statement
+router.post("/createOrUpdateStatement",createOrUpdateStatement)
+router.get("/getAllStatement",getStatement)
 
 
 // router.put("/updateModalSchema",adminUpdateModalSchema)

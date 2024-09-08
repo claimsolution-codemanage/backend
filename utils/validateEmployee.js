@@ -31,6 +31,11 @@ export const validateEmployeeUpdate=(body)=>{
    branchId:Joi.string().required("Employee branch is required"),
    type:Joi.string().required("Employee department is required"),
    designation:Joi.string().required("Employee designation is required"),
+   bankName:Joi.string().allow('').optional(),
+   bankBranchName:Joi.string().allow('').optional(),
+   bankAccountNo:Joi.string().allow('').optional(),
+   panNo:Joi.string().allow('').optional(),
+   address:Joi.string().allow('').optional(),
   })
 
   return bodySchema.validate(body)
@@ -118,3 +123,5 @@ export const validateAddEmpCase =(body)=>{
   })
   return caseSchema.validate(body)
 }
+
+

@@ -129,6 +129,9 @@ const partnerSchema = new mongoose.Schema({
       areaOfOperation: {
          type: String,
       },
+      address:{
+         type: String,
+      },
       state: {
          type: String,
       },
