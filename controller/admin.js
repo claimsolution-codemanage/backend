@@ -4323,20 +4323,49 @@ export const adminCreateInvoice = async (req,res)=>{
       if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
    
       const {clientId,caseId} = req.query
-      console.log(clientId,caseId);
-      if(!validMongooseId(clientId) || !validMongooseId(caseId)) return res.status(400).json({ success: false, message: "caseId and clientId must be valid" })
+      // console.log(clientId,caseId);
+      // if(!validMongooseId(clientId) || !validMongooseId(caseId)) return res.status(400).json({ success: false, message: "caseId and clientId must be valid" })
 
-      const getClient = await Client.findById(clientId)
-      if(!getClient) return res.status(400).json({ success: false, message: "Client not found" })
-      const getCase = await Case.findById(caseId)
-      if(!getCase) return res.status(400).json({ success: false, message: "Case not found" })
+      // const getClient = await Client.findById(clientId)
+      // if(!getClient) return res.status(400).json({ success: false, message: "Client not found" })
+      // const getCase = await Case.findById(caseId)
+      // if(!getCase) return res.status(400).json({ success: false, message: "Case not found" })
 
+      // const { error } = validateInvoice(req.body)
+      // if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+      // const billCount = await Bill.find({}).count()
+
+      let getClient = false
+      let getCase = false
+      let billRef = {}
+      
       const { error } = validateInvoice(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
+      if(caseId && clientId){
+         if (!validMongooseId(clientId) || !validMongooseId(caseId)) return res.status(400).json({ success: false, message: "caseId and clientId must be valid" })
+            getClient = await Client.findById(clientId)
+            if (!getClient) return res.status(400).json({ success: false, message: "Client not found" })
+            getCase = await Case.findById(caseId)
+            if (!getCase) return res.status(400).json({ success: false, message: "Case not found" })
+
+         billRef = { caseId, clientId,branchId:getCase?.branchId }
+      }else{
+         billRef = { isOffice:true,paidBy:'Office'}
+      }
+
+
       const billCount = await Bill.find({}).count()
-      const newInvoice = new Bill({...req.body,branchId:getCase?.branchId,caseId,clientId,invoiceNo:`ACS-${billCount+1}`})
-      newInvoice.save()
+      let payload ={
+         ...req.body, 
+         ...billRef,
+         invoiceNo: `ACS-${billCount + 1}` 
+      }
+
+
+      const newInvoice = new Bill({...payload})
+      await newInvoice.save()
       return  res.status(200).json({success: true, message: "Successfully create invoice",_id:newInvoice?._id});
    } catch (error) {
       console.log("admin-create invoice in error:",error);
@@ -4726,7 +4755,7 @@ export const createOrUpdateStatement = async (req, res) => {
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
       if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
-      const { _id } = req.body
+      const { _id,partnerEmail,empEmail,partnerId,empId } = req.body
 
       let isExistStatement = {}
       if (_id) {
@@ -4735,6 +4764,23 @@ export const createOrUpdateStatement = async (req, res) => {
             return res.status(400).json({ success: false, message: "Statment is not found" })
          }
       } else {
+         if(partnerEmail || partnerId){
+            let filter ={}
+            if(partnerEmail){ filter.email={ $regex:partnerEmail, $options: "i" }} 
+            if(partnerId){ filter._id=partnerId} 
+            const findPartner = await Partner.findOne({$or:[filter] })
+            if(!findPartner) return res.status(400).json({ success: false, message: "Partner is not found" })
+            req.body.partnerId = findPartner._id?.toString()
+            req.body.branchId = findPartner?.branchId
+         }else  if(empEmail || empId){
+            let filter ={}
+            if(empEmail){ filter.email={ $regex:empEmail, $options: "i" }} 
+            if(empId){ filter._id=empId} 
+            const findEmp = await Employee.findOne({$or:[filter] })
+            if(!findEmp) return res.status(400).json({ success: false, message: "Employee is not found" })
+            req.body.empId = findEmp._id?.toString()
+            req.body.branchId = findEmp?.branchId
+         }
          isExistStatement = new Statement({ isActive: true })
       }
 
@@ -4910,6 +4956,135 @@ export const getStatement = async (req, res) => {
       const totalData = allStatement?.[0]?.total?.[0]?.count || 0
 
       return res.status(200).json({ success: true, message: `Successfully fetch all statement`, data: { data: data,totalData, statementOf } });
+
+   } catch (error) {
+      console.log("createOrUpdateStatement in error:", error);
+      res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
+
+   }
+}
+
+export const getAllStatement = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const { search, startDate, endDate, limit, pageNo } = req.query
+      const pageItemLimit = limit ? limit : 10;
+      const page = pageNo ? (pageNo - 1) * pageItemLimit : 0;
+
+
+      if (startDate && endDate) {
+         const validStartDate = getValidateDate(startDate)
+         if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+         const validEndDate = getValidateDate(endDate)
+         if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+      }
+
+      let matchQuery = []
+
+      if (startDate && endDate) {
+         const start = new Date(startDate).setHours(0, 0, 0, 0);
+         const end = new Date(endDate).setHours(23, 59, 59, 999);
+
+         matchQuery.push({
+            createdAt: {
+               $gte: new Date(start),
+               $lte: new Date(end)
+            }
+         });
+      }
+
+      const allStatement = await Statement.aggregate([
+         {
+            $match: {
+               $and:[
+                  ...matchQuery,
+                  {isActive:true}
+
+               ]
+            }
+         },
+         {
+            $lookup: {
+               from: 'partners',
+               localField: 'partnerId',
+               foreignField: '_id',
+               as: 'partnerDetails',
+               pipeline: [
+                  {
+                     $project: {
+                        'profile.consultantName': 1,
+                        'profile.consultantCode': 1,
+                     }
+                  }
+               ]
+            }
+         },
+         {
+            $unwind:{
+               path:'$partnerDetails',
+               preserveNullAndEmptyArrays:true
+            }
+         },
+         {
+            $lookup: {
+               from: 'employees',
+               localField: 'empId',
+               foreignField: '_id',
+               as: 'empDetails',
+               pipeline: [
+                  {
+                     $project: {
+                        'fullName': 1,
+                        'type': 1,
+                     }
+                  }
+               ]
+            }
+         },
+         {
+            $unwind:{
+               path:'$empDetails',
+               preserveNullAndEmptyArrays:true
+            }
+         },
+         {
+            $match: {
+               $and: [
+                  // Regex-based search after lookup
+                  search ? {
+                     $or: [
+                        { 'partnerDetails.profile.consultantName': { $regex: search, $options: 'i' } },
+                        { 'partnerDetails.profile.consultantCode': { $regex: search, $options: 'i' } },
+                        { 'empDetails.fullName': { $regex: search, $options: 'i' } },
+                     ]
+                  } :  { isActive: true }
+               ]
+            }
+         },
+         { '$sort': { 'createdAt': -1 } },
+         {
+            $facet: {
+               statement: [
+                  { $skip: Number(page) },
+                  { $limit: Number(pageItemLimit) },
+               ],
+               total: [
+                  { $count: "count" }
+               ]
+            }
+         }
+      ])
+
+      const data = allStatement?.[0]?.statement
+      const totalData = allStatement?.[0]?.total?.[0]?.count || 0
+
+      return res.status(200).json({ success: true, message: `Successfully fetch all statement`, data: { data: data,totalData} });
 
    } catch (error) {
       console.log("createOrUpdateStatement in error:", error);

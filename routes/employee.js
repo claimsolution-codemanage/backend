@@ -11,7 +11,7 @@ employeeRemoveInvoice,salesDownloadCaseReport,saleEmpViewPartnerReport,empDownlo
 employeeDownloadAllPartner,empViewAllEmployee,empAddReferenceCaseAndMarge,empRemoveReferenceCase,
 empChangeBranch,createSathiTeamAcc,empViewSathiEmployee,empDownloadSathiEmployee,empOptGetNormalEmployee,
 empOptShareCaseToEmployee,empDownloadAllEmployee,empClientDownload,empOpPaidInvoice,empOpGetSaleEmployee,
-empOpSharePartnerToSaleEmp,empAddPartnerRefToEmp,createOrUpdateStatement,getStatement,updateEmployeeAccount
+empOpSharePartnerToSaleEmp,empAddPartnerRefToEmp,createOrUpdateStatement,getStatement,updateEmployeeAccount,getAllStatement
 } from '../controller/employee.js';
 
 
@@ -97,8 +97,10 @@ router.get("/download/allEmployee",empDownloadAllEmployee)
 router.put("/operation/change-branch",empChangeBranch)
 
 // for statement
-router.post("/operation/createOrUpdateStatement",createOrUpdateStatement)
-router.get("/operation/getAllStatement",getStatement)
+router.post("/emp/createOrUpdateStatement",createOrUpdateStatement)
+router.get("/emp/getAllStatement",getStatement)
+router.get("/emp/getStatements",getAllStatement)
+
 
 
 

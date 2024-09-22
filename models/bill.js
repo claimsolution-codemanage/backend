@@ -44,6 +44,7 @@ const billSchema = new mongoose.Schema({
         require:true
     },
     isActive:{type:Boolean,default:true},
+    isOffice:{type:Boolean,default:false},
     subAmt: {type:Number,require:true},
     gstAmt:{type:Number,require:true},
     totalAmt:{type:Number,require:true},
