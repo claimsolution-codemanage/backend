@@ -37,6 +37,7 @@ import CaseComment from "../models/caseComment.js";
 import { validateStatement } from "../utils/helperFunction.js";
 import Statement from "../models/statement.js";
 import {Types} from "mongoose";
+import Notification from "../models/notification.js";
 
 
 export const adminAuthenticate = async (req, res) => {
@@ -732,6 +733,14 @@ export const changeStatusAdminCase = async (req, res) => {
          caseId:req.body._id
       })
       await addNewStatus.save()
+
+      const addNotification = new Notification({
+         caseId: updateCase?._id?.toString(),
+         message:`Case file No. ${updateCase?.fileNo} status mark as ${req.body.status}`,
+         branchId:updateCase?.branchId || "",
+         adminIds:[req?.user?._id]
+      })
+      await addNotification.save()
       return res.status(200).json({ success: true, message: `Case status change to ${req.body.status}` });
    } catch (error) {
       console.log("updateAdminCase in error:", error);
@@ -771,6 +780,14 @@ export const adminEditCaseStatus = async (req, res) => {
             adminId:req?.user?._id
          }
       } )
+
+      const addNotification = new Notification({
+         caseId: updateCase?._id?.toString(),
+         message:`Case file No. ${updateCase?.fileNo} status update`,
+         branchId:updateCase?.branchId || "",
+         adminIds:[req?.user?._id]
+      })
+      await addNotification.save()
       return res.status(200).json({ success: true, message: "Successfully update case process" });
    } catch (error) {
       console.log("updateAdminCaseProcess in error:", error);
@@ -2327,6 +2344,14 @@ export const adminUpdateCaseById = async (req, res) => {
          })
          return newDoc.save()
        }))
+
+       const addNotification = new Notification({
+         caseId: updateCase?._id?.toString(),
+         message:`Update on Case file No. ${updateCase?.fileNo}`,
+         branchId:updateCase?.branchId || "",
+         adminIds:[req?.user?._id]
+      })
+      await addNotification.save()
       return res.status(200).json({ success: true, message: "Successfully update case", data: updateCase });
 
    } catch (error) {
@@ -2564,6 +2589,14 @@ export const adminAddCaseComment = async (req, res) => {
          adminId:req?.user?._id,
       })
       await newComment.save()
+
+      const addNotification = new Notification({
+         caseId: getCase?._id?.toString(),
+         message:`New comment added on Case file No. ${getCase?.fileNo}`,
+         branchId:getCase?.branchId || "",
+         adminIds:[req?.user?._id]
+      })
+      await addNotification.save()
 
       return res.status(200).json({ success: true, message: "Successfully add case commit" });
    } catch (error) {
@@ -4812,7 +4845,7 @@ export const getStatement = async (req, res) => {
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
       if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
-      const { empId, partnerId, startDate, endDate, limit, pageNo } = req.query
+      const { empId, partnerId, startDate, endDate, limit, pageNo,isPdf } = req.query
       const pageItemLimit = limit ? limit : 10;
       const page = pageNo ? (pageNo - 1) * pageItemLimit : 0;
 
@@ -4942,8 +4975,10 @@ export const getStatement = async (req, res) => {
          {
             $facet: {
                statement: [
-                  { $skip: Number(page) },
-                  { $limit: Number(pageItemLimit) },
+                  ...(isPdf ? [] : [
+                     { $skip: Number(page) },
+                     { $limit: Number(pageItemLimit) }
+                  ])
                ],
                total: [
                   { $count: "count" }
@@ -5088,6 +5123,52 @@ export const getAllStatement = async (req, res) => {
 
    } catch (error) {
       console.log("createOrUpdateStatement in error:", error);
+      res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
+
+   }
+}
+
+export const getAllNotification = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const allNotification = await Notification.find({adminIds:{$nin:[req?.user?._id]}}).populate({
+         path:"caseId",
+         select:{
+            fileNo:1
+         }
+      }).sort({createdAt:-1})
+      return res.status(200).json({ success: true, message: `Successfully fetch all notification`, data: allNotification });
+
+   } catch (error) {
+      console.log("getAllNotification in error:", error);
+      res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
+
+   }
+}
+
+export const updateNotification = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      
+     const markNotification =req.body?.markNotification || []
+
+ 
+      await Notification.updateMany({_id:{$in:markNotification}},{$push:{adminIds:req?.user?._id}})
+      return res.status(200).json({ success: true, message: `Successfully mark as read notification`});
+
+   } catch (error) {
+      console.log("updateNotification in error:", error);
       res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
 
    }

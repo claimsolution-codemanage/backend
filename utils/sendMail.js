@@ -384,7 +384,7 @@ const OTPMail_HTML_TEMPLATE = (email, otp,type) => {
 				 <p>Forget password email ${email}</p>
 				 <p>To reset password of your account <a href=${process.env.FRONTEND_URL+link}>Click here.</a></p>
 				 <p> Don't share this mail with anyone. It content sensitive information of your account</p>
-				 <p>For more information  <a href="${process.env.FRONTEND_URL}">${process.env.FRONTEND_URL_Base}</a></p>
+				 <p>For more information  <a href="www.claimsolution.in">${process.env.FRONTEND_URL_Base}</a></p>
 				 </div>
 				 <div class="email-footer">
 					<a href="www.claimsolution.in">www.claimsolution.in</a>
@@ -520,7 +520,7 @@ const OTPMail_HTML_TEMPLATE = (email, otp,type) => {
 				 <div class="email-body">
 				 <p>Hi, You getting this mail to join claim solution as partner.</p>
 				 <p>To accept partner request <a href=${process.env.FRONTEND_URL+link}>Click here.</a></p>
-				 <p>For more information  <a href="${process.env.FRONTEND_URL}">${process.env.FRONTEND_URL_Base}</a></p>
+				 <p>For more information  <a href="www.claimsolution.in">${process.env.FRONTEND_URL_Base}</a></p>
 				 </div>
 				 <div class="email-footer">
 					<a href="www.claimsolution.in">www.claimsolution.in</a>
@@ -578,7 +578,7 @@ const OTPMail_HTML_TEMPLATE = (email, otp,type) => {
 				 <div class="email-body">
 				 <p>Hi, You getting this mail to join claim solution as client.</p>
 				 <p>To accept client request <a href=${process.env.FRONTEND_URL+link}>Click here.</a></p>
-				 <p>For more information  <a href="${process.env.FRONTEND_URL}">${process.env.FRONTEND_URL_Base}</a></p>
+				 <p>For more information  <a href="www.claimsolution.in">${process.env.FRONTEND_URL_Base}</a></p>
 				 </div>
 				 <div class="email-footer">
 					<a href="www.claimsolution.in">www.claimsolution.in</a>

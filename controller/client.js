@@ -18,6 +18,7 @@ import { encrypt } from "./payment.js";
 import { firebaseUpload } from "../utils/helper.js";
 import CaseDoc from "../models/caseDoc.js";
 import CaseStatus from "../models/caseStatus.js";
+import Notification from "../models/notification.js";
 
 export const clientUploadImage = async (req, res) => {
   try {
@@ -560,6 +561,13 @@ export const addNewClientCase = async (req, res) => {
       })
       return newDoc.save()
     }))
+
+    const addNotification = new Notification({
+      caseId: newAddCase?._id?.toString(),
+      message:`Client added new Case file No. ${newAddCase?.fileNo}`,
+      branchId:newAddCase?.branchId || "",
+   })
+   await addNotification.save()
 
     return res.status(201).json({ success: true, message: "Successfully add new case", data: newAddCase })
   } catch (error) {

@@ -26,6 +26,7 @@ import { validateAdminAddEmployeeToCase, validateAdminSharePartner } from "../ut
 import { addNewCase } from "./partner.js";
 import {Types} from "mongoose";
 import Statement from "../models/statement.js";
+import Notification from "../models/notification.js";
 
 export const employeeAuthenticate = async (req, res) => {
    try {
@@ -375,6 +376,14 @@ export const changeStatusEmployeeCase = async (req, res) => {
          caseId: req.body._id
       })
       await addNewStatus.save()
+
+      const addNotification = new Notification({
+         caseId:req.body._id,
+         message:`Case file No. ${updateCase.fileNo} status mark as ${req.body.status}`,
+         branchId:employee?.branchId,
+         empIds:[req?.user?._id]
+      })
+      await addNotification.save()
       return res.status(200).json({ success: true, message: `Case status change to ${req.body.status}` });
 
    } catch (error) {
@@ -422,6 +431,15 @@ export const employeeUpdateCaseById = async (req, res) => {
          })
          return newDoc.save()
       }))
+
+      
+      const addNotification = new Notification({
+         caseId: updateCase?._id?.toString(),
+         message:`Update on  Case file No. ${updateCase?.fileNo}`,
+         branchId:employee?.branchId,
+         empIds:[req?.user?._id]
+      })
+      await addNotification.save()
       return res.status(200).json({ success: true, message: "Successfully update case", });
 
    } catch (error) {
@@ -1620,7 +1638,15 @@ export const employeeAddCaseComment = async (req, res) => {
       })
       await newComment.save()
 
-      return res.status(200).json({ success: true, message: "Successfully add case commit" });
+      const addNotification = new Notification({
+         caseId:getCase?._id?.toString(),
+         message:`New comment added on Case file No. ${getCase?.fileNo}`,
+         branchId:employee?.branchId,
+         empIds:[req?.user?._id]
+      })
+      await addNotification.save()
+
+      return res.status(200).json({ success: true, message: "Successfully add case comment" });
    } catch (error) {
       console.log("employeeAddCaseCommit in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -2280,6 +2306,15 @@ export const saleEmployeeAddCase = async (req, res) => {
          })
          return newDoc.save()
       }))
+
+      const addNotification = new Notification({
+         caseId: newAddCase?._id?.toString(),
+         message:`New Case file No. ${newAddCase?.fileNo} added.`,
+         branchId:employee?.branchId,
+         empIds:[req?.user?._id]
+      })
+      await addNotification.save()
+
 
       if(newClient && clientDetails?.clientEmail){
          const jwtString = await Jwt.sign({
@@ -3802,7 +3837,7 @@ export const getStatement = async (req, res) => {
       }
       
 
-      const { empId, partnerId, startDate, endDate, limit, pageNo } = req.query
+      const { empId, partnerId, startDate, endDate, limit, pageNo,isPdf } = req.query
       const pageItemLimit = limit ? limit : 10;
       const page = pageNo ? (pageNo - 1) * pageItemLimit : 0;
 
@@ -3932,8 +3967,10 @@ export const getStatement = async (req, res) => {
          {
             $facet: {
                statement: [
-                  { $skip: Number(page) },
-                  { $limit: Number(pageItemLimit) },
+                  ...(isPdf ? [] : [
+                     { $skip: Number(page) },
+                     { $limit: Number(pageItemLimit) }
+                  ])
                ],
                total: [
                   { $count: "count" }
@@ -4083,6 +4120,58 @@ export const getAllStatement = async (req, res) => {
 
    } catch (error) {
       console.log("createOrUpdateStatement in error:", error);
+      res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
+
+   }
+}
+
+//  notification section
+export const getAllNotification = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      if(employee?.type?.toLowerCase()!="operation"){
+         return res.status(400).json({ success: false, message: "Access denied" })
+      }
+
+      const allNotification = await Notification.find({empIds:{$nin:[req?.user?._id]}}).populate({
+         path:"caseId",
+         select:{
+            fileNo:1
+         }
+      }).sort({createdAt:-1})
+      return res.status(200).json({ success: true, message: `Successfully fetch all notification`, data: allNotification });
+
+   } catch (error) {
+      console.log("getAllNotification in error:", error);
+      res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
+
+   }
+}
+
+export const updateNotification = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      if(employee?.type?.toLowerCase()!="operation"){
+         return res.status(400).json({ success: false, message: "Access denied" })
+      }
+      
+     const markNotification =req.body?.markNotification || []
+ 
+      await Notification.updateMany({_id:{$in:markNotification}},{$push:{empIds:req?.user?._id}})
+      return res.status(200).json({ success: true, message: `Successfully mark as read notification`});
+
+   } catch (error) {
+      console.log("updateNotification in error:", error);
       res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
 
    }

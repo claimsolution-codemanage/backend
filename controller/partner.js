@@ -19,6 +19,7 @@ import { firebaseUpload } from "../utils/helper.js";
 import CaseDoc from "../models/caseDoc.js";
 import CaseStatus from "../models/caseStatus.js";
 import Statement from "../models/statement.js";
+import Notification from "../models/notification.js";
 
 
 
@@ -810,6 +811,14 @@ export const addNewCase = async (req, res) => {
       })
       return newDoc.save()
     }))
+
+    const addNotification = new Notification({
+      caseId: newAddCase?._id?.toString(),
+      message:`Partner added new Case file No. ${newAddCase?.fileNo}`,
+      branchId:newAddCase?.branchId || "",
+   })
+   await addNotification.save()
+   
     return res.status(201).json({ success: true, message: "Successfully add new case", data: newAddCase })
   } catch (error) {
     console.log("addNewCase: ", error);
@@ -1153,7 +1162,7 @@ export const getStatement = async (req, res) => {
 
 
 
-     const {startDate, endDate, limit, pageNo } = req.query
+     const {startDate, endDate, limit, pageNo,isPdf } = req.query
      const pageItemLimit = limit ? limit : 10;
      const page = pageNo ? (pageNo - 1) * pageItemLimit : 0;
 
@@ -1242,10 +1251,12 @@ export const getStatement = async (req, res) => {
         { '$sort': { 'createdAt': -1 } },
         {
            $facet: {
-              statement: [
+            statement: [
+              ...(isPdf ? [] : [
                  { $skip: Number(page) },
-                 { $limit: Number(pageItemLimit) },
-              ],
+                 { $limit: Number(pageItemLimit) }
+              ])
+           ],
               total: [
                  { $count: "count" }
               ]
