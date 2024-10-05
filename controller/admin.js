@@ -4975,7 +4975,7 @@ export const getStatement = async (req, res) => {
          {
             $facet: {
                statement: [
-                  ...(isPdf ? [] : [
+                  ...(isPdf=="true" ? [] : [
                      { $skip: Number(page) },
                      { $limit: Number(pageItemLimit) }
                   ])

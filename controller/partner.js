@@ -4,7 +4,7 @@ import {
   validateAddCase
 
 } from "../utils/validatePatner.js";
-import { otp6Digit, getAllCaseQuery, getDownloadCaseExcel, partnerGetDownloadCaseExcel } from "../utils/helper.js";
+import { otp6Digit, getAllCaseQuery, getDownloadCaseExcel, partnerGetDownloadCaseExcel, getValidateDate } from "../utils/helper.js";
 import { sendOTPMail, sendForgetPasswordMail } from '../utils/sendMail.js'
 import { authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
@@ -1252,7 +1252,7 @@ export const getStatement = async (req, res) => {
         {
            $facet: {
             statement: [
-              ...(isPdf ? [] : [
+              ...(isPdf=="true" ? [] : [
                  { $skip: Number(page) },
                  { $limit: Number(pageItemLimit) }
               ])
