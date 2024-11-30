@@ -2340,6 +2340,7 @@ export const adminUpdateCaseById = async (req, res) => {
            format: doc?.docFormat,
            url: doc?.docURL,
            employeeId: req?.user?._id,
+           isPrivate:doc?.isPrivate,
            caseId: updateCase?._id?.toString(),
          })
          return newDoc.save()

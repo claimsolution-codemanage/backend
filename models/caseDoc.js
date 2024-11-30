@@ -28,6 +28,7 @@ const caseDocSchema = new mongoose.Schema({
         ref:"Admin"
     },
     date:{type:Date,default:new Date()},
+    isPrivate:{type:Boolean,default:false},
     isActive:{type:Boolean,default:true,required:true},
 
 },{timestamps:true});

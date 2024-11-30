@@ -655,7 +655,7 @@ export const firebaseUpload = async (req, res, folderPath) => {
       });
 
       blobStream.on('error', (error) => {
-        console.error(error);
+        console.log("error",error);
         return res.status(400).json({ success: false, message: "Failed to upload file" });
       });
 

@@ -635,7 +635,22 @@ export const viewClientCaseById = async (req, res) => {
     if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
     const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails")
     if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
-    const getCaseDoc = await CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
+    const getCaseDoc = await CaseDoc.find({ 
+      $and: [
+        {
+          $or: [
+            { caseId: getCase?._id },
+            { caseMargeId: getCase?._id }
+          ]
+        },
+        {
+          $or: [
+            { isPrivate: false },
+            { isPrivate: { $exists: false } }
+          ]
+        }
+      ],    
+  isActive: true }).select("-adminId")
     const getCaseStatus = await CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
     const getCaseJson = getCase.toObject()
     getCaseJson.caseDocs = getCaseDoc

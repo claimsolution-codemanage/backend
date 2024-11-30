@@ -902,7 +902,22 @@ export const partnerViewCaseById = async (req, res) => {
     if (!partner?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
     const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails")
     if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
-    const getCaseDoc = await CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
+    const getCaseDoc = await CaseDoc.find({ 
+      $and: [
+        {
+          $or: [
+            { caseId: getCase?._id },
+            { caseMargeId: getCase?._id }
+          ]
+        },
+        {
+          $or: [
+            { isPrivate: false },
+            { isPrivate: { $exists: false } }
+          ]
+        }
+      ],  
+    isActive: true }).select("-adminId")
     const getCaseStatus = await CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
     const getCaseJson = getCase.toObject()
     getCaseJson.caseDocs = getCaseDoc
