@@ -38,6 +38,7 @@ import { validateStatement } from "../utils/helperFunction.js";
 import Statement from "../models/statement.js";
 import {Types} from "mongoose";
 import Notification from "../models/notification.js";
+import CasePaymentDetails from "../models/casePaymentDetails.js";
 
 
 export const adminAuthenticate = async (req, res) => {
@@ -1953,11 +1954,12 @@ export const viewCaseByIdByAdmin = async (req, res) => {
       const getCaseDoc = await CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
       const getCaseStatus = await CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
       const getCaseComment = await CaseComment.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true })
+      const getCasePaymentDetails = await CasePaymentDetails.find({ caseId: getCase?._id, isActive: true })
       const getCaseJson = getCase.toObject()
       getCaseJson.caseDocs = getCaseDoc
       getCaseJson.processSteps = getCaseStatus
       getCaseJson.caseCommit = getCaseComment
-
+      getCaseJson.casePayment = getCasePaymentDetails
       return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
 
    } catch (error) {
@@ -2359,6 +2361,48 @@ export const adminUpdateCaseById = async (req, res) => {
       console.log("updateAdminCase in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
 
+   }
+}
+
+export const adminAddOrUpdatePayment= async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Client account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const {_id,paymentMode,caseId} = req.body
+
+      if(!caseId) return res.status(400).json({ success: false, message: "CaseId is required" })
+
+      let isExist
+      if(_id){
+         isExist = await CasePaymentDetails.findById(_id)
+         if(!isExist) return res.status(400).json({ success: false, message: "Payment details is not found" })
+      }else{
+         isExist = new CasePaymentDetails({
+            caseId
+         })
+      }
+
+      const updateKey = [
+         "dateOfPayment","utrNumber","bankName", "chequeNumber",
+         "chequeDate","chequeAmount","transactionDate","paymentMode"
+      ]
+
+      updateKey.forEach(ele=>{
+         if(req.body[ele]){
+            isExist[ele] = req.body[ele]
+         }
+      })
+
+      await  isExist.save()
+      return res.status(200).json({ success: true, message: "Success" });
+   } catch (error) {
+      console.log("AdminAddCaseCommit in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }
 

@@ -20,6 +20,7 @@ import CaseDoc from "../models/caseDoc.js";
 import CaseStatus from "../models/caseStatus.js";
 import Statement from "../models/statement.js";
 import Notification from "../models/notification.js";
+import CasePaymentDetails from "../models/casePaymentDetails.js";
 
 
 
@@ -919,10 +920,11 @@ export const partnerViewCaseById = async (req, res) => {
       ],  
     isActive: true }).select("-adminId")
     const getCaseStatus = await CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
+    const getCasePaymentDetails = await CasePaymentDetails.find({ caseId: getCase?._id, isActive: true })
     const getCaseJson = getCase.toObject()
     getCaseJson.caseDocs = getCaseDoc
     getCaseJson.processSteps = getCaseStatus
-
+    getCaseJson.casePayment = getCasePaymentDetails
     return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
 
   } catch (error) {

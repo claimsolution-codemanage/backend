@@ -12,7 +12,7 @@ employeeDownloadAllPartner,empViewAllEmployee,empAddReferenceCaseAndMarge,empRem
 empChangeBranch,createSathiTeamAcc,empViewSathiEmployee,empDownloadSathiEmployee,empOptGetNormalEmployee,
 empOptShareCaseToEmployee,empDownloadAllEmployee,empClientDownload,empOpPaidInvoice,empOpGetSaleEmployee,
 empOpSharePartnerToSaleEmp,empAddPartnerRefToEmp,createOrUpdateStatement,getStatement,updateEmployeeAccount,getAllStatement,
-getAllNotification,updateNotification
+getAllNotification,updateNotification,empAddOrUpdatePayment
 } from '../controller/employee.js';
 
 
@@ -40,6 +40,8 @@ router.put("/addCaseComment",employeeAddCaseComment)
 router.put("/updateCaseById",employeeUpdateCaseById)
 router.put("/operation/addReferenceCaseAndMarge",empAddReferenceCaseAndMarge)
 router.put("/operation/removeReferenceCase",empRemoveReferenceCase)
+router.post("/emp/empAddOrUpdatePayment",empAddOrUpdatePayment)
+
 
 
 // client

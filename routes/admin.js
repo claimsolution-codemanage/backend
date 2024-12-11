@@ -18,7 +18,8 @@ adminUnActiveInvoice,adminEditInvoice,adminRemoveInvoice,
 adminAllUnactiveCaseDoc,adminUnactiveCaseDoc,adminChangeBranch,
 adminEmployeeProfile,adminDownloadEmpSathiEmployee,adminViewEmpSathiEmployee,
 adminDownloadAllEmployee,adminPaidInvoice,adminAddPartnerRefToEmp,
-createOrUpdateStatement,getStatement,getAllStatement,getAllNotification,updateNotification
+createOrUpdateStatement,getStatement,getAllStatement,getAllNotification,updateNotification,
+adminAddOrUpdatePayment
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -74,6 +75,7 @@ router.get("/viewAllCase",viewAllAdminCase)
 router.put("/changeCaseStatus",changeStatusAdminCase)
 router.get("/viewCaseById",viewCaseByIdByAdmin)
 router.post("/updateCaseById",adminUpdateCaseById)
+router.post("/addOrUpdatePayment",adminAddOrUpdatePayment)
 router.put("/editCaseProcessById",adminEditCaseStatus)
 router.put("/addCaseFeeClient",adminAddCaseFeeClient)
 router.put("/updateClientCaseFee",adminUpdateClientCaseFee)

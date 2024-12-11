@@ -27,6 +27,7 @@ import { addNewCase } from "./partner.js";
 import {Types} from "mongoose";
 import Statement from "../models/statement.js";
 import Notification from "../models/notification.js";
+import CasePaymentDetails from "../models/casePaymentDetails.js";
 
 export const employeeAuthenticate = async (req, res) => {
    try {
@@ -1040,10 +1041,12 @@ export const employeeViewCaseByIdBy = async (req, res) => {
       const getCaseDoc = await CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
       const getCaseStatus = await CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
       const getCaseComment = await CaseComment.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true })
+      const getCasePaymentDetails = await CasePaymentDetails.find({ caseId: getCase?._id, isActive: true })
       const getCaseJson = getCase.toObject()
       getCaseJson.caseDocs = getCaseDoc
       getCaseJson.processSteps = getCaseStatus
       getCaseJson.caseCommit = getCaseComment
+      getCaseJson.casePayment = getCasePaymentDetails
       return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
 
    } catch (error) {
@@ -1648,6 +1651,48 @@ export const employeeAddCaseComment = async (req, res) => {
       await addNotification.save()
 
       return res.status(200).json({ success: true, message: "Successfully add case comment" });
+   } catch (error) {
+      console.log("employeeAddCaseCommit in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
+export const empAddOrUpdatePayment= async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+
+      const {_id,paymentMode,caseId} = req.body
+
+      if(!caseId) return res.status(400).json({ success: false, message: "CaseId is required" })
+
+      let isExist
+      if(_id){
+         isExist = await CasePaymentDetails.findById(_id)
+         if(!isExist) return res.status(400).json({ success: false, message: "Payment details is not found" })
+      }else{
+         isExist = new CasePaymentDetails({
+            caseId
+         })
+      }
+
+      const updateKey = [
+         "dateOfPayment","utrNumber","bankName", "chequeNumber",
+         "chequeDate","chequeAmount","transactionDate","paymentMode"
+      ]
+
+      updateKey.forEach(ele=>{
+         if(req.body[ele]){
+            isExist[ele] = req.body[ele]
+         }
+      })
+
+      await  isExist.save()
+      return res.status(200).json({ success: true, message: "Success" });
    } catch (error) {
       console.log("employeeAddCaseCommit in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
