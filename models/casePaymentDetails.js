@@ -23,7 +23,7 @@ const casePaymentSchema = new mongoose.Schema({
     chequeDate:{
         type:Date,
     },
-    chequeAmount:{
+    amount:{
         type:Number,
     },
     transactionDate:{

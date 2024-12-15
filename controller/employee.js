@@ -4,7 +4,7 @@ import Client from "../models/client.js";
 import { validateEmployeeSignIn, validateEmployeeResetPassword, validateUpdateEmployeeCase, validateAddPartner, validateAddEmpCase, validateEmployeeSignUp, validateSathiTeamSignUp, validateEmployeeUpdate } from "../utils/validateEmployee.js";
 import { authEmployee, authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
-import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, getAllClientSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel, getAllClientDownloadExcel } from "../utils/helper.js";
+import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, getAllClientSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel, getAllClientDownloadExcel, commonInvoiceDownloadExcel } from "../utils/helper.js";
 import { sendAddClientRequest, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import Jwt from "jsonwebtoken";
 import Case from "../models/case.js";
@@ -1209,11 +1209,13 @@ export const empRemoveReferenceCase = async (req, res) => {
       if (type?.toLowerCase() == "partner") {
          const getClientCase = await Case.findById(_id)
          if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
-         if (!validMongooseId(getClientCase?.partnerReferenceCaseDetails?.referenceId)) return res.status(400).json({ success: false, message: "Not a valid partner CaseId" })
-
-         console.log(getClientCase?.partnerReferenceCaseDetails?.referenceId);
-         const updatedPartnerCase = await Case.findByIdAndUpdate(getClientCase?.partnerReferenceCaseDetails?.referenceId, { $set: { isPartnerReferenceCase: false, } }, { new: true })
-         if (!updatedPartnerCase) return res.status(404).json({ success: false, message: "Partner case is not found of the added reference case" })
+         if (!validMongooseId(getClientCase?.partnerReferenceCaseDetails?.referenceId) && !validMongooseId(getClientCase?.partnerId)) return res.status(400).json({ success: false, message: "Not a valid partner CaseId" })
+         
+         // if partner referance add in sale emp case
+         if(getClientCase?.partnerReferenceCaseDetails?.referenceId){
+            const updatedPartnerCase = await Case.findByIdAndUpdate(getClientCase?.partnerReferenceCaseDetails?.referenceId, { $set: { isPartnerReferenceCase: false, } }, { new: true })
+            if (!updatedPartnerCase) return res.status(404).json({ success: false, message: "Partner case is not found of the added reference case" })
+         }
 
          const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
             {
@@ -1225,9 +1227,11 @@ export const empRemoveReferenceCase = async (req, res) => {
                   partnerReferenceCaseDetails: {},
                }
             }, { new: true })
-         await CaseDoc.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } })
-         await CaseStatus.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } })
-         await CaseComment.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } })
+         if(getClientCase?.partnerReferenceCaseDetails?.referenceId && !getClientCase?.empSaleId){
+            await CaseDoc.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } })
+            await CaseStatus.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } })
+            await CaseComment.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } })
+         }
 
          return res.status(200).json({ success: true, message: "Successfully remove partner reference case" })
       }
@@ -1682,7 +1686,7 @@ export const empAddOrUpdatePayment= async (req, res) => {
 
       const updateKey = [
          "dateOfPayment","utrNumber","bankName", "chequeNumber",
-         "chequeDate","chequeAmount","transactionDate","paymentMode"
+         "chequeDate","amount","transactionDate","paymentMode"
       ]
 
       updateKey.forEach(ele=>{
@@ -1790,6 +1794,39 @@ export const employeeViewAllInvoice = async (req, res) => {
       const aggregateResult = await Bill.aggregate(aggregationPipeline);
       return res.status(200).json({ success: true, message: "get case data", data: getAllBill, noOf: noOfBill, totalAmt: aggregateResult });
 
+   } catch (error) {
+      console.log("employee-get invoice in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+export const empDownloadAllInvoice = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      if (employee?.type?.toLowerCase() != "finance" && employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
+
+      const searchQuery = req.query.search ? req.query.search : "";
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+      const type = req?.query?.type
+
+      const query = getAllInvoiceQuery(searchQuery, startDate, endDate, false, type, employee?.branchId)
+      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+
+      const getAllBill = await Bill.find(query?.query).populate("transactionId","paymentMode");
+      // console.log("getAllBill",getAllBill);
+      
+      const excelBuffer = await commonInvoiceDownloadExcel(getAllBill)
+      // console.log("excelBuffer",excelBuffer);
+      
+      res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.status(200)
+      res.send(excelBuffer)
    } catch (error) {
       console.log("employee-get invoice in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });

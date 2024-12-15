@@ -19,7 +19,7 @@ adminAllUnactiveCaseDoc,adminUnactiveCaseDoc,adminChangeBranch,
 adminEmployeeProfile,adminDownloadEmpSathiEmployee,adminViewEmpSathiEmployee,
 adminDownloadAllEmployee,adminPaidInvoice,adminAddPartnerRefToEmp,
 createOrUpdateStatement,getStatement,getAllStatement,getAllNotification,updateNotification,
-adminAddOrUpdatePayment
+adminAddOrUpdatePayment,adminDownloadAllInvoice
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -117,6 +117,7 @@ router.delete("/adminRemoveComplaintById",adminRemoveComplaintById)
 // for invoice
 router.post("/createInvoice",adminCreateInvoice)
 router.get("/viewAllInvoice",adminViewAllInvoice)
+router.get("/adminDownloadAllInvoice",adminDownloadAllInvoice)
 router.get("/viewInvoiceById",adminViewInvoiceById)
 router.put("/editInvoiceById",adminEditInvoice)
 router.put("/paidInvoiceById",adminPaidInvoice)

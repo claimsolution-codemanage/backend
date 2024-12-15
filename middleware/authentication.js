@@ -45,8 +45,6 @@ export const authEmployee = async(req,res)=>{
    if(!req.headers["x-auth-token"]) return {success:false,message:"UnAuth token"}
 
    const token = req.headers["x-auth-token"]
-   console.log("token",token);
-
    try {
       await jwt.verify(token,process.env.EMPLOYEE_SECRET_KEY)
       const decode = await jwtDecode(token)

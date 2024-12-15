@@ -12,7 +12,7 @@ employeeDownloadAllPartner,empViewAllEmployee,empAddReferenceCaseAndMarge,empRem
 empChangeBranch,createSathiTeamAcc,empViewSathiEmployee,empDownloadSathiEmployee,empOptGetNormalEmployee,
 empOptShareCaseToEmployee,empDownloadAllEmployee,empClientDownload,empOpPaidInvoice,empOpGetSaleEmployee,
 empOpSharePartnerToSaleEmp,empAddPartnerRefToEmp,createOrUpdateStatement,getStatement,updateEmployeeAccount,getAllStatement,
-getAllNotification,updateNotification,empAddOrUpdatePayment
+getAllNotification,updateNotification,empAddOrUpdatePayment,empDownloadAllInvoice
 } from '../controller/employee.js';
 
 
@@ -65,6 +65,7 @@ router.get("/finance/viewAllInvoice",employeeViewAllInvoice)
 router.get("/finance/viewInvoiceById",employeeViewInvoiceById)
 router.put("/finance/editInvoiceById",employeeEditInvoice)
 router.put("/finance/paidInvoiceById",empOpPaidInvoice)
+router.get("/emp/empDownloadAllInvoice",empDownloadAllInvoice)
 router.put("/finance/unActiveInvoiceById",employeeUnActiveInvoice)
 router.get("/finance/downloadInvoiceById",employeeDownloadInvoiceById)
 router.delete("/finance/removeInvoiceById",employeeRemoveInvoice)

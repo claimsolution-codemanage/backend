@@ -685,3 +685,97 @@ export const backupMongoDB = (dbName, backupPath) => {
     });
   });
 };
+
+export const commonInvoiceDownloadExcel = async (getAllInvoice = []) => {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Invoice');
+
+  // Define Excel columns
+  worksheet.columns = [
+    { header: 'SL No.', key: 'sNo', width: 10 },
+    { header: 'Branch', key: 'branch', width: 10 },
+    { header: 'Bill Date', key: 'billDate', width: 20 },
+    { header: 'Invoice No', key: 'invoiceNo', width: 30 },
+    { header: 'Invoice To', key: 'paidBy', width: 30 },
+    { header: 'Sender Name', key: 'senderName', width: 30 },
+    { header: 'Sender GST No.', key: 'senderGst', width: 30 },
+    { header: 'Sender PAN No.', key: 'senderPan', width: 30 },
+    { header: 'Sender Email', key: 'senderEmail', width: 30 },
+    { header: 'Sender Mobile No.', key: 'senderMobile', width: 30 },
+    { header: 'Sender Address', key: 'senderAddress', width: 30 },
+    { header: 'Sender State', key: 'senderState', width: 30 },
+    { header: 'Sender Country', key: 'senderCountry', width: 30 },
+    { header: 'Receiver Name', key: 'receiverName', width: 30 },
+    { header: 'Receiver GST No.', key: 'receiverGst', width: 30 },
+    { header: 'Receiver PAN No.', key: 'receiverPan', width: 30 },
+    { header: 'Receiver Email', key: 'receiverEmail', width: 30 },
+    { header: 'Receiver Mobile No.', key: 'receiverMobile', width: 30 },
+    { header: 'Receiver Address', key: 'receiverAddress', width: 30 },
+    { header: 'Receiver State', key: 'receiverState', width: 30 },
+    { header: 'Receiver Country', key: 'receiverCountry', width: 30 },
+    { header: 'Paid', key: 'paid', width: 15 },
+    { header: 'Payment Mode', key: 'paymentMode', width: 20 },
+    { header: 'Remark', key: 'remark', width: 40 },
+    { header: 'Item Description', key: 'itemDesc', width: 40 },
+    { header: 'Item Qty', key: 'itemQty', width: 10 },
+    { header: 'Item GST (%)', key: 'itemGst', width: 15 },
+    { header: 'Item Rate', key: 'itemRate', width: 15 },
+    { header: 'Item GST Amount', key: 'itemGstAmt', width: 20 },
+    { header: 'Item Total Amount', key: 'itemAmt', width: 20 },
+    { header: 'Sub Amount', key: 'subAmt', width: 20 },
+    { header: 'CGST', key: 'cgst', width: 15 },
+    { header: 'SGST', key: 'sgst', width: 15 },
+    { header: 'IGST', key: 'igst', width: 15 },
+    { header: 'Total Amount', key: 'totalAmt', width: 20 },
+  ];
+
+  // Populate rows
+  getAllInvoice.forEach((invData, index) => {
+    const isIgst = invData?.sender?.state !== invData?.receiver?.state; // IGST when states differ
+    invData?.invoiceItems?.forEach((item, itemIndex) => {
+      worksheet.addRow({
+        sNo: itemIndex === 0 ? index + 1 : "",
+        branch: invData?.branchId || "",
+        billDate: invData?.billDate ? new Date(invData?.billDate) : '',
+        invoiceNo: invData?.invoiceNo || "",
+        paidBy: invData?.isOffice ? "Client" : "Office",
+        senderName: itemIndex === 0 ? invData?.sender?.name || '' : "",
+        senderGst: itemIndex === 0 ? invData?.sender?.gstNo || '' : "",
+        senderPan: itemIndex === 0 ? invData?.sender?.panNo || '' : "",
+        senderEmail: itemIndex === 0 ? invData?.sender?.email || '' : "",
+        senderMobile: itemIndex === 0 ? invData?.sender?.mobileNo || '' : "",
+        senderAddress: itemIndex === 0 ? invData?.sender?.address || '' : "",
+        senderState: itemIndex === 0 ? invData?.sender?.state || '' : "",
+        senderCountry: itemIndex === 0 ? invData?.sender?.country || '' : "",
+        receiverName: itemIndex === 0 ? invData?.receiver?.name || '' : "",
+        receiverGst: itemIndex === 0 ? invData?.receiver?.gstNo || '' : "",
+        receiverPan: itemIndex === 0 ? invData?.receiver?.panNo || '' : "",
+        receiverEmail: itemIndex === 0 ? invData?.receiver?.email || '' : "",
+        receiverMobile: itemIndex === 0 ? invData?.receiver?.mobileNo || '' : "",
+        receiverAddress: itemIndex === 0 ? invData?.receiver?.address || '' : "",
+        receiverState: itemIndex === 0 ? invData?.receiver?.state || '' : "",
+        receiverCountry: itemIndex === 0 ? invData?.receiver?.country || '' : "",
+        paid: itemIndex === 0 ? (invData?.isPaid ? "Yes" : "No") : "",
+        paymentMode: itemIndex === 0 ? invData?.transactionId?.paymentMode || '' : "",
+        remark: itemIndex === 0 ? invData?.remark || '' : "",
+        itemDesc: item?.description || '',
+        itemQty: item?.quantity || "",
+        itemGst: item?.gstRate || "",
+        itemRate: item?.rate || "",
+        itemGstAmt: item?.gstAmt || "",
+        itemAmt: item?.amt || "",
+        subAmt: itemIndex === 0 ? invData?.subAmt || "" : "",
+        cgst: itemIndex === 0 ? (!isIgst ? invData?.gstAmt / 2 : "") : "",
+        sgst: itemIndex === 0 ? (!isIgst ? invData?.gstAmt / 2 : "") : "",
+        igst: itemIndex === 0 ? (isIgst ? invData?.gstAmt : "") : "",
+        totalAmt: itemIndex === 0 ? invData?.totalAmt || "" : "",
+      });
+    });
+  });
+
+  // Generate Excel file buffer
+  const buffer = await workbook.xlsx.writeBuffer();
+
+  return buffer;
+};
+
