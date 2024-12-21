@@ -3408,11 +3408,6 @@ export const salesDownloadCaseReport = async (req, res) => {
           const result = await Case.aggregate(pipeline);
          //  const getAllCase = result[0].cases;
          //  const noOfCase = result[0].totalCount[0]?.count || 0;
-
-         result?.map(ele=> console.log(ele?.casestatuses))
-     console.log(result);
-     
-
       
       const excelBuffer = await getDownloadCaseExcel(result,findEmp?._id ? findEmp?._id?.toString() :employee?._id?.toString())
       res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
