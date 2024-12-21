@@ -4,7 +4,7 @@ import Client from "../models/client.js";
 import { validateEmployeeSignIn, validateEmployeeResetPassword, validateUpdateEmployeeCase, validateAddPartner, validateAddEmpCase, validateEmployeeSignUp, validateSathiTeamSignUp, validateEmployeeUpdate } from "../utils/validateEmployee.js";
 import { authEmployee, authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
-import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, getAllClientSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel, getAllClientDownloadExcel, commonInvoiceDownloadExcel } from "../utils/helper.js";
+import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, getAllClientSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel, getAllClientDownloadExcel, commonInvoiceDownloadExcel, sendNotificationAndMail } from "../utils/helper.js";
 import { sendAddClientRequest, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import Jwt from "jsonwebtoken";
 import Case from "../models/case.js";
@@ -378,13 +378,18 @@ export const changeStatusEmployeeCase = async (req, res) => {
       })
       await addNewStatus.save()
 
-      const addNotification = new Notification({
-         caseId:req.body._id,
-         message:`Case file No. ${updateCase.fileNo} status mark as ${req.body.status}`,
-         branchId:employee?.branchId,
-         empIds:[req?.user?._id]
-      })
-      await addNotification.save()
+      // send notification through email and db notification
+      const notificationEmpUrl = `/employee/view case/${req.body._id}`
+      const notificationAdminUrl =`/admin/view case/${req.body._id}`
+
+      sendNotificationAndMail(
+         req.body._id,
+         `Case file No. ${updateCase.fileNo} status mark as ${req.body.status}`,
+         employee?.branchId,
+         req?.user?._id,
+         notificationEmpUrl,
+         notificationAdminUrl
+      )
       return res.status(200).json({ success: true, message: `Case status change to ${req.body.status}` });
 
    } catch (error) {
@@ -434,14 +439,19 @@ export const employeeUpdateCaseById = async (req, res) => {
          return newDoc.save()
       }))
 
-      
-      const addNotification = new Notification({
-         caseId: updateCase?._id?.toString(),
-         message:`Update on  Case file No. ${updateCase?.fileNo}`,
-         branchId:employee?.branchId,
-         empIds:[req?.user?._id]
-      })
-      await addNotification.save()
+
+      // send notification through email and db notification
+      const notificationEmpUrl = `/employee/view case/${updateCase?._id?.toString()}`
+      const notificationAdminUrl = `/admin/view case/${updateCase?._id?.toString()}`
+
+      sendNotificationAndMail(
+         updateCase?._id?.toString(),
+         `Update on  Case file No.  ${updateCase?.fileNo}`,
+         employee?.branchId,
+         req?.user?._id,
+         notificationEmpUrl,
+         notificationAdminUrl
+      )
       return res.status(200).json({ success: true, message: "Successfully update case", });
 
    } catch (error) {
@@ -1646,13 +1656,18 @@ export const employeeAddCaseComment = async (req, res) => {
       })
       await newComment.save()
 
-      const addNotification = new Notification({
-         caseId:getCase?._id?.toString(),
-         message:`New comment added on Case file No. ${getCase?.fileNo}`,
-         branchId:employee?.branchId,
-         empIds:[req?.user?._id]
-      })
-      await addNotification.save()
+      // send notification through email and db notification
+      const notificationEmpUrl = `/employee/view case/${getCase?._id?.toString()}`
+      const notificationAdminUrl = `/admin/view case/${getCase?._id?.toString()}`
+
+      sendNotificationAndMail(
+         getCase?._id?.toString(),
+         `New comment added on Case file No. ${getCase?.fileNo}`,
+         employee?.branchId,
+         req?.user?._id,
+         notificationEmpUrl,
+         notificationAdminUrl
+      )
 
       return res.status(200).json({ success: true, message: "Successfully add case comment" });
    } catch (error) {
@@ -1673,6 +1688,9 @@ export const empAddOrUpdatePayment= async (req, res) => {
       const {_id,paymentMode,caseId} = req.body
 
       if(!caseId) return res.status(400).json({ success: false, message: "CaseId is required" })
+
+      const findCase = await Case.findOne({_id:caseId,isActive:true})
+      if(!findCase) return res.status(400).json({ success: false, message: "Case is not found" })
 
       let isExist
       if(_id){
@@ -1696,6 +1714,18 @@ export const empAddOrUpdatePayment= async (req, res) => {
       })
 
       await  isExist.save()
+      // send notification through email and db notification
+      const notificationEmpUrl = `/employee/view case/${caseId}`
+      const notificationAdminUrl = `/admin/view case/${caseId}`
+
+      sendNotificationAndMail(
+         caseId,
+         `Payment details update on  Case file No.  ${findCase?.fileNo}`,
+         employee?.branchId,
+         req?.user?._id,
+         notificationEmpUrl,
+         notificationAdminUrl
+      )
       return res.status(200).json({ success: true, message: "Success" });
    } catch (error) {
       console.log("employeeAddCaseCommit in error:", error);
@@ -2397,6 +2427,19 @@ export const saleEmployeeAddCase = async (req, res) => {
          empIds:[req?.user?._id]
       })
       await addNotification.save()
+
+      // send notification through email and db notification
+      const notificationEmpUrl = `/employee/view case/${newAddCase?._id?.toString()}`
+      const notificationAdminUrl = `/admin/view case/${newAddCase?._id?.toString()}`
+
+      sendNotificationAndMail(
+         newAddCase?._id?.toString(),
+         `New Case file No. ${newAddCase?.fileNo} added.`,
+         employee?.branchId,
+         req?.user?._id,
+         notificationEmpUrl,
+         notificationAdminUrl
+      )
 
 
       if(newClient && clientDetails?.clientEmail){
@@ -3312,7 +3355,33 @@ export const salesDownloadCaseReport = async (req, res) => {
                     { branchId: { $regex: searchQuery, $options: "i" } },
                   ]          
              }},
-             {'$sort':{'createdAt':-1}}
+             {'$sort':{'createdAt':-1}},
+            //  {
+            //    $lookup:{
+            //       from: "casestatuses",
+            //       localField: "_id",
+            //       foreignField: "caseId",
+            //       as: "casestatuses",
+            //       pipeline:[
+            //          {
+            //             $project:{
+            //                remark:1,
+            //                date:1,
+            //                status:1,
+            //                createdAt:1
+            //             }
+            //          },
+            //          {
+            //             $sort:{
+            //                createdAt:-1
+            //             }
+            //          },
+            //          {
+            //             $limit:1
+            //          }
+            //       ]
+            //    }
+            //  },
             // {
             //   $facet: {
             //     cases: [
@@ -3340,6 +3409,11 @@ export const salesDownloadCaseReport = async (req, res) => {
          //  const getAllCase = result[0].cases;
          //  const noOfCase = result[0].totalCount[0]?.count || 0;
 
+         result?.map(ele=> console.log(ele?.casestatuses))
+     console.log(result);
+     
+
+      
       const excelBuffer = await getDownloadCaseExcel(result,findEmp?._id ? findEmp?._id?.toString() :employee?._id?.toString())
       res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

@@ -3,7 +3,7 @@ import { validateClientSignUp, validateClientSignIn, validateClientProfileBody, 
 import bcrypt from 'bcrypt'
 import { sendOTPMail } from "../utils/sendMail.js";
 import { authClient } from "../middleware/authentication.js";
-import { otp6Digit } from '../utils/helper.js'
+import { otp6Digit, sendNotificationAndMail } from '../utils/helper.js'
 import Case from "../models/case.js";
 import { getAllCaseQuery } from "../utils/helper.js";
 import { validMongooseId } from "../utils/helper.js";
@@ -563,12 +563,18 @@ export const addNewClientCase = async (req, res) => {
       return newDoc.save()
     }))
 
-    const addNotification = new Notification({
-      caseId: newAddCase?._id?.toString(),
-      message:`Client added new Case file No. ${newAddCase?.fileNo}`,
-      branchId:newAddCase?.branchId || "",
-   })
-   await addNotification.save()
+    // send notification through email and db notification
+    const notificationEmpUrl = `/employee/view case/${newAddCase?._id?.toString()}`
+    const notificationAdminUrl = `/admin/view case/${newAddCase?._id?.toString()}`
+
+    sendNotificationAndMail(
+      newAddCase?._id?.toString(),
+      `Client added new Case file No. ${newAddCase?.fileNo}`,
+      newAddCase?.branchId || "",
+      "",
+      notificationEmpUrl,
+      notificationAdminUrl
+    )
 
     return res.status(201).json({ success: true, message: "Successfully add new case", data: newAddCase })
   } catch (error) {
@@ -808,6 +814,7 @@ export const clientDashboard = async (req, res) => {
     const clientNeccessaryData = {
       lastLogin: client?.lastLogin,
       recentLogin: client?.recentLogin,
+      fullName:client?.fullName
     }
 
     const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year

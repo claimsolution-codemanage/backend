@@ -5,7 +5,7 @@ import {
    validateEditAdminCaseStatus,validateAdminSharePartner,validateAdminRemovePartner,
 } from "../utils/validateAdmin.js";
 import bcrypt from 'bcrypt';
-import { commonInvoiceDownloadExcel, generatePassword, getAllCaseDocQuery, getAllInvoiceQuery, getAllSathiDownloadExcel, getEmployeeByIdQuery, getValidateDate } from "../utils/helper.js";
+import { commonInvoiceDownloadExcel, generatePassword, getAllCaseDocQuery, getAllInvoiceQuery, getAllSathiDownloadExcel, getEmployeeByIdQuery, getValidateDate, sendNotificationAndMail } from "../utils/helper.js";
 import { sendAdminSigninMail, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import { authAdmin } from "../middleware/authentication.js";
 import Employee from "../models/employee.js";
@@ -735,13 +735,18 @@ export const changeStatusAdminCase = async (req, res) => {
       })
       await addNewStatus.save()
 
-      const addNotification = new Notification({
-         caseId: updateCase?._id?.toString(),
-         message:`Case file No. ${updateCase?.fileNo} status mark as ${req.body.status}`,
-         branchId:updateCase?.branchId || "",
-         adminIds:[req?.user?._id]
-      })
-      await addNotification.save()
+      // send notification through email and db notification
+      const notificationEmpUrl = `/employee/view case/${updateCase?._id?.toString()}`
+      const notificationAdminUrl = `/admin/view case/${updateCase?._id?.toString()}`
+
+      sendNotificationAndMail(
+         updateCase?._id?.toString(),
+         `Case file No. ${updateCase?.fileNo} status mark as ${req.body.status}`,
+         updateCase?.branchId || "",
+         req?.user?._id,
+         notificationEmpUrl,
+         notificationAdminUrl
+      )
       return res.status(200).json({ success: true, message: `Case status change to ${req.body.status}` });
    } catch (error) {
       console.log("updateAdminCase in error:", error);
@@ -782,13 +787,18 @@ export const adminEditCaseStatus = async (req, res) => {
          }
       } )
 
-      const addNotification = new Notification({
-         caseId: updateCase?._id?.toString(),
-         message:`Case file No. ${updateCase?.fileNo} status update`,
-         branchId:updateCase?.branchId || "",
-         adminIds:[req?.user?._id]
-      })
-      await addNotification.save()
+      // send notification through email and db notification
+      const notificationEmpUrl = `/employee/view case/${updateCase?._id?.toString()}`
+      const notificationAdminUrl = `/admin/view case/${updateCase?._id?.toString()}`
+
+      sendNotificationAndMail(
+         updateCase?._id?.toString(),
+         `Case file No. ${updateCase?.fileNo} status update`,
+         updateCase?.branchId || "",
+         req?.user?._id,
+         notificationEmpUrl,
+         notificationAdminUrl
+      )
       return res.status(200).json({ success: true, message: "Successfully update case process" });
    } catch (error) {
       console.log("updateAdminCaseProcess in error:", error);
@@ -2348,13 +2358,18 @@ export const adminUpdateCaseById = async (req, res) => {
          return newDoc.save()
        }))
 
-       const addNotification = new Notification({
-         caseId: updateCase?._id?.toString(),
-         message:`Update on Case file No. ${updateCase?.fileNo}`,
-         branchId:updateCase?.branchId || "",
-         adminIds:[req?.user?._id]
-      })
-      await addNotification.save()
+      // send notification through email and db notification
+      const notificationEmpUrl = `/employee/view case/${updateCase?._id?.toString()}`
+      const notificationAdminUrl = `/admin/view case/${updateCase?._id?.toString()}`
+
+      sendNotificationAndMail(
+         updateCase?._id?.toString(),
+         `Update on Case file No. ${updateCase?.fileNo}`,
+         updateCase?.branchId || "",
+         req?.user?._id,
+         notificationEmpUrl,
+         notificationAdminUrl
+      )
       return res.status(200).json({ success: true, message: "Successfully update case", data: updateCase });
 
    } catch (error) {
@@ -2376,6 +2391,8 @@ export const adminAddOrUpdatePayment= async (req, res) => {
       const {_id,paymentMode,caseId} = req.body
 
       if(!caseId) return res.status(400).json({ success: false, message: "CaseId is required" })
+      const findCase = await Case.findOne({_id:caseId,isActive:true})
+      if(!findCase) return res.status(400).json({ success: false, message: "Case is not found" })
 
       let isExist
       if(_id){
@@ -2399,6 +2416,18 @@ export const adminAddOrUpdatePayment= async (req, res) => {
       })
 
       await  isExist.save()
+      // send notification through email and db notification
+      const notificationEmpUrl = `/employee/view case/${findCase?._id?.toString()}`
+      const notificationAdminUrl = `/admin/view case/${findCase?._id?.toString()}`
+
+      sendNotificationAndMail(
+         findCase?._id?.toString(),
+         `Payment details update on Case file No. ${findCase?.fileNo}`,
+         findCase?.branchId || "",
+         req?.user?._id,
+         notificationEmpUrl,
+         notificationAdminUrl
+      )
       return res.status(200).json({ success: true, message: "Success" });
    } catch (error) {
       console.log("AdminAddCaseCommit in error:", error);
@@ -2635,13 +2664,20 @@ export const adminAddCaseComment = async (req, res) => {
       })
       await newComment.save()
 
-      const addNotification = new Notification({
-         caseId: getCase?._id?.toString(),
-         message:`New comment added on Case file No. ${getCase?.fileNo}`,
-         branchId:getCase?.branchId || "",
-         adminIds:[req?.user?._id]
-      })
-      await addNotification.save()
+
+
+      // send notification through email and db notification
+      const notificationEmpUrl = `/employee/view case/${getCase?._id?.toString()}`
+      const notificationAdminUrl = `/admin/view case/${getCase?._id?.toString()}`
+
+      sendNotificationAndMail(
+         getCase?._id?.toString(),
+         `New comment added on Case file No. ${getCase?.fileNo}`,
+         getCase?.branchId || "",
+         req?.user?._id,
+         notificationEmpUrl,
+         notificationAdminUrl
+      )
 
       return res.status(200).json({ success: true, message: "Successfully add case commit" });
    } catch (error) {

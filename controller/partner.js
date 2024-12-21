@@ -4,7 +4,7 @@ import {
   validateAddCase
 
 } from "../utils/validatePatner.js";
-import { otp6Digit, getAllCaseQuery, getDownloadCaseExcel, partnerGetDownloadCaseExcel, getValidateDate } from "../utils/helper.js";
+import { otp6Digit, getAllCaseQuery, getDownloadCaseExcel, partnerGetDownloadCaseExcel, getValidateDate, sendNotificationAndMail } from "../utils/helper.js";
 import { sendOTPMail, sendForgetPasswordMail } from '../utils/sendMail.js'
 import { authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
@@ -813,12 +813,18 @@ export const addNewCase = async (req, res) => {
       return newDoc.save()
     }))
 
-    const addNotification = new Notification({
-      caseId: newAddCase?._id?.toString(),
-      message:`Partner added new Case file No. ${newAddCase?.fileNo}`,
-      branchId:newAddCase?.branchId || "",
-   })
-   await addNotification.save()
+    // send notification through email and db notification
+    const notificationEmpUrl = `/employee/view case/${newAddCase?._id?.toString()}`
+    const notificationAdminUrl = `/admin/view case/${newAddCase?._id?.toString()}`
+
+    sendNotificationAndMail(
+      newAddCase?._id?.toString(),
+      `Partner added new Case file No. ${newAddCase?.fileNo}`,
+      newAddCase?.branchId || "",
+      "",
+      notificationEmpUrl,
+      notificationAdminUrl
+    )
    
     return res.status(201).json({ success: true, message: "Successfully add new case", data: newAddCase })
   } catch (error) {
@@ -1030,6 +1036,7 @@ export const getpartnerDashboard = async (req, res) => {
     const partnerNecessaryData = {
       lastLogin: partner?.lastLogin,
       recentLogin: partner?.recentLogin,
+      fullName:partner?.fullName
 
     }
 
