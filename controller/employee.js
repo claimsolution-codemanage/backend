@@ -4,7 +4,7 @@ import Client from "../models/client.js";
 import { validateEmployeeSignIn, validateEmployeeResetPassword, validateUpdateEmployeeCase, validateAddPartner, validateAddEmpCase, validateEmployeeSignUp, validateSathiTeamSignUp, validateEmployeeUpdate } from "../utils/validateEmployee.js";
 import { authEmployee, authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
-import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, getAllClientSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel, getAllClientDownloadExcel, commonInvoiceDownloadExcel, sendNotificationAndMail } from "../utils/helper.js";
+import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, getAllClientSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel, getAllClientDownloadExcel, commonInvoiceDownloadExcel, sendNotificationAndMail, getAllStatementDownloadExcel } from "../utils/helper.js";
 import { sendAddClientRequest, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import Jwt from "jsonwebtoken";
 import Case from "../models/case.js";
@@ -4140,6 +4140,178 @@ export const getStatement = async (req, res) => {
       console.log("createOrUpdateStatement in error:", error);
       res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
 
+   }
+}
+
+export const empDownloadAllStatement = async (req, res) => {
+   try {
+      const verify = await authEmployee(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      const caseAccess = ["operation", "finance", "sathi team"]
+      if(!caseAccess.includes(employee?.type?.toLowerCase())){
+         return res.status(400).json({ success: false, message: "Access denied" })
+      }
+
+      
+      const { empId, partnerId, startDate, endDate } = req.query
+      
+      
+      if (startDate && endDate) {
+         const validStartDate = getValidateDate(startDate)
+         if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+            const validEndDate = getValidateDate(endDate)
+         if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+         }
+      
+      let matchQuery = [{branchId:{ $regex: employee?.branchId, $options: 'i' }}]
+
+      if (startDate && endDate) {
+         const start = new Date(startDate).setHours(0, 0, 0, 0);
+         const end = new Date(endDate).setHours(23, 59, 59, 999);
+
+         matchQuery.push({
+            createdAt: {
+               $gte: new Date(start),
+               $lte: new Date(end)
+            }
+         });
+      }
+
+      if (empId) {
+         matchQuery.push({ empId: new Types.ObjectId(empId) })
+      }
+
+      if (partnerId) {
+         matchQuery.push({ partnerId: new Types.ObjectId(partnerId) })
+      }
+
+      const pipeline = [
+         {
+            '$match': {
+               '$and': [
+                  ...matchQuery,
+                  { 'isActive': true }
+               ]
+            }
+         }, {
+            '$lookup': {
+               'from': 'partners',
+               'localField': 'partnerId',
+               'foreignField': '_id',
+               'as': 'partnerDetails',
+               'pipeline': [
+                  {
+                     '$lookup': {
+                        'from': 'employees',
+                        'localField': 'salesId',
+                        'foreignField': '_id',
+                        'as': 'referby',
+                        'pipeline': [
+                           {
+                              '$project': {
+                                 'fullName': 1,
+                                 'email': 1,
+                                 'type': 1
+                              }
+                           }
+                        ]
+                     }
+                  }, {
+                     '$unwind': {
+                        'path': '$referby'
+                     }
+                  }, {
+                     '$project': {
+                        'bankName': '$bankingDetails.bankName',
+                        'bankAccountNo': '$bankingDetails.bankAccountNo',
+                        'bankBranchName': '$bankingDetails.bankBranchName',
+                        'panNo': '$bankingDetails.panNo',
+                        'bankBranchName':'$bankingDetails.bankBranchName',
+                        'consultantName': '$profile.consultantName',
+                        'consultantCode': '$profile.consultantCode',
+                        'address': '$profile.address',
+                        'branchId': 1,
+                        'referby': 1
+                     }
+                  }
+               ]
+            }
+         }, {
+            '$unwind': {
+               'path': '$partnerDetails',
+               'preserveNullAndEmptyArrays': true
+            }
+         }, {
+            '$lookup': {
+               'from': 'employees',
+               'localField': 'empId',
+               'foreignField': '_id',
+               'as': 'empDetails',
+               'pipeline': [
+                  {
+                     '$lookup': {
+                        'from': 'employees',
+                        'localField': 'referEmpId',
+                        'foreignField': '_id',
+                        'as': 'referby',
+                        'pipeline': [
+                           {
+                              '$project': {
+                                 'fullName': 1,
+                                 'email': 1,
+                                 'type': 1
+                              }
+                           }
+                        ]
+                     }
+                  }, {
+                     '$unwind': {
+                        'path': '$referby'
+                     }
+                  }, {
+                     '$project': {
+                        'fullName': 1,
+                        'bankName': 1,
+                        'bankAccountNo': 1,
+                        'bankBranchName': 1,
+                        'panNo': 1,
+                        'address': 1,
+                        'type': 1,
+                        'email': 1,
+                        'branchId': 1,
+                        'empId': 1,
+                        'referby': 1
+                     }
+                  }
+               ]
+            }
+         }, {
+            '$unwind': {
+               'path': '$empDetails',
+               'preserveNullAndEmptyArrays': true
+            }
+         }, {
+            '$sort': {
+               'createdAt': -1
+            }
+         }
+      ]
+
+      const allStatement = await Statement.aggregate(pipeline)
+
+      const excelBuffer = await getAllStatementDownloadExcel(allStatement);
+      res.setHeader('Content-Disposition', 'attachment; filename="statement.xlsx"')
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.status(200)
+      res.send(excelBuffer)
+   } catch (error) {
+     console.log("downloadAllStatement error:",error);
+     return res.status(500).json({success:false,message:"Oops! something went wrong", error: error})
+     
    }
 }
 

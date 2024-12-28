@@ -13,6 +13,7 @@ import path from 'path'
 import { commonSendMail, generateNotificationTemplate } from "./sendMail.js";
 import Employee from "../models/employee.js";
 import Notification from "../models/notification.js";
+import Admin from "../models/admin.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -792,12 +793,18 @@ export const sendNotificationAndMail = async (caseId, message, branchId="", user
         isActive: true,
         $or: [
           { type: { $regex: "^Operation$", $options: "i" } },
-          { type: { $regex: "^Finance$", $options: "i" } },
+          { type: { $regex: "^Branch$", $options: "i" } },
         ],
       }).select("email");
 
      mailList = getAllEmp?.map(ele => ele?.email)
     }
+
+    const findAdmin = await Admin.find({}).select("email")
+    findAdmin?.forEach(ele => mailList.push(ele?.email))
+
+    const mailTo = findAdmin?.[0]?.email || process.env.ADMIN_MAIL_ID
+
 
 
     if (caseId) {
@@ -820,9 +827,9 @@ export const sendNotificationAndMail = async (caseId, message, branchId="", user
     await commonSendMail(
       generateNotificationTemplate(message, empUrl, adminUrl),
       "Claimsolution latest notification",
-      process.env.ADMIN_MAIL_ID,
+      mailTo,
       [],
-      mailList
+      mailList?.filter(ele=>ele && ele!=mailTo)
     )
     console.log("successfully sendNotificationAndMail");
     
@@ -830,4 +837,68 @@ export const sendNotificationAndMail = async (caseId, message, branchId="", user
     console.log("sendNotificationAndMail", error);
 
   }
+}
+
+
+export const getAllStatementDownloadExcel = async (data) => {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Statement');
+  // Define Excel columns
+  worksheet.columns = [
+    { header: 'SL No', key: 'sNo', width: 10 },
+    { header: 'Branch Id', key: 'branchId', width: 20 },
+    { header: 'Name', key: 'Name', width: 30 },
+    { header: 'Consultant Code/ Sathi Id', key: 'ConsultantCode_SathiId', width: 30 },
+    { header: 'Bank Name', key: 'bankName', width: 30 },
+    { header: 'Bank Account No', key: 'bankAccountNo', width: 30 },
+    { header: 'Bank Branch', key: 'bankBranchName', width: 30 },
+    { header: 'Manager Name', key: 'manager_name', width: 30 },
+    { header: 'Address', key: 'address', width: 30 },
+    { header: 'PAN No', key: 'panNo', width: 30 },
+    { header: 'Case Login', key: 'caseLogin', width: 20 },
+    { header: 'Policy Holder', key: 'policyHolder', width: 20 },
+    { header: 'File No', key: 'fileNo', width: 20 },
+    { header: 'Policy No', key: 'policyNo', width: 20 },
+    { header: 'Insurance Company Name', key: 'insuranceCompanyName', width: 30 },
+    { header: 'Claim Amount', key: 'claimAmount', width: 30 },
+    { header: 'Approved Amt', key: 'approvedAmt', width: 30 },
+    { header: 'Constultancy Fee', key: 'constultancyFee', width: 30 },
+    { header: 'TDS', key: 'TDS', width: 30 },
+    { header: 'Mode Of Login', key: 'modeOfLogin', width: 30 },
+    { header: 'Payable Amt', key: 'payableAmt', width: 30 },
+
+  ];
+
+
+
+  // Populate Excel rows with data
+  data.forEach((ele, index) => {
+    worksheet.addRow({
+      sNo: index + 1 || "-",
+      branchId: ele?.partnerDetails?.branchId ? ele?.partnerDetails?.branchId : ele?.empDetails?.branchId,
+      Name: ele?.partnerDetails?.consultantName ? ele?.partnerDetails?.consultantName : ele?.empDetails?.fullName,
+      ConsultantCode_SathiId: ele?.partnerDetails?.consultantCode ? ele?.partnerDetails?.consultantCode : ele?.empDetails?.empId,
+      bankName: ele?.partnerDetails?.bankName ? ele?.partnerDetails?.bankName : ele?.empDetails?.bankName,
+      bankAccountNo: ele?.partnerDetails?.bankAccountNo ? ele?.partnerDetails?.bankAccountNo : ele?.empDetails?.bankAccountNo,
+      bankBranchName: ele?.partnerDetails?.bankBranchName ? ele?.partnerDetails?.bankBranchName : ele?.empDetails?.bankBranchName,
+      manager_name: ele?.partnerDetails?.referby?.fullName ? ele?.partnerDetails?.referby?.fullName : ele?.empDetails?.referby?.fullName,
+      address: ele?.partnerDetails?.address ? ele?.partnerDetails?.address : ele?.empDetails?.address,
+      panNo: ele?.partnerDetails?.panNo ? ele?.partnerDetails?.panNo : ele?.empDetails?.panNo,
+      caseLogin: new Date(ele?.caseLogin).toLocaleDateString(),
+      policyHolder: ele?.policyHolder,
+      fileNo: ele?.fileNo,
+      policyNo: ele?.policyNo,
+      insuranceCompanyName: ele?.insuranceCompanyName,
+      claimAmount: ele?.claimAmount,
+      approvedAmt: ele?.approvedAmt,
+      constultancyFee: ele?.constultancyFee,
+      TDS: ele?.TDS,
+      modeOfLogin: ele?.modeOfLogin,
+      payableAmt: ele?.payableAmt,
+    });
+  });
+
+
+  // Generate Excel buffer
+  return await workbook.xlsx.writeBuffer();
 }

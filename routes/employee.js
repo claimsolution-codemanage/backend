@@ -12,7 +12,8 @@ employeeDownloadAllPartner,empViewAllEmployee,empAddReferenceCaseAndMarge,empRem
 empChangeBranch,createSathiTeamAcc,empViewSathiEmployee,empDownloadSathiEmployee,empOptGetNormalEmployee,
 empOptShareCaseToEmployee,empDownloadAllEmployee,empClientDownload,empOpPaidInvoice,empOpGetSaleEmployee,
 empOpSharePartnerToSaleEmp,empAddPartnerRefToEmp,createOrUpdateStatement,getStatement,updateEmployeeAccount,getAllStatement,
-getAllNotification,updateNotification,empAddOrUpdatePayment,empDownloadAllInvoice
+getAllNotification,updateNotification,empAddOrUpdatePayment,empDownloadAllInvoice,
+empDownloadAllStatement
 } from '../controller/employee.js';
 
 
@@ -103,6 +104,7 @@ router.put("/operation/change-branch",empChangeBranch)
 // for statement
 router.post("/emp/createOrUpdateStatement",createOrUpdateStatement)
 router.get("/emp/getAllStatement",getStatement)
+router.get("/emp/download/empDownloadAllStatement",empDownloadAllStatement)
 router.get("/emp/getStatements",getAllStatement)
 
 // notification section

@@ -392,6 +392,19 @@ const OTPMail_HTML_TEMPLATE = (email, otp,type) => {
 				 padding: 20px;
 				 text-align: center;
 			  }
+			.btn {
+				display: inline-block;
+				padding: 10px 20px;
+				font-size: 16px;
+				color: #ffffff;
+				background-color: #007bff;
+				text-decoration: none;
+				border-radius: 5px;
+				margin-top: 20px;
+			}
+			.btn:hover {
+				background-color: #0056b3;
+			}
 			</style>
 		 </head>
 		 <body>
@@ -402,7 +415,7 @@ const OTPMail_HTML_TEMPLATE = (email, otp,type) => {
 				 </div>
 				 <div class="email-body">
 				 <p>Forget password email ${email}</p>
-				 <p>To reset password of your account <a href=${process.env.FRONTEND_URL+link}>Click here.</a></p>
+				 <a href="${process.env.PANEL_FRONTEND_URL+link}" class="btn">Click here</a>
 				 <p> Don't share this mail with anyone. It content sensitive information of your account</p>
 				 <p>For more information  <a href="www.claimsolution.in">${process.env.FRONTEND_URL_Base}</a></p>
 				 </div>
