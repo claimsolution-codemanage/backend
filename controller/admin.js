@@ -5,7 +5,7 @@ import {
    validateEditAdminCaseStatus,validateAdminSharePartner,validateAdminRemovePartner,
 } from "../utils/validateAdmin.js";
 import bcrypt from 'bcrypt';
-import { commonInvoiceDownloadExcel, generatePassword, getAllCaseDocQuery, getAllInvoiceQuery, getAllSathiDownloadExcel, getAllStatementDownloadExcel, getEmployeeByIdQuery, getValidateDate, sendNotificationAndMail } from "../utils/helper.js";
+import { commonDownloadCaseExcel, commonInvoiceDownloadExcel, generatePassword, getAllCaseDocQuery, getAllInvoiceQuery, getAllSathiDownloadExcel, getAllStatementDownloadExcel, getEmployeeByIdQuery, getValidateDate, sendNotificationAndMail } from "../utils/helper.js";
 import { sendAdminSigninMail, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import { authAdmin } from "../middleware/authentication.js";
 import Employee from "../models/employee.js";
@@ -3321,14 +3321,6 @@ export const adminDownloadAllCase = async (req, res) => {
       const type = req?.query?.type ? req.query.type : true
       const isReject = req?.query?.isReject=="true" ? {$in:["Reject"]} : {$nin:["Reject"]}
       
-
-      // const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type,false,false,isReject)
-      // if (!query.success) return res.status(400).json({ success: false, message: query.message })
-      // const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
-
-      
-      const matchQuery = []
-
       
       if (startDate && endDate) {
          const validStartDate = getValidateDate(startDate)
@@ -3337,157 +3329,213 @@ export const adminDownloadAllCase = async (req, res) => {
          if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
       }
 
-      if (startDate && endDate) {
-         const start = new Date(startDate).setHours(0, 0, 0, 0);
-         const end = new Date(endDate).setHours(23, 59, 59, 999);
-         
-         matchQuery.push({
-           createdAt: {
-             $gte: new Date(start),
-             $lte: new Date(end)
-           }
-         });
-      }
-
-      const pipeline = [
-         {
-           $match: {
-             $and: [
-               { isPartnerReferenceCase: false },
-               { isEmpSaleReferenceCase: false },
+         const andCondition = [
+            { isPartnerReferenceCase: false },
+            { isEmpSaleReferenceCase: false },
+            { isActive: Boolean(req.query.type == "true" ? true :false) },
+            req?.query?.isReject=="true" ? {currentStatus:{$in:["Reject"]}} : {currentStatus:{$nin:["Reject"]}},
+         ]
+         if (statusType) {
+            andCondition.push(
                { currentStatus: { $regex: statusType, $options: "i" } },
-               { isActive: Boolean(req.query.type == "true" ? true :false) },
-               req?.query?.isReject=="true" ? {currentStatus:{$in:["Reject"]}} : {currentStatus:{$nin:["Reject"]}},
-               ...matchQuery,
-             ]
-           }
-         },
-         {
-            $addFields: {
-              validPartnerIdString: {
-                $cond: {
-                  if: {
-                    $and: [
-                      { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
-                      { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
-                      { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
-                    ]
-                  },
-                  then: "$partnerId",
-                  else: null
-                }
-              }
-            }
-          },
-          {
-            $lookup: {
-              from: 'partners',
-              let: { partnerIdString: "$validPartnerIdString" },
-              pipeline: [
-                {
-                  $match: {
-                    $expr: {
-                      $and: [
-                        { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
-                        { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
-                        { 
-                          $eq: [
-                            "$_id",
-                            { $toObjectId: "$$partnerIdString" }
-                          ]
-                        }
-                      ]
-                    }
-                  }
-                },
-                {
-                  $project: {
-                    fullName: 1 // Include only the fullName field
-                  }}
-              ],
-              as: 'partnerDetails'
-            }
-          },
-          {'$unwind':{
-            'path':'$partnerDetails',
-            'preserveNullAndEmptyArrays':true
-          }},
-          {
-            $addFields: {
-              validSaleEmpIdString: {
-                $cond: {
-                  if: {
-                    $and: [
-                      { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
-                      { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
-                      { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
-                    ]
-                  },
-                  then: "$empSaleId",
-                  else: null
-                }
-              }
-            }
-          },
-          {
-            $lookup: {
-              from: 'employees',
-              let: { saleEmpIdString: "$validSaleEmpIdString" },
-              pipeline: [
-                {
-                  $match: {
-                    $expr: {
-                      $and: [
-                        { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
-                        { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
-                        { 
-                          $eq: [
-                            "$_id",
-                            { $toObjectId: "$$saleEmpIdString" }
-                          ]
-                        }
-                      ]
-                    }
-                  }
-                },
-                {
-                  $project: {
-                    fullName: 1, // Include only the fullName field
-                    designation:1,
-                    type:1
-                  }}
-              ],
-              as: 'employeeDetails'
-            }
-          },
-          {'$unwind':{
-            'path':'$employeeDetails',
-            'preserveNullAndEmptyArrays':true
-          }},
-          {'$match':{
-               '$or': [
-                 { name: { $regex: searchQuery, $options: "i" } },
-                 { 'partnerDetails.fullName': { $regex: searchQuery, $options: "i" } },
-                 { 'employeeDetails.fullName': { $regex: searchQuery, $options: "i" } },
-                 { consultantCode: { $regex: searchQuery, $options: "i" } },
-                 { fileNo: { $regex: searchQuery, $options: "i" } },
-                 { email: { $regex: searchQuery, $options: "i" } },
-                 { mobileNo: { $regex: searchQuery, $options: "i" } },
-                 { policyType: { $regex: searchQuery, $options: "i" } },
-                 { caseFrom: { $regex: searchQuery, $options: "i" } },
-                 { branchId: { $regex: searchQuery, $options: "i" } },
-               ]          
-          }},
-          {'$sort':{'createdAt':-1}},
-       ];
-       
-       const result = await Case.aggregate(pipeline);
+            )
+         }
 
-      const excelBuffer = await getDownloadCaseExcel(result)
-      res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.status(200)
-      res.send(excelBuffer)
+         if (searchQuery) {
+            andCondition.push(
+               {
+                  $or: [
+                     { name: { $regex: searchQuery, $options: "i" } },
+                     { 'employeeDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                     { 'partnerDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                     { partnerName: { $regex: searchQuery, $options: "i" } },
+                     { consultantCode: { $regex: searchQuery, $options: "i" } },
+                     { fileNo: { $regex: searchQuery, $options: "i" } },
+                     { email: { $regex: searchQuery, $options: "i" } },
+                     { mobileNo: { $regex: searchQuery, $options: "i" } },
+                     { policyType: { $regex: searchQuery, $options: "i" } },
+                     { caseFrom: { $regex: searchQuery, $options: "i" } },
+                     { branchId: { $regex: searchQuery, $options: "i" } },
+                  ]
+               }
+            )
+         }
+
+         if (startDate && endDate) {
+            const start = new Date(startDate).setHours(0, 0, 0, 0);
+            const end = new Date(endDate).setHours(23, 59, 59, 999);
+            andCondition.push(
+               {
+                  createdAt: {
+                     $gte: new Date(start),
+                     $lte: new Date(end)
+                  }
+               }
+
+            )
+         }
+
+
+         let matchQuery = {
+            $and: andCondition
+         };
+
+         const pipeline = [
+            {
+               $lookup: {
+                  from: "casepaymentdetails",       // Collection name
+                  localField: "_id",             // Field in `cases` collection
+                  foreignField: "caseId",           // Field in `CasePaymentDetails` collection
+                  as: "paymentDetails"             // Output array field
+               }
+            },
+            {
+               $lookup: {
+                  from: "casestatuses",
+                  let: { caseId: "$_id" },
+                  pipeline: [
+                     { $match: { $expr: { $eq: ["$caseId", "$$caseId"] } } },
+                     {
+                        $sort: {
+                           date: -1, createdAt: -1
+                        }
+                     }, // Sort by updatedAt descending
+                     { $limit: 1 }                 // Take the latest case status
+                  ],
+                  as: "latestCaseStatus"
+               }
+            },
+            {
+               '$unwind': {
+                  'path': '$latestCaseStatus'
+               }
+            },
+            {
+               $addFields: {
+                 validPartnerIdString: {
+                   $cond: {
+                     if: {
+                       $and: [
+                         { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
+                         { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
+                         { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
+                       ]
+                     },
+                     then: "$partnerId",
+                     else: null
+                   }
+                 }
+               }
+             },
+             {
+               $lookup: {
+                 from: 'partners',
+                 let: { partnerIdString: "$validPartnerIdString" },
+                 pipeline: [
+                   {
+                     $match: {
+                       $expr: {
+                         $and: [
+                           { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
+                           { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
+                           { 
+                             $eq: [
+                               "$_id",
+                               { $toObjectId: "$$partnerIdString" }
+                             ]
+                           }
+                         ]
+                       }
+                     }
+                   },
+                   {
+                     $project: {
+                       fullName: 1 // Include only the fullName field
+                     }}
+                 ],
+                 as: 'partnerDetails'
+               }
+             },
+             {'$unwind':{
+               'path':'$partnerDetails',
+               'preserveNullAndEmptyArrays':true
+             }},
+             {
+               $addFields: {
+                 validSaleEmpIdString: {
+                   $cond: {
+                     if: {
+                       $and: [
+                         { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
+                         { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
+                         { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
+                       ]
+                     },
+                     then: "$empSaleId",
+                     else: null
+                   }
+                 }
+               }
+             },
+             {
+               $lookup: {
+                 from: 'employees',
+                 let: { saleEmpIdString: "$validSaleEmpIdString" },
+                 pipeline: [
+                   {
+                     $match: {
+                       $expr: {
+                         $and: [
+                           { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
+                           { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
+                           { 
+                             $eq: [
+                               "$_id",
+                               { $toObjectId: "$$saleEmpIdString" }
+                             ]
+                           }
+                         ]
+                       }
+                     }
+                   },
+                   {
+                     $project: {
+                       fullName: 1, // Include only the fullName field
+                       designation:1,
+                       type:1
+                     }}
+                 ],
+                 as: 'employeeDetails'
+               }
+             },
+             {'$unwind':{
+               'path':'$employeeDetails',
+               'preserveNullAndEmptyArrays':true
+             }},
+             {
+               '$project':{
+                  caseDocs: 0,
+                  processSteps: 0,
+                  addEmployee: 0,
+                  __v:0,
+                  validPartnerIdString:0,
+                  validSaleEmpIdString:0
+               }
+             },
+             {
+                $match: {
+                   ...matchQuery
+                  }
+               },
+               {'$sort':{'createdAt':-1}},
+         ]
+
+         const getAllCase = await Case.aggregate(pipeline)
+         const excelBuffer = await commonDownloadCaseExcel(getAllCase)
+         res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
+         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+         res.status(200)
+         res.send(excelBuffer)
 
    } catch (error) {
       console.log("adminDeleteClientById in error:", error);

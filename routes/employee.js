@@ -13,7 +13,7 @@ empChangeBranch,createSathiTeamAcc,empViewSathiEmployee,empDownloadSathiEmployee
 empOptShareCaseToEmployee,empDownloadAllEmployee,empClientDownload,empOpPaidInvoice,empOpGetSaleEmployee,
 empOpSharePartnerToSaleEmp,empAddPartnerRefToEmp,createOrUpdateStatement,getStatement,updateEmployeeAccount,getAllStatement,
 getAllNotification,updateNotification,empAddOrUpdatePayment,empDownloadAllInvoice,
-empDownloadAllStatement
+empDownloadAllStatement,employeeFindCaseByFileNo
 } from '../controller/employee.js';
 
 
@@ -36,6 +36,7 @@ router.get("/all/dashboard",allEmployeeDashboard)
 // case
 router.get("/viewAllCase",viewAllEmployeeCase)
 router.get("/viewCaseById",employeeViewCaseByIdBy)
+router.get("/employeeFindCaseByFileNo",employeeFindCaseByFileNo)
 router.put("/changeCaseStatus",changeStatusEmployeeCase)
 router.put("/addCaseComment",employeeAddCaseComment)
 router.put("/updateCaseById",employeeUpdateCaseById)

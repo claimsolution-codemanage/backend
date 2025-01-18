@@ -379,7 +379,6 @@ export const partnerGetDownloadCaseExcel = async (getAllCase = []) => {
 
 
 export const getDownloadCaseExcel = async (getAllCase = [],_id) => {
-  console.log("compare",_id);
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Cases');
   // Define Excel columns
@@ -407,7 +406,6 @@ export const getDownloadCaseExcel = async (getAllCase = [],_id) => {
     { header: 'City', key: 'city', width: 30 },
     { header: 'State', key: 'state', width: 30 },
     { header: 'Problem Statement', key: 'problemStatement', width: 30 },
-    // { header: 'Partner Consultant Code', key: 'partnerCode', width: 20 },
   ];
 
   // Populate Excel rows with data
@@ -438,6 +436,93 @@ export const getDownloadCaseExcel = async (getAllCase = [],_id) => {
       problemStatement: caseData?.problemStatement,
       // partnerCode: caseData?.partnerCode || "-",
     });
+  });
+
+
+  // Generate Excel buffer
+  return await workbook.xlsx.writeBuffer();
+}
+
+export const commonDownloadCaseExcel = async (getAllCase = [],_id) => {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Cases');
+  // Define Excel columns
+  worksheet.columns = [
+    { header: 'SL No.', key: 'sNo', width: 10 },
+    { header: 'Branch ID', key: 'branchId', width: 20 },
+    { header: 'Current Status', key: 'currentStatus', width: 30 },
+    { header: 'Status Date', key: 'statusDate', width: 20 },
+    { header: 'Status Remark', key: 'statusRemark', width: 20 },
+    { header: 'Date', key: 'date', width: 20 },
+    { header: 'Case From', key: 'caseFrom', width: 20 },
+    {header:"Team Added By",key:"addedBy",width:20},
+    { header: 'Partner Name', key: 'partnerName', width: 20 },
+    { header: 'Case Name', key: 'name', width: 30 },
+    { header: 'Mobile No', key: 'mobileNo', width: 30 },
+    { header: 'Email Id', key: 'email', width: 30 },
+    { header: 'claim Amount', key: 'claimAmount', width: 30 },
+    { header: 'Policy No', key: 'policyNo', width: 30 },
+    { header: 'File No', key: 'fileNo', width: 30 },
+    { header: 'Policy Type', key: 'policyType', width: 30 },
+    { header: 'Complaint Type', key: 'complaintType', width: 30 },
+    { header: 'Father Name', key: 'fatherName', width: 30 },
+    { header: 'Insurance Company Name', key: 'insuranceCompanyName', width: 30 },
+    { header: 'Address', key: 'address', width: 30 },
+    { header: 'DOB', key: 'DOB', width: 30 },
+    { header: 'Pin Code', key: 'pinCode', width: 30 },
+    { header: 'City', key: 'city', width: 30 },
+    { header: 'State', key: 'state', width: 30 },
+    { header: 'Problem Statement', key: 'problemStatement', width: 30 },
+    { header: 'Payment mode', key: 'paymentMode', width: 20 },
+    { header: 'Date of payment', key: 'dateofPayment', width: 20 },
+    { header: 'Bank name', key: 'bankName', width: 20 },
+    { header: 'Cheque number', key: 'chequeNumber', width: 20 },
+    { header: 'Amount', key: 'amount', width: 20 },
+    { header: 'Cheque date', key: 'chequeDate', width: 20 },
+    { header: 'UTR number', key: 'utrNumber', width: 20 },
+    { header: 'Transaction date', key: 'transactionDate', width: 20 },
+  ];
+
+  // Populate Excel rows with data
+  getAllCase.forEach((caseData, index) => {
+    const paymentDetails = caseData?.paymentDetails?.length>0 ? caseData?.paymentDetails : [{}];
+    paymentDetails?.forEach((payment,ind)=>{
+      worksheet.addRow({
+        sNo: (index+1 || ""),
+        branchId:caseData?.branchId || "",
+        currentStatus: caseData?.currentStatus || "",
+        statusDate: ind==0 ? (caseData?.latestCaseStatus?.date || caseData?.latestCaseStatus?.createdAt || "-") :"" ,
+        statusRemark: ind==0 ? (caseData?.latestCaseStatus?.remark || "-") :"" ,
+        date: ind==0 ? (caseData?.createdAt || "") :"" ,
+        caseFrom: ind==0 ? (caseData?.caseFrom || "") :"" ,
+        addedBy: ind==0 ?( caseData?.employeeDetails?.fullName ? `${caseData?.employeeDetails?.fullName} | ${caseData?.employeeDetails?.type} | ${caseData?.employeeDetails?.designation}` : "-") :"" ,
+        partnerName: ind==0 ? (caseData?.partnerDetails?.fullName || "-") :"" ,
+        name: ind==0 ? (caseData.name ||"") :"" ,
+        mobileNo: ind==0 ?( caseData?.mobileNo ||"") :"" ,
+        email: ind==0 ? (caseData?.email ||"") :"" ,
+        claimAmount: ind==0 ?( caseData?.claimAmount ||"") :"" ,
+        policyNo: ind==0 ? (caseData?.policyNo ||"") :"" ,
+        fileNo: caseData?.fileNo ||"" ,
+        policyType: ind==0 ? (caseData?.policyType ||"") :"" ,
+        complaintType: ind==0 ? (caseData?.complaintType ||"") :"" ,
+        fatherName: ind==0 ? (caseData?.fatherName ||""):"" ,
+        insuranceCompanyName: ind==0 ? (caseData?.insuranceCompanyName || "") :"" ,
+        address: ind==0 ? (caseData?.address ||"") :"" ,
+        DOB: ind==0 ? ( caseData?.DOB ||"") :"" ,
+        pinCode: ind==0 ? (caseData?.pinCode || "") :"" ,
+        city: ind==0 ?( caseData?.city || "") :"" ,
+        state: ind==0 ? (caseData?.state ||"") :"" ,
+        problemStatement: ind==0 ? (caseData?.problemStatement ||"") :"" ,
+        paymentMode:payment?.paymentMode ||"-",
+        dateofPayment:payment?.dateofPayment || "-",
+        bankName:payment?.bankName ||"-",
+        chequeNumber:payment?.chequeNumber || "-",
+        amount:payment?.amount || "-",
+        chequeDate:payment?.chequeDate || "-",
+        utrNumber:payment?.utrNumber || "-",
+        transactionDate:payment?.transactionDate || "-",
+      });
+    })
   });
 
 
