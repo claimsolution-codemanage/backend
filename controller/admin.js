@@ -19,7 +19,7 @@ import {
 import Partner from "../models/partner.js";
 import Client from '../models/client.js'
 import { validateAddClientCase, validateClientProfileBody } from "../utils/validateClient.js";
-import { trusted } from "mongoose";
+import { Types } from "mongoose";
 import Jwt from 'jsonwebtoken'
 import { validateResetPassword } from "../utils/helper.js";
 import jwtDecode from "jwt-decode";
@@ -34,11 +34,10 @@ import { bucket } from "../index.js";
 import CaseDoc from "../models/caseDoc.js";
 import CaseStatus from "../models/caseStatus.js";
 import CaseComment from "../models/caseComment.js";
-import { validateStatement } from "../utils/helperFunction.js";
 import Statement from "../models/statement.js";
-import {Types} from "mongoose";
 import Notification from "../models/notification.js";
 import CasePaymentDetails from "../models/casePaymentDetails.js";
+import EmpDoc from "../models/empDoc.js";
 
 
 export const adminAuthenticate = async (req, res) => {
@@ -491,10 +490,50 @@ export const adminEmployeeProfile = async (req,res)=>{
       const {_id} = req.query;
       if(!validMongooseId(_id)) return res.status(400).json({status:false,message:"Not a valid Id"})
 
-      const getEmp = await Employee.findById(_id).select("-password")
-      if(!getEmp) return res.status(400).json({success:false,message:"Employee account not found"})
-      
-      return res.status(200).json({success:true,data:getEmp})
+      const pipeline = [
+         {
+            '$match': {
+               '_id': new Types.ObjectId(_id)
+            }
+         },
+         {
+            '$project': {
+               'password': 0,
+               "updatedAt":0,
+               "__v":0
+            }
+         },
+         {
+            '$lookup': {
+               'from': 'empdocs',
+               'localField': '_id',
+               'foreignField': 'employeeId',
+               'as': 'docs',
+               'pipeline':[
+                  {
+                     '$project': {
+                        "type:":0,
+                        "format":0,
+                        'date':0,
+                        'isActive': 0,
+                        'employeeId':0,
+                        'isPrivate':0,
+                        'createdAt':0,
+                        'updatedAt':0,
+                        "__v":0,
+                     }  
+                  }
+               ]
+            }
+         }
+      ]
+
+      const data = await Employee.aggregate(pipeline)
+      if (!data?.[0]) {
+         return res.status(400).json({ success: false, message: "Employee account not found" })
+      }
+
+      return res.status(200).json({success:true,data:data?.[0]})
 
    } catch (error) {
       console.log("adminEmployeeProfile in error:",error);
@@ -506,6 +545,7 @@ export const adminEmployeeProfile = async (req,res)=>{
 export const adminUpdateEmployeeAccount = async (req, res) => {
    try {
       const { _id } = req.query
+      const {docs} = req.body
       const verify = await authAdmin(req, res)
       if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -513,29 +553,45 @@ export const adminUpdateEmployeeAccount = async (req, res) => {
       if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
       if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
-      const { error } = validateEmployeeUpdate(req.body)
-      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-      const updateEmployee = await Employee.findByIdAndUpdate(_id, {
-         $set: {
-            fullName: req?.body?.fullName?.trim(),
-            type: req?.body?.type,
-            branchId:req.body?.branchId?.trim(),
-            designation: req?.body?.designation?.trim(),
-            bankName:req?.body?.bankName?.trim(),
-            bankBranchName:req?.body?.bankBranchName?.trim(),
-            bankAccountNo:req?.body?.bankAccountNo?.trim(),
-            panNo:req?.body?.panNo?.trim(),
-            address:req?.body?.address?.trim(),
+      const updateKeys = ["fullName","type","branchId","designation","bankName","bankBranchName","bankAccountNo","panNo","address",
+         "profileImg","dob","gender", "district","city", "state","pinCode"
+      ]
+
+      const isExist = await Employee.findOne({_id})
+      if(!isExist){
+         return res.status(400).json({ success: false, message: "Employee not found" })
+      }
+
+      updateKeys?.forEach(ele=>{
+         if(req.body[ele]){
+            isExist[ele] = req.body[ele]
          }
       })
-      if (!updateEmployee) return res.status(401).json({ success: false, message: "Employee not found" })
+
+      const oldDocs = docs?.filter(ele=>Boolean(ele?._id))
+      const deleteDoc = oldDocs?.map(ele=>ele?._id)
+      console.log("dele",deleteDoc);
+      
+      await EmpDoc.deleteMany({employeeId:isExist?._id?.toString(),_id:{$nin:deleteDoc}})
+
+      const newDoc = req?.body?.docs?.filter(doc=>doc?.new) || []
+      let selectedDocs = newDoc?.map(doc=>{
+         return {
+            name: doc?.docName,
+            type: doc?.docType,
+            format: doc?.docFormat,
+            url: doc?.docURL,
+            employeeId: isExist?._id,
+            isPrivate:doc?.isPrivate || false,
+         }
+      })
+
+      await EmpDoc.insertMany(selectedDocs)
+
+      await isExist.save()
       return res.status(200).json({ success: true, message: "Successfully update Employee" });
-
-
-
    } catch (error) {
       console.log("updateEmployeeAccount in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -2331,18 +2387,6 @@ export const adminUpdateCaseById = async (req, res) => {
       
       const newDoc = req?.body?.caseDocs?.filter(doc=>doc?.new)
       const oldDoc = req?.body?.caseDocs?.filter(doc=>!doc?.new)
-
-      // req.body.caseDocs = req?.body?.caseDocs?.map(caseFile => {
-      //    return {
-      //       docDate: caseFile?.docDate ? caseFile?.docDate : new Date(),
-      //       docName: caseFile?.docName,
-      //       docType: caseFile?.docFormat,
-      //       docFormat: caseFile?.docFormat,
-      //       docURL: caseFile?.docURL,
-      //    }
-      // })
-
-      // console.log("case_id", _id, req.body);
 
       const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body,caseDocs:oldDoc } }, { new: true })
       await Promise.all(newDoc?.map(async (doc) => {

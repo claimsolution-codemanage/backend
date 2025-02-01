@@ -17,6 +17,13 @@ const employeeSchema = new mongoose.Schema({
    bankAccountNo:{type:String,default:""},
    panNo:{type:String,default:""},
    address:{type:String,default:""},
+   profileImg:{type:String,default:""},
+   dob:{type:Date,default:new Date()},
+   gender:{type:String,default:""},
+   district:{type:String,default:""},
+   city:{type:String,default:""},
+   state:{type:String,default:""},
+   pinCode:{type:String,default:""},
    isActive:{type:"boolean",default:true,required:"true"}
 },{timestamps:true});
 
