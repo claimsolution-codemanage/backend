@@ -19,7 +19,7 @@ adminAllUnactiveCaseDoc,adminUnactiveCaseDoc,adminChangeBranch,
 adminEmployeeProfile,adminDownloadEmpSathiEmployee,adminViewEmpSathiEmployee,
 adminDownloadAllEmployee,adminPaidInvoice,adminAddPartnerRefToEmp,
 createOrUpdateStatement,getStatement,getAllStatement,getAllNotification,updateNotification,
-adminAddOrUpdatePayment,adminDownloadAllInvoice,adminDownloadAllStatement
+adminAddOrUpdatePayment,adminDownloadAllInvoice,adminDownloadAllStatement,adminFindCaseByFileNo
 } from '../controller/admin.js';
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
@@ -156,6 +156,7 @@ router.post("/createOrUpdateStatement",createOrUpdateStatement)
 router.get("/getAllStatement",getStatement)
 router.get("/getStatements",getAllStatement)
 router.get("/download/downloadAllStatement",adminDownloadAllStatement)
+router.get("/adminFindCaseByFileNo",adminFindCaseByFileNo)
 
 // notification
 router.get("/getAllNotification",getAllNotification)

@@ -1085,17 +1085,13 @@ export const employeeFindCaseByFileNo = async (req, res) => {
          {
             $project: {
                clientId: 1,
-               consultantCode: 1,
                name: 1,
                fileNo: 1,
                claimAmount: 1,
                policyNo: 1,
-               currentStatus: 1,
                insuranceCompanyName: 1,
-               branchId: 1,
                partnerId: 1,
                empSaleId: 1,
-               createdAt: 1,
             }
          },
          {

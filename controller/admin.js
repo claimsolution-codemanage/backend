@@ -5547,3 +5547,156 @@ export const updateNotification = async (req, res) => {
 
    }
 }
+
+export const adminFindCaseByFileNo = async (req, res) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      const { fileNo } = req.query;
+      const pipeline = [
+         {
+            $match: {
+               fileNo: fileNo || ""
+            }
+         },
+         {
+            $project: {
+               clientId: 1,
+               name: 1,
+               fileNo: 1,
+               claimAmount: 1,
+               policyNo: 1,
+               insuranceCompanyName: 1,
+               partnerId: 1,
+               empSaleId: 1,
+            }
+         },
+         {
+            $addFields: {
+               validPartnerIdString: {
+                  $cond: {
+                     if: {
+                        $and: [
+                           { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
+                           { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
+                           { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
+                        ]
+                     },
+                     then: "$partnerId",
+                     else: null
+                  }
+               }
+            }
+         },
+         {
+            $lookup: {
+               from: 'partners',
+               let: { partnerIdString: "$validPartnerIdString" },
+               pipeline: [
+                  {
+                     $match: {
+                        $expr: {
+                           $and: [
+                              { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
+                              { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
+                              {
+                                 $eq: [
+                                    "$_id",
+                                    { $toObjectId: "$$partnerIdString" }
+                                 ]
+                              }
+                           ]
+                        }
+                     }
+                  },
+                  {
+                     $project: {
+                        fullName: 1, // Include only the fullName field,
+                        email: 1
+                     }
+                  }
+               ],
+               as: 'partnerDetails'
+            }
+         },
+         {
+            '$unwind': {
+               'path': '$partnerDetails',
+               'preserveNullAndEmptyArrays': true
+            }
+         },
+         {
+            $addFields: {
+               validSaleEmpIdString: {
+                  $cond: {
+                     if: {
+                        $and: [
+                           { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
+                           { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
+                           { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
+                        ]
+                     },
+                     then: "$empSaleId",
+                     else: null
+                  }
+               }
+            }
+         },
+         {
+            $lookup: {
+               from: 'employees',
+               let: { saleEmpIdString: "$validSaleEmpIdString" },
+               pipeline: [
+                  {
+                     $match: {
+                        $expr: {
+                           $and: [
+                              { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
+                              { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
+                              {
+                                 $eq: [
+                                    "$_id",
+                                    { $toObjectId: "$$saleEmpIdString" }
+                                 ]
+                              }
+                           ]
+                        }
+                     }
+                  },
+                  {
+                     $project: {
+                        fullName: 1, // Include only the fullName field
+                        designation: 1,
+                        type: 1,
+                        email: 1,
+                     }
+                  }
+               ],
+               as: 'employeeDetails'
+            }
+         },
+         {
+            '$unwind': {
+               'path': '$employeeDetails',
+               'preserveNullAndEmptyArrays': true
+            }
+         },
+
+         { '$sort': { 'createdAt': -1 } },
+      ];
+
+      const result = await Case.aggregate(pipeline);
+
+      return res.status(200).json({ success: true, message: "get case data", data: result });
+
+   } catch (error) {
+      console.log("updateAdminCase in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
