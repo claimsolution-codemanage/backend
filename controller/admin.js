@@ -9,7 +9,7 @@ import { commonDownloadCaseExcel, commonInvoiceDownloadExcel, generatePassword, 
 import { sendAdminSigninMail, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import { authAdmin } from "../middleware/authentication.js";
 import Employee from "../models/employee.js";
-import { validateEmployeeSignUp, validateEmployeeUpdate } from "../utils/validateEmployee.js";
+import { validateEmployeeSignUp } from "../utils/validateEmployee.js";
 import { validMongooseId } from "../utils/helper.js";
 import Case from "../models/case.js";
 import {
@@ -38,7 +38,7 @@ import Statement from "../models/statement.js";
 import Notification from "../models/notification.js";
 import CasePaymentDetails from "../models/casePaymentDetails.js";
 import EmpDoc from "../models/empDoc.js";
-
+import EmployeeJoiningForm from "../models/employeeJoiningForm.js";
 
 export const adminAuthenticate = async (req, res) => {
    try {
@@ -5698,5 +5698,60 @@ export const adminFindCaseByFileNo = async (req, res) => {
       console.log("updateAdminCase in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
 
+   }
+}
+
+export const adminAddOrUpdateEmpJoiningForm = async (req, res) => {
+   try {
+      const {empId} = req.body
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      let isExist = await EmployeeJoiningForm.findOne({empId})
+
+      if(!isExist){
+         isExist = new EmployeeJoiningForm({empId})
+      }
+
+      const updateKeys = ["name", "fatherName","correspondenceAddress","permanentAddress","telephone", "mobile", "email",
+         "dateOfBirth", "maritalStatus","panCardNo","bloodGroup", "emergencyContact","educationalDetails",
+         "employmentDetails", "familyDetails", "professionalReferences", "signature","place","date",]
+
+    updateKeys.forEach(key=>{
+      if(req.body[key]){
+         isExist[key] = req.body[key]
+      }
+    })
+
+    isExist.isActive = true
+    await isExist.save()
+    return res.status(200).json({ success: true, message: `Success`});
+
+   } catch (error) {
+      console.log("addOrUpdateEmpJoiningForm in error:", error);
+      res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
+   }
+}
+
+export const admingetEmpJoiningForm = async (req, res) => {
+   try {
+      const { empId } = req.query
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+      let isExist = await EmployeeJoiningForm.findOne({ empId })
+      return res.status(200).json({ success: true, message: `Success`, data: isExist });
+
+   } catch (error) {
+      console.log("addOrUpdateEmpJoiningForm in error:", error);
+      res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
    }
 }

@@ -19,8 +19,11 @@ adminAllUnactiveCaseDoc,adminUnactiveCaseDoc,adminChangeBranch,
 adminEmployeeProfile,adminDownloadEmpSathiEmployee,adminViewEmpSathiEmployee,
 adminDownloadAllEmployee,adminPaidInvoice,adminAddPartnerRefToEmp,
 createOrUpdateStatement,getStatement,getAllStatement,getAllNotification,updateNotification,
-adminAddOrUpdatePayment,adminDownloadAllInvoice,adminDownloadAllStatement,adminFindCaseByFileNo
+adminAddOrUpdatePayment,adminDownloadAllInvoice,adminDownloadAllStatement,adminFindCaseByFileNo,
+adminAddOrUpdateEmpJoiningForm,
+admingetEmpJoiningForm
 } from '../controller/admin.js';
+
 
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
 import { viewAllAdminComplaint,adminRemoveComplaintById } from '../controller/complaint.js';
@@ -50,6 +53,9 @@ router.put("/setIsActiveEmployee",adminSetIsActiveEmployee)
 router.get("/adminViewAllEmployee",adminViewAllEmployee)
 router.get("/sale-employee",adminGetSaleEmployee)
 router.get("/normal-employee",adminGetNormalEmployee)
+router.post("/employee/adminAddOrUpdateEmpJoiningForm",adminAddOrUpdateEmpJoiningForm)
+router.get("/employee/admingetEmpJoiningForm",admingetEmpJoiningForm)
+
 
 // for partner
 router.get("/viewAllPartner",viewAllPartnerByAdmin)
