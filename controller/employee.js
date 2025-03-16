@@ -28,6 +28,8 @@ import {Types} from "mongoose";
 import Statement from "../models/statement.js";
 import Notification from "../models/notification.js";
 import CasePaymentDetails from "../models/casePaymentDetails.js";
+import { createOrUpdateCaseStatusForm } from "../utils/dbFunction.js";
+import CasegroStatus from "../models/groStatus.js";
 
 export const employeeAuthenticate = async (req, res) => {
    try {
@@ -278,6 +280,24 @@ export const empOpGetSaleEmployee = async (req, res) => {
       const noOfEmployee = await Employee.find(query).count()
       return res.status(200).json({ success: true, message: "get sale employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
 
+   } catch (error) {
+      console.log("empop sale emp in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+   }
+}
+
+export const empOpCreateOrUpdateCaseForm = async (req, res,next) => {
+   try {
+      const verify =  await authEmployee(req,res)
+      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+
+      const employee = await Employee.findById(req?.user?._id)
+      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
+      
+      await createOrUpdateCaseStatusForm(req,res,next)
    } catch (error) {
       console.log("empop sale emp in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -1040,6 +1060,7 @@ export const employeeViewCaseByIdBy = async (req, res) => {
       const employee = await Employee.findById(req?.user?._id)
       if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
       if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      let isOperation = employee?.type?.toLowerCase() == "operation"
 
 
 
@@ -1048,15 +1069,32 @@ export const employeeViewCaseByIdBy = async (req, res) => {
 
       const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit")
       if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
-      const getCaseDoc = await CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
-      const getCaseStatus = await CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
-      const getCaseComment = await CaseComment.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true })
-      const getCasePaymentDetails = await CasePaymentDetails.find({ caseId: getCase?._id, isActive: true })
-      const getCaseJson = getCase.toObject()
-      getCaseJson.caseDocs = getCaseDoc
-      getCaseJson.processSteps = getCaseStatus
-      getCaseJson.caseCommit = getCaseComment
-      getCaseJson.casePayment = getCasePaymentDetails
+         const [getCaseDoc, getCaseStatus, getCaseComment, getCasePaymentDetails, getCaseGroDetails] = await Promise.all([
+            CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
+            CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
+            CaseComment.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }),
+            CasePaymentDetails.find({ caseId: getCase?._id, isActive: true }),
+            CasegroStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
+          ]);
+          
+          // Convert `getCaseGroDetails` to a plain object if it exists
+            const caseGroDetailsObj = getCaseGroDetails ? getCaseGroDetails.toObject() : null;
+          const getCaseJson = getCase.toObject();
+          getCaseJson.caseDocs = getCaseDoc;
+          getCaseJson.processSteps = getCaseStatus;
+          getCaseJson.caseCommit = getCaseComment;
+          getCaseJson.casePayment = getCasePaymentDetails;
+          if(caseGroDetailsObj){
+             getCaseJson.caseGroDetails = {
+               ...caseGroDetailsObj,
+               groStatusUpdates: caseGroDetailsObj?.groStatusUpdates?.filter(ele => isOperation || ele?.isPrivate) || [],
+               queryHandling: caseGroDetailsObj?.queryHandling?.filter(ele => isOperation || ele?.isPrivate) || [],
+               queryReply: caseGroDetailsObj?.queryReply?.filter(ele => isOperation || ele?.isPrivate) || [],
+               approvalLetter: caseGroDetailsObj?.approvalLetterPrivate ? (isOperation && caseGroDetailsObj?.approvalLetter) : caseGroDetailsObj?.approvalLetter,
+             };          
+          }else{
+            getCaseJson.caseGroDetails = caseGroDetailsObj
+          }
       return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
 
    } catch (error) {

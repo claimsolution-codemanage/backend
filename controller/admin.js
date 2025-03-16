@@ -39,6 +39,8 @@ import Notification from "../models/notification.js";
 import CasePaymentDetails from "../models/casePaymentDetails.js";
 import EmpDoc from "../models/empDoc.js";
 import EmployeeJoiningForm from "../models/employeeJoiningForm.js";
+import CasegroStatus from "../models/groStatus.js";
+import { createOrUpdateCaseStatusForm } from "../utils/dbFunction.js";
 
 export const adminAuthenticate = async (req, res) => {
    try {
@@ -2017,15 +2019,20 @@ export const viewCaseByIdByAdmin = async (req, res) => {
 
       const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit")
       if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
-      const getCaseDoc = await CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
-      const getCaseStatus = await CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
-      const getCaseComment = await CaseComment.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true })
-      const getCasePaymentDetails = await CasePaymentDetails.find({ caseId: getCase?._id, isActive: true })
-      const getCaseJson = getCase.toObject()
-      getCaseJson.caseDocs = getCaseDoc
-      getCaseJson.processSteps = getCaseStatus
-      getCaseJson.caseCommit = getCaseComment
-      getCaseJson.casePayment = getCasePaymentDetails
+      const [getCaseDoc, getCaseStatus, getCaseComment, getCasePaymentDetails, getCaseGroDetails] = await Promise.all([
+         CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
+         CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
+         CaseComment.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }),
+         CasePaymentDetails.find({ caseId: getCase?._id, isActive: true }),
+         CasegroStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
+       ]);
+
+       const getCaseJson = getCase.toObject();
+       getCaseJson.caseDocs = getCaseDoc;
+       getCaseJson.processSteps = getCaseStatus;
+       getCaseJson.caseCommit = getCaseComment;
+       getCaseJson.casePayment = getCasePaymentDetails;
+       getCaseJson.caseGroDetails = getCaseGroDetails
       return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
 
    } catch (error) {
@@ -3117,6 +3124,22 @@ export const adminDeleteCaseDocById = async (req, res) => {
    } catch (error) {
       console.log("adminDeleteCaseDocById in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
+export const adminCreateOrUpdateCaseForm = async (req, res,next) => {
+   try {
+      const verify = await authAdmin(req, res)
+      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+      const admin = await Admin.findById(req?.user?._id)
+      if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+      if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      
+      await createOrUpdateCaseStatusForm(req,res,next)
+   } catch (error) {
+      console.log("adminCreateOrUpdateCaseForm in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }
 

@@ -21,6 +21,7 @@ import CaseStatus from "../models/caseStatus.js";
 import Statement from "../models/statement.js";
 import Notification from "../models/notification.js";
 import CasePaymentDetails from "../models/casePaymentDetails.js";
+import CasegroStatus from "../models/groStatus.js";
 
 
 
@@ -909,28 +910,46 @@ export const partnerViewCaseById = async (req, res) => {
     if (!partner?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
     const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails")
     if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
-    const getCaseDoc = await CaseDoc.find({ 
-      $and: [
-        {
-          $or: [
-            { caseId: getCase?._id },
-            { caseMargeId: getCase?._id }
-          ]
-        },
-        {
-          $or: [
-            { isPrivate: false },
-            { isPrivate: { $exists: false } }
-          ]
-        }
-      ],  
-    isActive: true }).select("-adminId")
-    const getCaseStatus = await CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId")
-    const getCasePaymentDetails = await CasePaymentDetails.find({ caseId: getCase?._id, isActive: true })
-    const getCaseJson = getCase.toObject()
-    getCaseJson.caseDocs = getCaseDoc
-    getCaseJson.processSteps = getCaseStatus
-    getCaseJson.casePayment = getCasePaymentDetails
+
+    const [getCaseDoc, getCaseStatus, getCasePaymentDetails, getCaseGroDetails] = await Promise.all([
+      CaseDoc.find({ 
+        $and: [
+          {
+            $or: [
+              { caseId: getCase?._id },
+              { caseMargeId: getCase?._id }
+            ]
+          },
+          {
+            $or: [
+              { isPrivate: false },
+              { isPrivate: { $exists: false } }
+            ]
+          }
+        ],  
+      isActive: true }).select("-adminId"),
+      CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
+      CasePaymentDetails.find({ caseId: getCase?._id, isActive: true }),
+      CasegroStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
+    ]);
+    
+    // Convert `getCaseGroDetails` to a plain object if it exists
+      const caseGroDetailsObj = getCaseGroDetails ? getCaseGroDetails.toObject() : null;
+    const getCaseJson = getCase.toObject();
+    getCaseJson.caseDocs = getCaseDoc;
+    getCaseJson.processSteps = getCaseStatus;
+    getCaseJson.casePayment = getCasePaymentDetails;
+    if(caseGroDetailsObj){
+       getCaseJson.caseGroDetails = {
+         ...caseGroDetailsObj,
+         groStatusUpdates: caseGroDetailsObj?.groStatusUpdates?.filter(ele => ele?.isPrivate) || [],
+         queryHandling: caseGroDetailsObj?.queryHandling?.filter(ele => ele?.isPrivate) || [],
+         queryReply: caseGroDetailsObj?.queryReply?.filter(ele => ele?.isPrivate) || [],
+         approvalLetter: caseGroDetailsObj?.approvalLetterPrivate ? "" : caseGroDetailsObj?.approvalLetter,
+       };          
+    }else{
+      getCaseJson.caseGroDetails = caseGroDetailsObj
+    }
     return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
 
   } catch (error) {

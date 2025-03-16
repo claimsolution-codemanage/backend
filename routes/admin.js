@@ -21,7 +21,8 @@ adminDownloadAllEmployee,adminPaidInvoice,adminAddPartnerRefToEmp,
 createOrUpdateStatement,getStatement,getAllStatement,getAllNotification,updateNotification,
 adminAddOrUpdatePayment,adminDownloadAllInvoice,adminDownloadAllStatement,adminFindCaseByFileNo,
 adminAddOrUpdateEmpJoiningForm,
-admingetEmpJoiningForm
+admingetEmpJoiningForm,
+adminCreateOrUpdateCaseForm
 } from '../controller/admin.js';
 
 
@@ -90,6 +91,7 @@ router.put("/addReferenceCaseAndMarge",adminAddReferenceCaseAndMarge)
 router.put("/removeReferenceCase",adminRemoveReferenceCase)
 router.delete("/deleteCaseById",adminDeleteCaseById)
 router.delete("/deleteCaseDocId",adminDeleteCaseDocById)
+router.post("/adminCreateOrUpdateCaseForm",adminCreateOrUpdateCaseForm)
 
 
 // case doc
