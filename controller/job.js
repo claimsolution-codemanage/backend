@@ -7,12 +7,13 @@ import { validateAdminAddJob } from "../utils/validateAdmin.js"
 
 export const adminAddJob = async (req,res)=>{
     try {
-       const verify =  await authAdmin(req,res)
-       if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+      const {admin} = req
+      //  const verify =  await authAdmin(req,res)
+      //  if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
  
-       const admin = await Admin.findById(req?.user?._id)
-       if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      //  const admin = await Admin.findById(req?.user?._id)
+      //  if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+      // if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
        const {error} = validateAdminAddJob(req.body)
@@ -41,12 +42,13 @@ export const adminAddJob = async (req,res)=>{
 
  export const adminDeleteJob = async (req,res)=>{
     try {
-        const verify =  await authAdmin(req,res)
-        if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+      const {admin} = req
+      //   const verify =  await authAdmin(req,res)
+      //   if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
   
-        const admin = await Admin.findById(req?.user?._id)
-        if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      //   const admin = await Admin.findById(req?.user?._id)
+      //   if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+      // if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
   
         if(!validMongooseId(req.query._id)) return res.status(400).json({success: false, message:"Not a valid id"})

@@ -4,6 +4,7 @@ import CasegroStatus from "../models/groStatus.js"
 import Statement from "../models/statement.js"
 import Bill from "../models/bill.js"
 import Client from "../models/client.js"
+import CaseOmbudsmanStatus from "../models/ombudsmanStatus.js"
 
 const senderDetails = {
     name: "ADAKIYA CONSULTANCY SERVICES PVT.LTD",
@@ -37,8 +38,8 @@ export const createOrUpdateCaseStatusForm = async (req, res, next) => {
             mobileNo: findClient?.profile?.primaryMobileNo || "",
         }
 
+        let isExist;
         if (type && type?.toLowerCase() == "gro") {
-            let isExist;
             if (_id) {
                 isExist = await CasegroStatus.findOne({ caseId, isActive: true })
                 if (!isExist) return res.status(400).json({ status: 0, message: "GRO is not found" })
@@ -57,102 +58,124 @@ export const createOrUpdateCaseStatusForm = async (req, res, next) => {
             updateBooleanKeys.forEach(ele => {
                 isExist[ele] = Boolean(req.body[ele]) || false
             })
+        }else if(type && type?.toLowerCase() == "ombudsman"){
+            if (_id) {
+                isExist = await CaseOmbudsmanStatus.findOne({ caseId, isActive: true })
+                if (!isExist) return res.status(400).json({ status: 0, message: "Ombudsman is not found" })
+            } else {
+                isExist = new CaseOmbudsmanStatus({
+                    caseId, clientId: findCase?.clientId, branchId: findCase?.branchId || ""
+                })
+            }
+            const updateKeys = ["partnerFee", "consultantFee", "filingDate","complaintNumber","method", "statusUpdates", "queryHandling", "queryReply","hearingSchedule","awardPart", "approvedAmount", "approvalDate","approvalLetter"]
+            const updateBooleanKeys = ["specialCase", "isSettelment", "approved", "approvalLetterPrivate"]
+            updateKeys.forEach(ele => {
+                if (req.body[ele]) {
+                    isExist[ele] = req.body[ele]
+                }
+            })
+            updateBooleanKeys.forEach(ele => {
+                isExist[ele] = Boolean(req.body[ele]) || false
+            })
+        }
 
-            if (isSettelment) {
-                let isExistPaymentDetails = await CasePaymentDetails.findOne({ _id: isExist?.paymentDetailsId, isActive: true })
-                console.log("isExistPaymentDetails",isExistPaymentDetails);
-                
-                if (!isExistPaymentDetails) {
-                    isExistPaymentDetails = new CasePaymentDetails({ caseId:findCase?._id, isActive: true, branchId: findCase?.branchId || "" })
+        if (isSettelment && isExist) {
+            let isExistPaymentDetails = await CasePaymentDetails.findOne({ _id: isExist?.paymentDetailsId, isActive: true })
+            console.log("isExistPaymentDetails",isExistPaymentDetails);
+            
+            if (!isExistPaymentDetails) {
+                isExistPaymentDetails = new CasePaymentDetails({ caseId:findCase?._id, isActive: true, branchId: findCase?.branchId || "" })
+            }
+
+            const approvedAmt = req?.body?.amount ? Number(req?.body?.amount) : 0
+
+            const updatePaymentDetailsKeys = ["paymentMode", "dateOfPayment", "utrNumber", "bankName", "chequeNumber", "chequeDate", "amount", "transactionDate"]
+            updatePaymentDetailsKeys.forEach(ele => {
+                if (req.body[ele]) {
+                    isExistPaymentDetails[ele] = req.body[ele]
+                }
+            })
+            await isExistPaymentDetails.save()
+            isExist.paymentDetailsId = isExistPaymentDetails?._id
+
+            console.log("partnerId",findCase?.branchId);
+            
+            if (findCase?.partnerId && partnerFee) {
+                let isExistStatement = await Statement.findOne({_id:isExist.statementId, isActive: true })
+                if (!isExistStatement) {
+                    isExistStatement = new Statement({ partnerId: findCase?.partnerId, isActive: true, branchId: findCase?.branchId})
                 }
 
-                const approvedAmt = req?.body?.amount ? Number(req?.body?.amount) : 0
+                const payAmt = approvedAmt * Number(partnerFee) / 100
 
-                const updatePaymentDetailsKeys = ["paymentMode", "dateOfPayment", "utrNumber", "bankName", "chequeNumber", "chequeDate", "amount", "transactionDate"]
+                const updatePaymentDetailsKeys = ["caseLogin", "policyHolder", "fileNo", "policyNo", "insuranceCompanyName", "claimAmount", "approvedAmt", "constultancyFee",
+                    "TDS", "modeOfLogin", "payableAmt", "utrDetails"]
+                const satatmentDetails = {
+                    "caseLogin": findCase?.createdAt,
+                    "policyHolder": findCase?.name,
+                    "fileNo": findCase?.fileNo,
+                    "policyNo": findCase?.policyNo,
+                    "insuranceCompanyName": findCase?.insuranceCompanyName,
+                    "claimAmount": findCase?.claimAmount,
+                    "approvedAmt": approvedAmt,
+                    "constultancyFee": payAmt,
+                    "TDS": 0,
+                    "modeOfLogin": "Online",
+                    "payableAmt": payAmt,
+                    "utrDetails": "",
+                }
                 updatePaymentDetailsKeys.forEach(ele => {
-                    if (req.body[ele]) {
-                        isExistPaymentDetails[ele] = req.body[ele]
+                    if (satatmentDetails[ele]) {
+                        isExistStatement[ele] = satatmentDetails[ele]
                     }
                 })
-                await isExistPaymentDetails.save()
-                isExist.paymentDetailsId = isExistPaymentDetails?._id
+                await isExistStatement.save()
+                isExist.statementId = isExistStatement._id
+            }
+        }
 
-                console.log("partnerId",findCase?.branchId);
+        if (approved && isExist) {
+            const billCount = await Bill.find({}).count()
+            let isExistBill = await Bill.findOne({ _id: isExist?.billId, isActive: true })
+            if (!isExistBill) {
+                isExistBill = new Bill({
+                    invoiceNo: `ACS-${billCount + 1}`, caseId,
+                    clientId: findCase?.clientId,
+                    branchId: findCase?.branchId || "",
+                    billDate: new Date()
+                })
+            }
+            if (!isExistBill?.isPaid) {
+                let gstRate = 18
+                let totalAmt = Number(approvedAmount || 0) * Number(consultantFee || 0) / 100
+                let gstAmt = totalAmt * gstRate / 100 || 0
+                let subAmt = totalAmt - gstAmt
+                console.log("caseFee",gstAmt,subAmt,totalAmt);
                 
-                if (findCase?.partnerId && partnerFee) {
-                    let isExistStatement = await Statement.findOne({_id:isExist.statementId, isActive: true })
-                    if (!isExistStatement) {
-                        isExistStatement = new Statement({ partnerId: findCase?.partnerId, isActive: true, branchId: findCase?.branchId})
-                    }
-
-                    const payAmt = approvedAmt * Number(partnerFee) / 100
-
-                    const updatePaymentDetailsKeys = ["caseLogin", "policyHolder", "fileNo", "policyNo", "insuranceCompanyName", "claimAmount", "approvedAmt", "constultancyFee",
-                        "TDS", "modeOfLogin", "payableAmt", "utrDetails"]
-                    const satatmentDetails = {
-                        "caseLogin": findCase?.createdAt,
-                        "policyHolder": findCase?.name,
-                        "fileNo": findCase?.fileNo,
-                        "policyNo": findCase?.policyNo,
-                        "insuranceCompanyName": findCase?.insuranceCompanyName,
-                        "claimAmount": findCase?.claimAmount,
-                        "approvedAmt": approvedAmt,
-                        "constultancyFee": payAmt,
-                        "TDS": 0,
-                        "modeOfLogin": "Online",
-                        "payableAmt": payAmt,
-                        "utrDetails": "",
-                    }
-                    updatePaymentDetailsKeys.forEach(ele => {
-                        if (satatmentDetails[ele]) {
-                            isExistStatement[ele] = satatmentDetails[ele]
-                        }
-                    })
-                    await isExistStatement.save()
-                    isExist.statementId = isExistStatement._id
+                let itemDetails = {
+                    name: "fee",
+                    description: "consultant fee",
+                    quantity: 0,
+                    gstRate,
+                    rate: 0,
+                    gstAmt,
+                    amt: subAmt,
+                    totalAmt
                 }
+                isExistBill.sender = senderDetails
+                isExistBill.receiver = receiverDetails
+                isExistBill.invoiceItems = itemDetails
+                isExistBill.subAmt = subAmt
+                isExistBill.gstAmt = gstAmt
+                isExistBill.totalAmt = totalAmt
+
+                await isExistBill.save()
             }
 
-            if (approved) {
-                const billCount = await Bill.find({}).count()
-                let isExistBill = await Bill.findOne({ _id: isExist?.billId, isActive: true })
-                if (!isExistBill) {
-                    isExistBill = new Bill({
-                        invoiceNo: `ACS-${billCount + 1}`, caseId,
-                        clientId: findCase?.clientId,
-                        branchId: findCase?.branchId || "",
-                        billDate: new Date()
-                    })
-                }
-                if (!isExistBill?.isPaid) {
-                    let gstRate = 18
-                    let totalAmt = Number(approvedAmount || 0) * Number(consultantFee || 0) / 100
-                    let gstAmt = totalAmt * gstRate / 100 || 0
-                    let subAmt = totalAmt - gstAmt
-                    console.log("caseFee",gstAmt,subAmt,totalAmt);
-                    
-                    let itemDetails = {
-                        name: "fee",
-                        description: "consultant fee",
-                        quantity: 0,
-                        gstRate,
-                        rate: 0,
-                        gstAmt,
-                        amt: subAmt,
-                        totalAmt
-                    }
-                    isExistBill.sender = senderDetails
-                    isExistBill.receiver = receiverDetails
-                    isExistBill.invoiceItems = itemDetails
-                    isExistBill.subAmt = subAmt
-                    isExistBill.gstAmt = gstAmt
-                    isExistBill.totalAmt = totalAmt
+            isExist.billId = isExistBill?._id
+        }
 
-                    await isExistBill.save()
-                }
-
-                isExist.billId = isExistBill?._id
-            }
+        if(isExist){
             await isExist.save()
         }
         return res.status(200).json({ status: 1, message: "Success" })

@@ -22,12 +22,13 @@ export const addComplaint = async (req,res)=>{
 
  export const viewAllAdminComplaint = async(req,res)=>{
     try {
-       const verify =  await authAdmin(req,res)
-       if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+      const {admin} = req
+      //  const verify =  await authAdmin(req,res)
+      //  if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
  
-       const admin = await Admin.findById(req?.user?._id)
-       if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      //  const admin = await Admin.findById(req?.user?._id)
+      //  if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+      // if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
        const pageItemLimit = req.query.limit ? req.query.limit : 10;
@@ -74,12 +75,13 @@ export const addComplaint = async (req,res)=>{
 
  export const adminRemoveComplaintById = async(req,res)=>{
    try {
-      const verify =  await authAdmin(req,res)
-      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+      const {admin} = req
+      // const verify =  await authAdmin(req,res)
+      // if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
 
-      const admin = await Admin.findById(req?.user?._id)
-      if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
-      if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      // const admin = await Admin.findById(req?.user?._id)
+      // if(!admin) return res.status(401).json({success: false, message:"Admin account not found"})
+      // if(!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
 
       const {_id} = req.query;

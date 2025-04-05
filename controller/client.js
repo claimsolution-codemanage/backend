@@ -21,6 +21,7 @@ import CaseStatus from "../models/caseStatus.js";
 import Notification from "../models/notification.js";
 import CasePaymentDetails from "../models/casePaymentDetails.js";
 import CasegroStatus from "../models/groStatus.js";
+import CaseOmbudsmanStatus from "../models/ombudsmanStatus.js";
 
 export const clientUploadImage = async (req, res) => {
   try {
@@ -644,7 +645,7 @@ export const viewClientCaseById = async (req, res) => {
     const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails")
     if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
 
-    const [getCaseDoc, getCaseStatus, getCasePaymentDetails, getCaseGroDetails] = await Promise.all([
+    const [getCaseDoc, getCaseStatus, getCasePaymentDetails, getCaseGroDetails,getCaseOmbudsmanDetails] = await Promise.all([
       CaseDoc.find({ 
         $and: [
           {
@@ -663,10 +664,14 @@ export const viewClientCaseById = async (req, res) => {
       CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
       CasePaymentDetails.find({ caseId: getCase?._id, isActive: true }),
       CasegroStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
+      CaseOmbudsmanStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
+      
     ]);
     
     // Convert `getCaseGroDetails` to a plain object if it exists
       const caseGroDetailsObj = getCaseGroDetails ? getCaseGroDetails.toObject() : null;
+      const caseOmbudsmanDetailsObj = getCaseOmbudsmanDetails ? getCaseOmbudsmanDetails.toObject() : null;
+
     const getCaseJson = getCase.toObject();
     getCaseJson.caseDocs = getCaseDoc;
     getCaseJson.processSteps = getCaseStatus;
@@ -682,6 +687,21 @@ export const viewClientCaseById = async (req, res) => {
     }else{
       getCaseJson.caseGroDetails = caseGroDetailsObj
     }
+
+        //  ombudsman status
+        if (caseOmbudsmanDetailsObj) {
+          getCaseJson.caseOmbudsmanDetails = {
+            ...caseOmbudsmanDetailsObj,
+            statusUpdates: caseOmbudsmanDetailsObj?.statusUpdates?.filter(ele => ele?.isPrivate) || [],
+            queryHandling: caseOmbudsmanDetailsObj?.queryHandling?.filter(ele => ele?.isPrivate) || [],
+            queryReply: caseOmbudsmanDetailsObj?.queryReply?.filter(ele => ele?.isPrivate) || [],
+            hearingSchedule: caseOmbudsmanDetailsObj?.hearingSchedule?.filter(ele => ele?.isPrivate) || [],
+            awardPart: caseOmbudsmanDetailsObj?.awardPart?.filter(ele => ele?.isPrivate) || [],
+            approvalLetter: caseOmbudsmanDetailsObj?.approvalLetterPrivate ? "" : caseOmbudsmanDetailsObj?.approvalLetter,
+          };
+        } else {
+          getCaseJson.caseOmbudsmanDetails = caseOmbudsmanDetailsObj
+        }
     return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
 
   } catch (error) {

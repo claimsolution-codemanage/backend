@@ -30,6 +30,7 @@ import Notification from "../models/notification.js";
 import CasePaymentDetails from "../models/casePaymentDetails.js";
 import { createOrUpdateCaseStatusForm } from "../utils/dbFunction.js";
 import CasegroStatus from "../models/groStatus.js";
+import CaseOmbudsmanStatus from "../models/ombudsmanStatus.js";
 
 export const employeeAuthenticate = async (req, res) => {
    try {
@@ -50,6 +51,7 @@ export const employeeAuthenticate = async (req, res) => {
 
 export const employeeUploadImage = async (req, res) => {
    try {
+      const {employee} = req
       firebaseUpload(req, res, "images");
    } catch (error) {
       console.log("employeeUploadImage", error);
@@ -59,6 +61,7 @@ export const employeeUploadImage = async (req, res) => {
 
 export const employeeUploadAttachment = async (req, res) => {
    try {
+      const {employee} = req
       firebaseUpload(req, res, "attachments");
    } catch (error) {
       console.log("employeeUploadAttachment", error);
@@ -95,12 +98,12 @@ export const employeeSignin = async (req, res) => {
 
 export const empProfile = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const { _id } = req.query;
       if (!validMongooseId(_id)) return res.status(400).json({ status: false, message: "Not a valid Id" })
@@ -118,13 +121,14 @@ export const empProfile = async (req, res) => {
 
 export const updateEmployeeAccount = async (req, res) => {
    try {
+      const {employee} = req
       const { _id } = req.query
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
       
       const { error } = validateEmployeeUpdate(req.body)
@@ -160,12 +164,13 @@ export const updateEmployeeAccount = async (req, res) => {
 
 export const createSathiTeamAcc = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const empAccess = ["branch", "sales"]
       if (!empAccess.includes(employee?.type?.toLowerCase())) return res.status(400).json({ success: false, message: "Access denied" })
@@ -213,12 +218,13 @@ export const createSathiTeamAcc = async (req, res) => {
 
 export const empOpPaidInvoice = async (req,res)=>{
    try {
-      const verify =  await authEmployee(req,res)
-      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+      const {employee} = req
+      // const verify =  await authEmployee(req,res)
+      // if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
       
 
@@ -245,12 +251,13 @@ export const empOpPaidInvoice = async (req,res)=>{
 
 export const empOpGetSaleEmployee = async (req, res) => {
    try {
-      const verify =  await authEmployee(req,res)
-      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+      const {employee} = req
+      // const verify =  await authEmployee(req,res)
+      // if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
       
 
@@ -289,12 +296,13 @@ export const empOpGetSaleEmployee = async (req, res) => {
 
 export const empOpCreateOrUpdateCaseForm = async (req, res,next) => {
    try {
-      const verify =  await authEmployee(req,res)
-      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+      const {employee} = req
+      // const verify =  await authEmployee(req,res)
+      // if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
       
       await createOrUpdateCaseStatusForm(req,res,next)
@@ -307,12 +315,13 @@ export const empOpCreateOrUpdateCaseForm = async (req, res,next) => {
 
 export const empOpSharePartnerToSaleEmp = async (req, res) => {
    try {
-      const verify =  await authEmployee(req,res)
-      if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
+      const {employee} = req
+      // const verify =  await authEmployee(req,res)
+      // if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
       
       
@@ -344,15 +353,16 @@ export const empOpSharePartnerToSaleEmp = async (req, res) => {
 
 export const employeeResetPassword = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
       const { error } = validateEmployeeResetPassword(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
 
       const { password, confirmPassword } = req.body
@@ -371,12 +381,13 @@ export const employeeResetPassword = async (req, res) => {
 
 export const changeStatusEmployeeCase = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(400).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(400).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
@@ -421,12 +432,13 @@ export const changeStatusEmployeeCase = async (req, res) => {
 
 export const employeeUpdateCaseById = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
@@ -483,12 +495,13 @@ export const employeeUpdateCaseById = async (req, res) => {
 
 export const employeeEditClient = async (req, res, next) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
@@ -533,12 +546,13 @@ export const employeeEditClient = async (req, res, next) => {
 
 export const employeeupdateParnterProfile = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
@@ -586,12 +600,13 @@ export const employeeupdateParnterProfile = async (req, res) => {
 
 export const employeeUpdatePartnerBankingDetails = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
@@ -626,12 +641,13 @@ export const employeeUpdatePartnerBankingDetails = async (req, res) => {
 
 export const empAddPartnerRefToEmp = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "employee account not active" })
 
       const { partnerId,empEmail } = req?.body
       if (!partnerId) return res.status(400).json({ success: false, message: "Partner id required" })
@@ -658,12 +674,13 @@ export const empAddPartnerRefToEmp = async (req, res) => {
 
 export const viewAllEmployeeCase = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       // query = ?statusType=&search=&limit=&pageNo
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
@@ -1054,12 +1071,13 @@ export const viewAllEmployeeCase = async (req, res) => {
 
 export const employeeViewCaseByIdBy = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       let isOperation = employee?.type?.toLowerCase() == "operation"
 
 
@@ -1069,21 +1087,25 @@ export const employeeViewCaseByIdBy = async (req, res) => {
 
       const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit")
       if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
-         const [getCaseDoc, getCaseStatus, getCaseComment, getCasePaymentDetails, getCaseGroDetails] = await Promise.all([
+         const [getCaseDoc, getCaseStatus, getCaseComment, getCasePaymentDetails, getCaseGroDetails,getCaseOmbudsmanDetails] = await Promise.all([
             CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
             CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
             CaseComment.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }),
             CasePaymentDetails.find({ caseId: getCase?._id, isActive: true }),
             CasegroStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
+            CaseOmbudsmanStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
           ]);
           
           // Convert `getCaseGroDetails` to a plain object if it exists
             const caseGroDetailsObj = getCaseGroDetails ? getCaseGroDetails.toObject() : null;
+            const caseOmbudsmanDetailsObj = getCaseOmbudsmanDetails ? getCaseOmbudsmanDetails.toObject() : null;
           const getCaseJson = getCase.toObject();
           getCaseJson.caseDocs = getCaseDoc;
           getCaseJson.processSteps = getCaseStatus;
           getCaseJson.caseCommit = getCaseComment;
           getCaseJson.casePayment = getCasePaymentDetails;
+
+         //  gro details
           if(caseGroDetailsObj){
              getCaseJson.caseGroDetails = {
                ...caseGroDetailsObj,
@@ -1095,6 +1117,22 @@ export const employeeViewCaseByIdBy = async (req, res) => {
           }else{
             getCaseJson.caseGroDetails = caseGroDetailsObj
           }
+
+         //  ombudsman status
+          if(caseOmbudsmanDetailsObj){
+            getCaseJson.caseOmbudsmanDetails = {
+              ...caseOmbudsmanDetailsObj,
+              statusUpdates: caseOmbudsmanDetailsObj?.statusUpdates?.filter(ele => isOperation || ele?.isPrivate) || [],
+              queryHandling: caseOmbudsmanDetailsObj?.queryHandling?.filter(ele => isOperation || ele?.isPrivate) || [],
+              queryReply: caseOmbudsmanDetailsObj?.queryReply?.filter(ele => isOperation || ele?.isPrivate) || [],
+              hearingSchedule: caseOmbudsmanDetailsObj?.hearingSchedule?.filter(ele => isOperation || ele?.isPrivate) || [],
+              awardPart: caseOmbudsmanDetailsObj?.awardPart?.filter(ele => isOperation || ele?.isPrivate) || [],
+              approvalLetter: caseOmbudsmanDetailsObj?.approvalLetterPrivate ? (isOperation && caseOmbudsmanDetailsObj?.approvalLetter) : caseOmbudsmanDetailsObj?.approvalLetter,
+            };          
+         }else{
+           getCaseJson.caseOmbudsmanDetails = caseOmbudsmanDetailsObj
+         }
+
       return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
 
    } catch (error) {
@@ -1106,12 +1144,13 @@ export const employeeViewCaseByIdBy = async (req, res) => {
 
 export const employeeFindCaseByFileNo = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const { fileNo } = req.query;
       const pipeline = [
@@ -1259,12 +1298,13 @@ export const employeeFindCaseByFileNo = async (req, res) => {
 
 export const empAddReferenceCaseAndMarge = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
 
       const { partnerId, partnerCaseId, empSaleId, empSaleCaseId, clientCaseId } = req?.query
@@ -1394,12 +1434,13 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
 
 export const empRemoveReferenceCase = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
 
       const { type, _id } = req?.query
@@ -1471,12 +1512,13 @@ export const empRemoveReferenceCase = async (req, res) => {
 
 export const employeeViewAllPartner = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
@@ -1642,12 +1684,13 @@ export const employeeViewAllPartner = async (req, res) => {
 
 export const employeeViewPartnerById = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
 
 
@@ -1667,12 +1710,13 @@ export const employeeViewPartnerById = async (req, res) => {
 
 export const employeeViewAllClient = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       // query = ?statusType=&search=&limit=&pageNo
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
@@ -1706,12 +1750,13 @@ export const employeeViewAllClient = async (req, res) => {
 
 export const empClientDownload = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
 
       const searchQuery = req.query.search ? req.query.search : "";
@@ -1739,12 +1784,13 @@ export const empClientDownload = async (req, res) => {
 
 export const employeeViewClientById = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
 
 
@@ -1816,12 +1862,13 @@ export const employeeResetForgetPassword = async (req, res) => {
 
 export const employeeAddCaseComment = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
 
       if (!req?.body?.Comment) return res.status(400).json({ success: false, message: "Case Comment required" })
@@ -1869,12 +1916,13 @@ export const employeeAddCaseComment = async (req, res) => {
 
 export const empAddOrUpdatePayment= async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const {_id,paymentMode,caseId} = req.body
 
@@ -1927,12 +1975,13 @@ export const empAddOrUpdatePayment= async (req, res) => {
 
 export const employeeCreateInvoice = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "finance") return res.status(400).json({ success: false, message: "Access Denied" })
 
       const { clientId, caseId } = req.query
@@ -1978,12 +2027,13 @@ export const employeeCreateInvoice = async (req, res) => {
 
 export const employeeViewAllInvoice = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "finance" && employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
 
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
@@ -2022,12 +2072,13 @@ export const employeeViewAllInvoice = async (req, res) => {
 }
 export const empDownloadAllInvoice = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "finance" && employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
 
       const searchQuery = req.query.search ? req.query.search : "";
@@ -2056,12 +2107,13 @@ export const empDownloadAllInvoice = async (req, res) => {
 
 export const employeeViewInvoiceById = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "finance" && employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
 
 
@@ -2082,12 +2134,13 @@ export const employeeViewInvoiceById = async (req, res) => {
 
 export const employeeDownloadInvoiceById = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "finance") return res.status(400).json({ success: false, message: "Access Denied" })
 
 
@@ -2114,12 +2167,13 @@ export const employeeDownloadInvoiceById = async (req, res) => {
 
 export const employeeEditInvoice = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "finance" && employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
 
       const { _id } = req.query;
@@ -2143,12 +2197,13 @@ export const employeeEditInvoice = async (req, res) => {
 
 export const employeeUnActiveInvoice = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "finance" && employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
 
       const { _id, type } = req.query;
@@ -2164,12 +2219,13 @@ export const employeeUnActiveInvoice = async (req, res) => {
 
 export const employeeRemoveInvoice = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "finance") return res.status(400).json({ success: false, message: "Access Denied" })
 
       const { _id, type } = req.query;
@@ -2188,11 +2244,12 @@ export const employeeRemoveInvoice = async (req, res) => {
 
 export const allEmployeeDashboard = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res);
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
-      const employee = await Employee.findById(req?.user?._id).select("-password")
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      const {employee} = req
+      // const verify = await authEmployee(req, res);
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
+      // const employee = await Employee.findById(req?.user?._id).select("-password")
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       let filter = {}
       let extractType = []
       const caseAccess = ["operation", "finance", "branch"]
@@ -2505,12 +2562,13 @@ export const allEmployeeDashboard = async (req, res) => {
 
 export const saleEmployeeAddPartner = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "sales" && employee?.type?.toLowerCase() != "branch" && employee?.type?.toLowerCase() != "sathi team") {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
@@ -2539,12 +2597,13 @@ export const saleEmployeeAddPartner = async (req, res) => {
 
 export const saleEmployeeAddCase = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "sales" && employee?.type?.toLowerCase() != "branch") {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
@@ -2656,12 +2715,13 @@ export const saleEmployeeAddCase = async (req, res) => {
 
 export const saleEmpViewPartnerReport = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       // if(employee?.type?.toLowerCase()!="sales"){
       //    return res.status(400).json({success: false, message:"Access denied"})
       // }
@@ -2925,12 +2985,13 @@ export const saleEmpViewPartnerReport = async (req, res) => {
 
 export const empDownloadPartnerReport = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       const empSaleId = req?.user?.empType?.toLowerCase() == "sales" ? req?.user?._id : false
 
       if (!validMongooseId(req.query.partnerId)) return res.status(400).json({ success: false, message: "Not a valid partnerId" })
@@ -2964,12 +3025,13 @@ export const empDownloadPartnerReport = async (req, res) => {
 
 export const salesDownloadCaseReport = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       // query = ?statusType=&search=&limit=&pageNo
       const searchQuery = req.query.search ? req.query.search : "";
@@ -3827,12 +3889,13 @@ export const salesDownloadCaseReport = async (req, res) => {
 
 export const employeeDownloadAllPartner = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const startDate = req.query.startDate
       const endDate = req.query.endDate
@@ -3987,12 +4050,13 @@ export const employeeDownloadAllPartner = async (req, res) => {
 
 export const empViewAllEmployee = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const searchQuery = req.query.search ? req.query.search : "";
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
@@ -4043,12 +4107,13 @@ export const empViewAllEmployee = async (req, res) => {
 
 export const empDownloadAllEmployee = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const searchQuery = req.query.search ? req.query.search : "";
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
@@ -4101,12 +4166,13 @@ export const empDownloadAllEmployee = async (req, res) => {
 
 export const empViewSathiEmployee = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const searchQuery = req.query.search ? req.query.search : "";
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
@@ -4157,12 +4223,13 @@ export const empViewSathiEmployee = async (req, res) => {
 
 export const empDownloadSathiEmployee = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const searchQuery = req.query.search ? req.query.search : "";
       const empId = req.query.empId 
@@ -4213,12 +4280,13 @@ export const empDownloadSathiEmployee = async (req, res) => {
 
 export const empChangeBranch = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const { _id, branchId, type } = req.body;
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
@@ -4249,12 +4317,13 @@ export const empChangeBranch = async (req, res) => {
 
 export const empOptGetNormalEmployee = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       // query = ?statusType=&search=&limit=&pageNo
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
@@ -4292,12 +4361,13 @@ export const empOptGetNormalEmployee = async (req, res) => {
 
 export const empOptShareCaseToEmployee = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
 
       
@@ -4316,12 +4386,13 @@ export const empOptShareCaseToEmployee = async (req, res) => {
 
 export const createOrUpdateStatement = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       const caseAccess = ["operation", "finance"]
       if(!caseAccess.includes(employee?.type?.toLowerCase())){
          return res.status(400).json({ success: false, message: "Access denied" })
@@ -4379,12 +4450,13 @@ export const createOrUpdateStatement = async (req, res) => {
 
 export const getStatement = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       const caseAccess = ["operation", "finance", "sathi team"]
       if(!caseAccess.includes(employee?.type?.toLowerCase())){
          return res.status(400).json({ success: false, message: "Access denied" })
@@ -4547,12 +4619,13 @@ export const getStatement = async (req, res) => {
 
 export const empDownloadAllStatement = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       const caseAccess = ["operation", "finance", "sathi team"]
       if(!caseAccess.includes(employee?.type?.toLowerCase())){
          return res.status(400).json({ success: false, message: "Access denied" })
@@ -4719,12 +4792,13 @@ export const empDownloadAllStatement = async (req, res) => {
 
 export const getAllStatement = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-         const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      //    const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const caseAccess = ["operation", "finance", "sathi team"]
       if(!caseAccess.includes(employee?.type?.toLowerCase())){
@@ -4854,12 +4928,13 @@ export const getAllStatement = async (req, res) => {
 //  notification section
 export const getAllNotification = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if(employee?.type?.toLowerCase()!="operation"){
          return res.status(400).json({ success: false, message: "Access denied" })
       }
@@ -4881,12 +4956,13 @@ export const getAllNotification = async (req, res) => {
 
 export const updateNotification = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const {employee} = req
+      // const verify = await authEmployee(req, res)
+      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      // const employee = await Employee.findById(req?.user?._id)
+      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
+      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if(employee?.type?.toLowerCase()!="operation"){
          return res.status(400).json({ success: false, message: "Access denied" })
       }
