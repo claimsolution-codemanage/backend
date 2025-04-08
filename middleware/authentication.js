@@ -61,7 +61,7 @@ export const authEmployee = async (req, res, next) => {
       if (!employee) return res.status(401).json({ success: false, message: Messages?.account_not_found })
       if (!employee?.isActive) return res.status(401).json({ success: false, message:Messages?.account_not_active})
       req.employee = employee
-      req.user = {_id}
+      req.user = payload
       console.log(payload);
       next()
    } catch (error) {
