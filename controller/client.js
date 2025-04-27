@@ -553,17 +553,23 @@ export const addNewClientCase = async (req, res) => {
     })
     await defaultStatus.save()
 
-    await Promise.all(req?.body?.caseDocs?.map(async (doc) => {
-      const newDoc = new CaseDoc({
-        name: doc?.docName,
-        type: doc?.docType,
-        format: doc?.docFormat,
-        url: doc?.docURL,
-        clientId: req?.user?._id,
-        caseId: newAddCase?._id?.toString(),
-      })
-      return newDoc.save()
-    }))
+//  add case doc
+    let bulkOps = [];
+    (req?.body?.caseDocs || [])?.forEach((doc) => {
+      bulkOps.push({
+        insertOne: {
+          document: {
+            name: doc?.docName,
+            type: doc?.docType,
+            format: doc?.docFormat,
+            url: doc?.docURL,
+            clientId: req?.user?._id,
+            caseId: newAddCase?._id?.toString(),
+          }
+        }
+      });
+    });
+    bulkOps?.length && await CaseDoc.bulkWrite(bulkOps)
 
     // send notification through email and db notification
     const notificationEmpUrl = `/employee/view case/${newAddCase?._id?.toString()}`
@@ -606,19 +612,18 @@ export const clientUpdateCaseById = async (req, res) => {
     const { error } = validateAddClientCase(req.body);
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-    req.body.caseDocs = req?.body?.caseDocs?.map(caseFile => {
-      return {
-        docDate: caseFile?.docDate ? caseFile?.docDate : new Date(),
-        docName: caseFile?.docName,
-        docType: caseFile?.docFormat,
-        docFormat: caseFile?.docFormat,
-        docURL: caseFile?.docURL,
-      }
-    })
+    // req.body.caseDocs = req?.body?.caseDocs?.map(caseFile => {
+    //   return {
+    //     docDate: caseFile?.docDate ? caseFile?.docDate : new Date(),
+    //     docName: caseFile?.docName,
+    //     docType: caseFile?.docFormat,
+    //     docFormat: caseFile?.docFormat,
+    //     docURL: caseFile?.docURL,
+    //   }
+    // })
 
-    console.log("case_id", _id, req.body);
 
-    const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body } }, { new: true })
+    const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body,caseDocs:[] } }, { new: true })
     return res.status(200).json({ success: true, message: "Successfully update case", data: updateCase });
 
   } catch (error) {
@@ -814,21 +819,29 @@ export const clientAddCaseFile = async (req, res) => {
     const { _id } = req.query
     if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-    const { error } = validateAddCaseFile(req.body);
-    if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-    if (!req.body?.docURL) return res.status(400).json({ success: false, message: "Please upload file first" })
+    // const { error } = validateAddCaseFile(req.body);
+    // if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+    // if (!req.body?.docURL) return res.status(400).json({ success: false, message: "Please upload file first" })
 
     const mycase = await Case.findById(_id)
     if (!mycase) return res.status(404).json({ success: false, message: "Case not found" })
-    const addNewDoc = new CaseDoc({
-      name: req.body.docName,
-      type: req.body.docType,
-      format: req.body.docFormat,
-      url: req.body.docURL,
-      caseId: mycase._id?.toString(),
-      clientId: req?.user?._id
-    })
-    await addNewDoc.save()
+
+    let bulkOps = [];
+    (req?.body?.caseDocs || [])?.forEach((doc) => {
+      bulkOps.push({
+        insertOne: {
+          document: {
+            name: doc?.docName,
+            type: doc?.docType,
+            format: doc?.docFormat,
+            url: doc?.docURL,
+            caseId: mycase._id?.toString(),
+            clientId: req?.user?._id
+          }
+        }
+      });
+    });
+    bulkOps?.length && await CaseDoc.bulkWrite(bulkOps)
 
     return res.status(200).json({ success: true, message: "Successfully add case file" })
 

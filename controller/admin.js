@@ -558,13 +558,6 @@ export const adminUpdateEmployeeAccount = async (req, res) => {
       const {admin} = req
       const { _id } = req.query
       const {docs} = req.body
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
       const updateKeys = ["fullName","type","branchId","designation","bankName","bankBranchName","bankAccountNo","panNo","address",
@@ -582,13 +575,10 @@ export const adminUpdateEmployeeAccount = async (req, res) => {
          }
       })
 
-      const oldDocs = docs?.filter(ele=>Boolean(ele?._id))
-      const deleteDoc = oldDocs?.map(ele=>ele?._id)
-      console.log("dele",deleteDoc);
-      
-      await EmpDoc.deleteMany({employeeId:isExist?._id?.toString(),_id:{$nin:deleteDoc}})
+      const docList = docs?.filter(ele=>Boolean(ele?._id))?.map(ele=>ele?._id)
+      await EmpDoc.deleteMany({employeeId:isExist?._id?.toString(),_id:{$nin:docList}})
 
-      const newDoc = req?.body?.docs?.filter(doc=>doc?.new) || []
+      const newDoc = docs?.filter(doc=>doc?.new) || []
       let selectedDocs = newDoc?.map(doc=>{
          return {
             name: doc?.docName,
@@ -600,8 +590,7 @@ export const adminUpdateEmployeeAccount = async (req, res) => {
          }
       })
 
-      await EmpDoc.insertMany(selectedDocs)
-
+      selectedDocs?.length && await EmpDoc.insertMany(selectedDocs)
       await isExist.save()
       return res.status(200).json({ success: true, message: "Successfully update Employee" });
    } catch (error) {
@@ -2410,14 +2399,6 @@ export const adminViewClientById = async (req, res) => {
 export const adminUpdateCaseById = async (req, res) => {
    try {
       const {admin} = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Client account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
-
       const { _id } = req.query
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
@@ -2428,22 +2409,27 @@ export const adminUpdateCaseById = async (req, res) => {
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
       
-      const newDoc = req?.body?.caseDocs?.filter(doc=>doc?.new)
-      const oldDoc = req?.body?.caseDocs?.filter(doc=>!doc?.new)
+      const newDoc = req?.body?.caseDocs?.filter(doc => doc?.new)
 
-      const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body,caseDocs:oldDoc } }, { new: true })
-      await Promise.all(newDoc?.map(async (doc) => {
-         const newDoc = new CaseDoc({
-           name: doc?.docName,
-           type: doc?.docType,
-           format: doc?.docFormat,
-           url: doc?.docURL,
-           employeeId: req?.user?._id,
-           isPrivate:doc?.isPrivate,
-           caseId: updateCase?._id?.toString(),
-         })
-         return newDoc.save()
-       }))
+      const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body, caseDocs: [] } }, { new: true })
+
+      let bulkOps = [];
+      newDoc?.forEach((doc) => {
+         bulkOps.push({
+            insertOne: {
+               document: {
+                  name: doc?.docName,
+                  type: doc?.docType,
+                  format: doc?.docFormat,
+                  url: doc?.docURL,
+                  employeeId: req?.user?._id,
+                  isPrivate: doc?.isPrivate,
+                  caseId: updateCase?._id?.toString(),
+               }
+            }
+         });
+      });
+      bulkOps?.length && await CaseDoc.bulkWrite(bulkOps)
 
       // send notification through email and db notification
       const notificationEmpUrl = `/employee/view case/${updateCase?._id?.toString()}`
@@ -5810,12 +5796,6 @@ export const adminAddOrUpdateEmpJoiningForm = async (req, res) => {
    try {
       const {admin} = req
       const {empId} = req.body
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       let isExist = await EmployeeJoiningForm.findOne({empId})
 

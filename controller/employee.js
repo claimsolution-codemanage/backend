@@ -123,12 +123,6 @@ export const updateEmployeeAccount = async (req, res) => {
    try {
       const {employee} = req
       const { _id } = req.query
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
       
       const { error } = validateEmployeeUpdate(req.body)
@@ -433,12 +427,6 @@ export const changeStatusEmployeeCase = async (req, res) => {
 export const employeeUpdateCaseById = async (req, res) => {
    try {
       const {employee} = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
@@ -453,24 +441,29 @@ export const employeeUpdateCaseById = async (req, res) => {
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
       const newDoc = req?.body?.caseDocs?.filter(doc => doc?.new)
-      const oldDoc = req?.body?.caseDocs?.filter(doc => !doc?.new)
 
-      const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body, caseDocs: oldDoc } }, { new: true })
+      const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body,caseDocs:[]} }, { new: true })
       if (!updateCase) return res.status(404).json({ success: true, message: "Case not found" });
 
-      await Promise.all(newDoc?.map(async (doc) => {
-         const newDoc = new CaseDoc({
-            name: doc?.docName,
-            type: doc?.docType,
-            format: doc?.docFormat,
-            url: doc?.docURL,
-            employeeId: req?.user?._id,
-            isPrivate:doc?.isPrivate,
-            caseId: updateCase?._id?.toString(),
-         })
-         return newDoc.save()
-      }))
+      let bulkOps = [];
 
+      newDoc?.forEach((doc) => {
+        bulkOps.push({
+          insertOne: {
+            document: {
+              name: doc?.docName,
+              type: doc?.docType,
+              format: doc?.docFormat,
+              url: doc?.docURL,
+              employeeId: req?.user?._id,
+              isPrivate: doc?.isPrivate,
+              caseId: updateCase?._id?.toString(),
+            }
+          }
+        });
+      });
+
+      bulkOps?.length && await CaseDoc.bulkWrite(bulkOps)
 
       // send notification through email and db notification
       const notificationEmpUrl = `/employee/view case/${updateCase?._id?.toString()}`
@@ -2657,18 +2650,23 @@ export const saleEmployeeAddCase = async (req, res) => {
          caseId: newAddCase?._id?.toString()
       })
       await defaultStatus.save()
-
-      await Promise.all(req?.body?.caseDocs?.map(async (doc) => {
-         const newDoc = new CaseDoc({
-            name: doc?.docName,
-            type: doc?.docType,
-            format: doc?.docFormat,
-            url: doc?.docURL,
-            employeeId: req?.user?._id,
-            caseId: newAddCase?._id?.toString(),
-         })
-         return newDoc.save()
-      }))
+      //  add case doc
+      let bulkOps = [];
+      (req?.body?.caseDocs || [])?.forEach((doc) => {
+         bulkOps.push({
+            insertOne: {
+               document: {
+                  name: doc?.docName,
+                  type: doc?.docType,
+                  format: doc?.docFormat,
+                  url: doc?.docURL,
+                  employeeId: req?.user?._id,
+                  caseId: newAddCase?._id?.toString(),
+               }
+            }
+         });
+      });
+      bulkOps?.length && await CaseDoc.bulkWrite(bulkOps)
 
       const addNotification = new Notification({
          caseId: newAddCase?._id?.toString(),
