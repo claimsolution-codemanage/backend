@@ -14,6 +14,7 @@ import { commonSendMail, generateNotificationTemplate } from "./sendMail.js";
 import Employee from "../models/employee.js";
 import Notification from "../models/notification.js";
 import Admin from "../models/admin.js";
+import Client from "../models/client.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -195,6 +196,186 @@ export const getAllClientSearchQuery = (searchQuery, type, startDate = "", endDa
     ]
   };
   return { success: true, query: query }
+}
+
+export const getAllClientResult = async (req) => {
+  try {
+    const { employee, admin } = req
+    let { limit = 10, pageNo = 0, search = "", startDate = "", endDate = "" } = req.query
+    pageNo = pageNo ? (pageNo - 1) * limit : 0
+
+    const matchQuery = {
+      "isActive": true,
+    }
+    
+    if(employee){
+      matchQuery.branchId = { $regex: employee?.branchId || "", $options: "i", }
+    }
+
+    if (startDate && endDate) {
+      matchQuery.createdAt = {
+        "$gte": new Date(new Date(startDate).setHours(0, 0, 0, 0)),
+        "$lte": new Date(new Date(endDate).setHours(23, 59, 59, 999))
+      }
+    }
+
+    if(employee && !["sales","branch","operation"]?.includes(employee?.type?.toLowerCase())){
+    return { status: 0, data: null,error:"Access deined" }
+    }
+
+    if (employee && employee?.type?.toLowerCase() == "sales" && employee?.designation?.toLowerCase() == "executive") {
+      const shareClientIds = []
+      const empPipeline = [
+        {
+          "$match": {
+            "isActive": true,
+            "$or": [
+              { "referEmpId": employee?._id },
+              { "_id": employee?._id }
+            ],
+          },
+        },
+        {
+          "$project": { "_id": 1, },
+        },
+        {
+          "$lookup": {
+            "from": "sharesections",
+            "localField": "_id",
+            "foreignField": "toEmployeeId",
+            "as": "share",
+            "pipeline": [
+              {
+                "$match": {
+                  "isActive": true,
+                  "clientId": { "$ne": null, },
+                },
+              },
+              {
+                "$project": {
+                  "clientId": 1,
+                },
+              },
+            ],
+          },
+        },
+        {
+          "$match": {
+            "share": { "$ne": [], },
+          },
+        },
+      ]
+
+      const empList = await Employee.aggregate(empPipeline)
+      empList?.forEach(emp => {
+        emp?.share?.forEach(sh => {
+          shareClientIds?.push(sh?.clientId)
+        })
+      })
+
+      if (shareClientIds?.length) {
+        matchQuery._id = { $in: shareClientIds }
+      }
+    }
+
+    const pipeline = [
+      {
+        "$match": {
+          ...matchQuery,
+          "$or": [
+            { "profile.consultantName": { "$regex": search, "$options": "i", }, },
+            { "profile.fatherName": { "$regex": search, "$options": "i", }, },
+            { "profile.consultantCode": { "$regex": search, "$options": "i", }, },
+            { "profile.primaryMobileNo": { "$regex": search, "$options": "i", }, },
+            { "profile.primaryEmail": { "$regex": search, "$options": "i", }, },
+            { "profile.aadhaarNo": { "$regex": search, "$options": "i", }, },
+            { "profile.panNo": { "$regex": search, "$options": "i", }, },
+            { "branchId": { "$regex": search, "$options": "i", }, },
+          ],
+        },
+      },
+      {
+        "$project": {
+          "branchId": 1,
+          "salesId": 1,
+          "isActive": 1,
+          "profile.associateWithUs": 1,
+          "profile.consultantName": 1,
+          "profile.consultantCode": 1,
+          "profile.primaryMobileNo": 1,
+          "profile.primaryEmail": 1,
+          "profile.city": 1,
+          "profile.state": 1,
+          "profile.fatherName": 1,
+          "profile.whatsappNo": 1,
+          "profile.dob": 1,
+          "profile.address": 1,
+          "profile.pinCode": 1,
+          "profile.about": 1,
+        },
+      },
+      {
+        "$facet": {
+          "data": [
+            { "$sort": { "createdAt": -1, }, },
+            {
+              "$lookup": {
+                "from": "sharesections",
+                "localField": "_id",
+                "foreignField": "clientId",
+                "as": "share",
+                "pipeline": [
+                  { "$match": { "isActive": true, }, },
+                  {
+                    "$lookup": {
+                      "from": "employees",
+                      "localField": "toEmployeeId",
+                      "foreignField": "_id",
+                      "as": "emp",
+                      "pipeline": [
+                        {
+                          "$match": { "isActive": true, },
+                        },
+                        {
+                          "$project": {
+                            "fullName": 1,
+                            "type": 1,
+                            "designation": 1,
+                            "branchId": 1,
+                            "empId": 1,
+                          },
+                        },
+                      ],
+                    },
+                  },
+                  {
+                    "$unwind": {
+                      "path": "$emp",
+                      "preserveNullAndEmptyArrays": true,
+                    },
+                  },
+                  {
+                    "$project": { "emp": 1, },
+                  },
+                ],
+              },
+            },
+            { "$skip": Number(pageNo), },
+            { "$limit": Number(limit), },
+          ],
+          "totalCount": [
+            { "$count": "count", },
+          ],
+        },
+      },
+    ]
+
+    const result = await Client.aggregate(pipeline)
+    return { status: 1, data: result?.[0]?.data, noOfClient: result?.[0]?.totalCount?.[0]?.count }
+  } catch (error) {
+    console.log("getAllClientResult error",error);
+    return { status: 0, data: null,error }
+  }
 }
 
 export const getAllEmployeeSearchQuery = (searchQuery,type=true,department=false,exclude=false,branchId=false) => {

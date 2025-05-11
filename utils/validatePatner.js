@@ -107,6 +107,10 @@ export const validateProfileBody =(body)=>{
       kycAadhaar:Joi.string().allow('').optional(),
       kycAadhaarBack:Joi.string().allow('').optional(),
       kycPan:Joi.string().allow('').optional(),
+      companyName:Joi.string().allow('').optional(),
+      companyAddress:Joi.string().allow('').optional(),
+      officalContactNo:Joi.string().allow('').optional(),
+      officalEmailId:Joi.string().allow('').optional(),
   })
   return profileSchema.validate(body)
 }

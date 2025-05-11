@@ -1,36 +1,33 @@
 import Employee from "../models/employee.js";
 import Partner from "../models/partner.js";
 import Client from "../models/client.js";
-import { validateEmployeeSignIn, validateEmployeeResetPassword, validateUpdateEmployeeCase, validateAddPartner, validateAddEmpCase, validateEmployeeSignUp, validateSathiTeamSignUp, validateEmployeeUpdate } from "../utils/validateEmployee.js";
-import { authEmployee, authPartner } from "../middleware/authentication.js";
-import bcrypt from 'bcrypt'
-import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, getAllClientSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel, getAllClientDownloadExcel, commonInvoiceDownloadExcel, sendNotificationAndMail, getAllStatementDownloadExcel, commonDownloadCaseExcel } from "../utils/helper.js";
-import { sendAddClientRequest, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
-import Jwt from "jsonwebtoken";
 import Case from "../models/case.js";
-import { validateAddClientCase, validateClientProfileBody } from "../utils/validateClient.js";
-import { validateResetPassword } from "../utils/helper.js";
-import jwtDecode from "jwt-decode";
-import { validateInvoice } from "../utils/validateEmployee.js";
-import Bill from "../models/bill.js";
-import { getAllInvoiceQuery } from "../utils/helper.js";
-import { invoiceHtmlToPdfBuffer } from "../utils/createPdf/invoice.js";
-import { validateBankingDetailsBody, validateProfileBody } from "../utils/validatePatner.js";
-// import { getValidateDate } from "../utils/helper.js";
-import { sendAddPartnerRequest } from "../utils/sendMail.js";
-import { firebaseUpload } from "../utils/helper.js";
 import CaseDoc from "../models/caseDoc.js";
 import CaseStatus from "../models/caseStatus.js";
 import CaseComment from "../models/caseComment.js";
-import { validateAdminAddEmployeeToCase, validateAdminSharePartner } from "../utils/validateAdmin.js";
-import { addNewCase } from "./partner.js";
-import {Types} from "mongoose";
 import Statement from "../models/statement.js";
 import Notification from "../models/notification.js";
 import CasePaymentDetails from "../models/casePaymentDetails.js";
-import { createOrUpdateCaseStatusForm } from "../utils/dbFunction.js";
 import CasegroStatus from "../models/groStatus.js";
 import CaseOmbudsmanStatus from "../models/ombudsmanStatus.js";
+import ShareSection from "../models/shareSection.js";
+import Bill from "../models/bill.js";
+import bcrypt from 'bcrypt'
+import Jwt from "jsonwebtoken";
+import { validateEmployeeSignIn, validateEmployeeResetPassword, validateUpdateEmployeeCase, validateAddPartner, validateAddEmpCase, validateEmployeeSignUp, validateSathiTeamSignUp, validateEmployeeUpdate } from "../utils/validateEmployee.js";
+import { authEmployee, authPartner } from "../middleware/authentication.js";
+import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, getAllClientSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel, getAllClientDownloadExcel, commonInvoiceDownloadExcel, sendNotificationAndMail, getAllStatementDownloadExcel, commonDownloadCaseExcel, getAllClientResult } from "../utils/helper.js";
+import { sendAddClientRequest, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
+import { validateAddClientCase, validateClientProfileBody } from "../utils/validateClient.js";
+import jwtDecode from "jwt-decode";
+import { validateInvoice } from "../utils/validateEmployee.js";
+import { invoiceHtmlToPdfBuffer } from "../utils/createPdf/invoice.js";
+import { validateBankingDetailsBody, validateProfileBody } from "../utils/validatePatner.js";
+import { sendAddPartnerRequest } from "../utils/sendMail.js";
+import { firebaseUpload,getAllInvoiceQuery,validateResetPassword } from "../utils/helper.js";
+import { validateAdminAddEmployeeToCase, validateAdminSharePartner } from "../utils/validateAdmin.js";
+import { createOrUpdateCaseStatusForm } from "../utils/dbFunction.js";
+import { Types } from "mongoose";
 
 export const employeeAuthenticate = async (req, res) => {
    try {
@@ -51,7 +48,7 @@ export const employeeAuthenticate = async (req, res) => {
 
 export const employeeUploadImage = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       firebaseUpload(req, res, "images");
    } catch (error) {
       console.log("employeeUploadImage", error);
@@ -61,7 +58,7 @@ export const employeeUploadImage = async (req, res) => {
 
 export const employeeUploadAttachment = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       firebaseUpload(req, res, "attachments");
    } catch (error) {
       console.log("employeeUploadAttachment", error);
@@ -121,10 +118,10 @@ export const empProfile = async (req, res) => {
 
 export const updateEmployeeAccount = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       const { _id } = req.query
       if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
-      
+
       const { error } = validateEmployeeUpdate(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
@@ -134,13 +131,13 @@ export const updateEmployeeAccount = async (req, res) => {
          $set: {
             fullName: req?.body?.fullName?.trim(),
             type: req?.body?.type,
-            branchId:req.body?.branchId?.trim(),
+            branchId: req.body?.branchId?.trim(),
             designation: req?.body?.designation?.trim(),
-            bankName:req?.body?.bankName?.trim(),
-            bankBranchName:req?.body?.bankBranchName?.trim(),
-            bankAccountNo:req?.body?.bankAccountNo?.trim(),
-            panNo:req?.body?.panNo?.trim(),
-            address:req?.body?.address?.trim(),
+            bankName: req?.body?.bankName?.trim(),
+            bankBranchName: req?.body?.bankBranchName?.trim(),
+            bankAccountNo: req?.body?.bankAccountNo?.trim(),
+            panNo: req?.body?.panNo?.trim(),
+            address: req?.body?.address?.trim(),
          }
       })
       if (!updateEmployee) return res.status(401).json({ success: false, message: "Employee not found" })
@@ -158,7 +155,7 @@ export const updateEmployeeAccount = async (req, res) => {
 
 export const createSathiTeamAcc = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -175,15 +172,15 @@ export const createSathiTeamAcc = async (req, res) => {
 
       const existEmployee = await Employee.find({ email: { $regex: req.body.email, $options: "i" } })
       if (existEmployee.length > 0) return res.status(401).json({ success: false, message: "Employee account already exists" })
-      
-      const lastSathiTeam = await Employee.findOne({type:"Sathi Team"})
+
+      const lastSathiTeam = await Employee.findOne({ type: "Sathi Team" })
 
       const noOfEmployee = await Employee.find({}).count()
       const systemPassword = generatePassword()
       const bcryptPassword = await bcrypt.hash(systemPassword, 10)
       const newEmployee = new Employee({
          fullName: req.body.fullName,
-         empId: `STM-24${noOfEmployee<10 ? "0" : ""}${noOfEmployee + 1}`,
+         empId: `STM-24${noOfEmployee < 10 ? "0" : ""}${noOfEmployee + 1}`,
          branchId: employee?.branchId?.trim(),
          email: req?.body?.email?.trim()?.toLowerCase(),
          mobileNo: req.body.mobileNo,
@@ -210,9 +207,9 @@ export const createSathiTeamAcc = async (req, res) => {
    }
 }
 
-export const empOpPaidInvoice = async (req,res)=>{
+export const empOpPaidInvoice = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify =  await authEmployee(req,res)
       // if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
 
@@ -220,66 +217,79 @@ export const empOpPaidInvoice = async (req,res)=>{
       // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
       // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
-      
 
-      const {_id} =  req.body;
-      if(!validMongooseId(_id)) return res.status(400).json({success: false, message:"Not a valid id"})
+
+      const { _id } = req.body;
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
       const { remark } = req.body
       if (!remark) return res.status(400).json({ success: false, message: "Remark is required" })
 
       const getInvoice = await Bill.findById(_id)
-      if(!getInvoice?.isPaid){
-         const invoice = await Bill.findByIdAndUpdate(_id,{$set:{remark:remark,isPaid:true,paidBy:"operation",paidDate: new Date()}}) 
-         return  res.status(200).json({success: true, message: "Successfully paid invoice"});
-      }else{
-         return  res.status(400).json({success: true, message: "Invoice already paid"});
+      if (!getInvoice?.isPaid) {
+         const invoice = await Bill.findByIdAndUpdate(_id, { $set: { remark: remark, isPaid: true, paidBy: "operation", paidDate: new Date() } })
+         return res.status(200).json({ success: true, message: "Successfully paid invoice" });
+      } else {
+         return res.status(400).json({ success: true, message: "Invoice already paid" });
       }
 
 
    } catch (error) {
-      console.log("emp-op-Paid-Invoice in error:",error);
-      return res.status(500).json({success:false,message:"Internal server error",error:error});
+      console.log("emp-op-Paid-Invoice in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }
 
 export const empOpGetSaleEmployee = async (req, res) => {
    try {
-      const {employee} = req
-      // const verify =  await authEmployee(req,res)
-      // if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      const { employee } = req
       if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
-      
 
-      // query = ?statusType=&search=&limit=&pageNo
-      const pageItemLimit = req.query.limit ? req.query.limit : 10;
-      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
-      const searchQuery = req.query.search ? req.query.search : "";
+      let {limit,search,pageNo} = req.query
+      const pageItemLimit = limit || 50;
+      pageNo = pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const searchQuery = search || "";
 
-      let query = {
-         $and:[
-            {isActive:true},
-            { type: { $regex: "sales", $options: "i" }},
-            { branchId: { $regex: employee?.branchId, $options: "i" }},
-            {
+      const pipeline =[
+         {
+           $match: {
+             isActive: true,
+             type: { $regex: "sales", $options: "i", },
+             branchId: { $regex: employee?.branchId || "",  $options: "i",  },
              $or: [
-                  { fullName: { $regex: searchQuery, $options: "i" }},
-                  { email: { $regex: searchQuery, $options: "i" }},
-                  { mobileNo: { $regex: searchQuery, $options: "i" }},
-                  { type: { $regex: searchQuery, $options: "i" }},
-                  { designation: { $regex: searchQuery, $options: "i" }},
-
-              ]
-            }
-         ]
-         };
-      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
-      const noOfEmployee = await Employee.find(query).count()
-      return res.status(200).json({ success: true, message: "get sale employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
+               {fullName: {$regex: searchQuery, $options: "i", },  },
+               {email: {$regex: searchQuery, $options: "i", },  },
+               {mobileNo: {$regex: searchQuery, $options: "i", },  },
+               {type: {$regex: searchQuery, $options: "i", },  },
+               {designation: {$regex: searchQuery, $options: "i", },  },
+             ],
+           },
+         },
+         {
+           $project: {
+             fullName: 1,
+             email: 1,
+             mobileNo: 1,
+             type: 1,
+             designation: 1,
+             branchId: 1,
+           },
+         },
+         {
+           $facet: {
+             data: [
+               {$sort: { createdAt: -1, }, },
+               { $skip: 0, },
+               { $limit: 10, },
+             ],
+             totalCount: [
+               {$count: "count",  },
+             ],
+           },
+         },
+       ]
+      const result = await Employee.aggregate(pipeline)
+      return res.status(200).json({ success: true, message: "get sale employee data", data: result?.[0]?.data || [], noOfEmployee: result?.[0]?.totalCount?.[0]?.count || 0 });
 
    } catch (error) {
       console.log("empop sale emp in error:", error);
@@ -288,9 +298,9 @@ export const empOpGetSaleEmployee = async (req, res) => {
    }
 }
 
-export const empOpCreateOrUpdateCaseForm = async (req, res,next) => {
+export const empOpCreateOrUpdateCaseForm = async (req, res, next) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify =  await authEmployee(req,res)
       // if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
 
@@ -298,8 +308,8 @@ export const empOpCreateOrUpdateCaseForm = async (req, res,next) => {
       // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
       // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
-      
-      await createOrUpdateCaseStatusForm(req,res,next)
+
+      await createOrUpdateCaseStatusForm(req, res, next)
    } catch (error) {
       console.log("empop sale emp in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -309,26 +319,17 @@ export const empOpCreateOrUpdateCaseForm = async (req, res,next) => {
 
 export const empOpSharePartnerToSaleEmp = async (req, res) => {
    try {
-      const {employee} = req
-      // const verify =  await authEmployee(req,res)
-      // if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      const { employee } = req
       if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
-      
-      
+
+
       const { error } = validateAdminSharePartner(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      // const updatePartners = req.body?.sharePartners?.map(casePartners => Partner.findByIdAndUpdate(casePartners, { $push: { shareEmployee: { $each: req?.body?.shareEmployee } } }, { new: true }))
-      // console.log("updatePartners", updatePartners);
-
-      const updatePartners = req.body?.sharePartners?.map(async(casePartners) =>{
+      const updatePartners = req.body?.sharePartners?.map(async (casePartners) => {
          const getPartner = await Partner.findById(casePartners)
-         if(getPartner){
-            const filterShareEmp =  req.body.shareEmployee.filter(empId => !getPartner?.shareEmployee?.includes(empId));
+         if (getPartner) {
+            const filterShareEmp = req.body.shareEmployee.filter(empId => !getPartner?.shareEmployee?.includes(empId));
             return Partner.findByIdAndUpdate(casePartners, { $push: { shareEmployee: { $each: filterShareEmp } } }, { new: true })
          }
       })
@@ -345,20 +346,41 @@ export const empOpSharePartnerToSaleEmp = async (req, res) => {
    }
 }
 
+export const empOpShareClientToSaleEmp = async (req, res) => {
+   try {
+      const { employee } = req
+      if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
+
+      const {shareClients=[],shareEmployee=[]} = req.body
+      let bulkOps = []
+      for (const toEmployeeId of shareEmployee) {
+         const exists = await ShareSection.find({toEmployeeId,clientId:{$in:shareClients}},{clientId:1})
+         let filter = shareClients?.filter(clientId=>!exists?.map(ele=>ele?.clientId?.toString())?.includes(clientId)) 
+         filter?.forEach(clientId=>{
+            bulkOps.push({
+               insertOne:{
+                  document:{
+                     clientId,
+                     toEmployeeId
+                  }
+               }
+            })
+         })
+      }   
+      await ShareSection.bulkWrite(bulkOps)
+      return res.status(200).json({ success: true, message: "Successfully share clients" });
+
+   } catch (error) {
+      console.log("empOp share client in error:", error);
+      return res.status(500).json({ success: false, message: "Something went wrong", error: error });
+   }
+}
+
 export const employeeResetPassword = async (req, res) => {
    try {
-      const {employee} = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
+      const { employee } = req
       const { error } = validateEmployeeResetPassword(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
-
-
       const { password, confirmPassword } = req.body
       if (password !== confirmPassword) return res.status(403).json({ success: false, message: "confirm password must be same" })
       const bcryptPassword = await bcrypt.hash(password, 10)
@@ -375,7 +397,7 @@ export const employeeResetPassword = async (req, res) => {
 
 export const changeStatusEmployeeCase = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -405,7 +427,7 @@ export const changeStatusEmployeeCase = async (req, res) => {
 
       // send notification through email and db notification
       const notificationEmpUrl = `/employee/view case/${req.body._id}`
-      const notificationAdminUrl =`/admin/view case/${req.body._id}`
+      const notificationAdminUrl = `/admin/view case/${req.body._id}`
 
       sendNotificationAndMail(
          req.body._id,
@@ -426,7 +448,7 @@ export const changeStatusEmployeeCase = async (req, res) => {
 
 export const employeeUpdateCaseById = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       if (employee?.type?.toLowerCase() != "operation") {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
@@ -442,25 +464,25 @@ export const employeeUpdateCaseById = async (req, res) => {
 
       const newDoc = req?.body?.caseDocs?.filter(doc => doc?.new)
 
-      const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body,caseDocs:[]} }, { new: true })
+      const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body, caseDocs: [] } }, { new: true })
       if (!updateCase) return res.status(404).json({ success: true, message: "Case not found" });
 
       let bulkOps = [];
 
       newDoc?.forEach((doc) => {
-        bulkOps.push({
-          insertOne: {
-            document: {
-              name: doc?.docName,
-              type: doc?.docType,
-              format: doc?.docFormat,
-              url: doc?.docURL,
-              employeeId: req?.user?._id,
-              isPrivate: doc?.isPrivate,
-              caseId: updateCase?._id?.toString(),
+         bulkOps.push({
+            insertOne: {
+               document: {
+                  name: doc?.docName,
+                  type: doc?.docType,
+                  format: doc?.docFormat,
+                  url: doc?.docURL,
+                  employeeId: req?.user?._id,
+                  isPrivate: doc?.isPrivate,
+                  caseId: updateCase?._id?.toString(),
+               }
             }
-          }
-        });
+         });
       });
 
       bulkOps?.length && await CaseDoc.bulkWrite(bulkOps)
@@ -488,7 +510,7 @@ export const employeeUpdateCaseById = async (req, res) => {
 
 export const employeeEditClient = async (req, res, next) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -539,13 +561,7 @@ export const employeeEditClient = async (req, res, next) => {
 
 export const employeeupdateParnterProfile = async (req, res) => {
    try {
-      const {employee} = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      const { employee } = req
       if (employee?.type?.toLowerCase() != "operation") {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
@@ -555,35 +571,19 @@ export const employeeupdateParnterProfile = async (req, res) => {
 
       const { error } = validateProfileBody(req.body);
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-      const updatePatnerDetails = await Partner.findByIdAndUpdate(_id, {
-         $set: {
-            "profile.profilePhoto": req.body.profilePhoto,
-            "profile.consultantName": req.body.consultantName,
-            "profile.alternateEmail": req.body.alternateEmail,
-            "profile.alternateMobileNo": req.body.alternateMobileNo,
-            "profile.primaryMobileNo": req.body.primaryMobileNo,
-            "profile.whatsupNo": req.body.whatsupNo,
-            "profile.panNo": req.body.panNo,
-            "profile.aadhaarNo": req.body.aadhaarNo,
-            "profile.dob": req.body.dob,
-            "profile.designation": req.body.designation,
-            "profile.areaOfOperation": req.body.areaOfOperation,
-            "profile.workAssociation": req.body.workAssociation,
-            "profile.state": req.body.state,
-            "profile.gender": req.body.gender,
-            "profile.district": req.body.district,
-            "profile.city": req.body.city,
-            "profile.address": req.body.address,
-            "profile.pinCode": req.body.pinCode,
-            "profile.about": req.body.about,
-            "profile.kycPhoto": req?.body?.kycPhoto,
-            "profile.kycAadhaar": req?.body?.kycAadhaar,
-            "profile.kycPan": req?.body?.kycPan,
-            "profile.kycAadhaarBack": req?.body?.kycAadhaarBack,
-         }
-      }, { new: true })
+      let isExist = await Partner.findById(_id)
+      if (!isExist) return res.status(400).json({ success: true, message: "Partner not found" })
+      const updateKeys = ["profilePhoto", "consultantName", "alternateEmail", "alternateMobileNo", "primaryMobileNo", "whatsupNo", "panNo", "aadhaarNo",
+         "dob", "designation", "areaOfOperation", "workAssociation", "state", "gender", "district", "city", "address", "pinCode", "about", "kycPhoto",
+         "kycAadhaar", "kycPan", "kycAadhaarBack", "companyName", "companyAddress", "officalContactNo", "officalEmailId"
+      ]
 
-      if (!updatePatnerDetails) return res.status(400).json({ success: true, message: "Partner not found" })
+      updateKeys?.forEach(key => {
+         if (req.body[key]) {
+            isExist.profile[key] = req.body[key]
+         }
+      })
+      await isExist.save()
       return res.status(200).json({ success: true, message: "Successfully update partner profile" })
    } catch (error) {
       console.log("updatePatnerDetails: ", error);
@@ -593,13 +593,7 @@ export const employeeupdateParnterProfile = async (req, res) => {
 
 export const employeeUpdatePartnerBankingDetails = async (req, res) => {
    try {
-      const {employee} = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      const { employee } = req
       if (employee?.type?.toLowerCase() != "operation") {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
@@ -610,21 +604,16 @@ export const employeeUpdatePartnerBankingDetails = async (req, res) => {
       const { error } = validateBankingDetailsBody(req.body);
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      const updatePatnerDetails = await Partner.findByIdAndUpdate(_id, {
-         $set: {
-            "bankingDetails.bankName": req.body.bankName,
-            "bankingDetails.bankAccountNo": req.body.bankAccountNo,
-            "bankingDetails.bankBranchName": req.body.bankBranchName,
-            "bankingDetails.gstNo": req.body.gstNo,
-            "bankingDetails.panNo": req.body.panNo,
-            "bankingDetails.cancelledChequeImg": req.body.cancelledChequeImg,
-            "bankingDetails.gstCopyImg": req.body.gstCopyImg,
-            "bankingDetails.ifscCode": req.body.ifscCode,
-            "bankingDetails.upiId": req.body.upiId,
+      let isExist = await Partner.findById(_id)
+      if (!isExist) return res.status(400).json({ success: true, message: "Partner not found" })
+      const updateKeys = ["bankName", "bankAccountNo", "bankBranchName", "gstNo", "panNo", "cancelledChequeImg", "gstCopyImg", "ifscCode", "upiId"]
 
+      updateKeys?.forEach(key => {
+         if (req.body[key]) {
+            isExist.bankingDetails[key] = req.body[key]
          }
-      }, { new: true })
-      if (!updatePatnerDetails) return res.status(400).json({ success: true, message: "Partner not found" })
+      })
+      await isExist.save()
       return res.status(200).json({ success: true, message: "Successfully update banking details" })
    } catch (error) {
       console.log("updatePatnerDetails: ", error);
@@ -634,7 +623,7 @@ export const employeeUpdatePartnerBankingDetails = async (req, res) => {
 
 export const empAddPartnerRefToEmp = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -642,21 +631,21 @@ export const empAddPartnerRefToEmp = async (req, res) => {
       // if (!employee) return res.status(401).json({ success: false, message: "employee account not found" })
       // if (!employee?.isActive) return res.status(401).json({ success: false, message: "employee account not active" })
 
-      const { partnerId,empEmail } = req?.body
+      const { partnerId, empEmail } = req?.body
       if (!partnerId) return res.status(400).json({ success: false, message: "Partner id required" })
       if (!validMongooseId(partnerId)) return res.status(400).json({ success: false, message: "Not a valid PartnerId" })
 
       if (!empEmail) return res.status(400).json({ success: false, message: "Employee email is required" })
 
-      const findPartner = await Partner.findById(partnerId)   
+      const findPartner = await Partner.findById(partnerId)
       if (!findPartner) return res.status(404).json({ success: false, message: "Parnter not found" })
 
-      const findEmp = await Employee.findOne({email:{ $regex: empEmail, $options: "i" }})
-      if(!findEmp) return res.status(404).json({ success: false, message: "Employee not found" })
+      const findEmp = await Employee.findOne({ email: { $regex: empEmail, $options: "i" } })
+      if (!findEmp) return res.status(404).json({ success: false, message: "Employee not found" })
 
-      const updatePartner = await Partner.findByIdAndUpdate(partnerId,{salesId:findEmp._id})
+      const updatePartner = await Partner.findByIdAndUpdate(partnerId, { salesId: findEmp._id })
       return res.status(200).json({ success: true, message: "Successfully add employee reference" });
-      
+
    } catch (error) {
       console.log("empAddPartnerRefToEmp in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -667,7 +656,7 @@ export const empAddPartnerRefToEmp = async (req, res) => {
 
 export const viewAllEmployeeCase = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -683,7 +672,7 @@ export const viewAllEmployeeCase = async (req, res) => {
       const startDate = req.query.startDate ? req.query.startDate : "";
       const endDate = req.query.endDate ? req.query.endDate : "";
       const caseAccess = ["operation", "finance", "branch"]
-      let empId = req?.query?.empId=="false" ? false :req?.query?.empId;
+      let empId = req?.query?.empId == "false" ? false : req?.query?.empId;
       let empBranchId = false;
       let branchWise = false
       let findEmp = false
@@ -691,23 +680,23 @@ export const viewAllEmployeeCase = async (req, res) => {
 
 
       //  for specific employee case 
-      if(empId){
+      if (empId) {
          if (!validMongooseId(empId)) return res.status(400).json({ success: false, message: "Not a valid employee Id1" })
          const getEmp = await Employee.findById(empId)
          if (!getEmp) return res.status(400).json({ success: false, message: "Searching employee account not found" })
          findEmp = getEmp
 
-      if(caseAccess?.includes(findEmp?.type?.toLowerCase())){
-         console.log("if---");
-         empBranchId = getEmp?.branchId
-         branchWise = true
-      }else if(findEmp?.type?.toLowerCase()!= "sales" && findEmp?.type?.toLowerCase() != "sathi team" && !empId){
-         console.log("else---");
-         empId =req.query?.empId
-         empBranchId = employee?.branchId
-         branchWise = true
-         isNormalEmp = true
-      }
+         if (caseAccess?.includes(findEmp?.type?.toLowerCase())) {
+            console.log("if---");
+            empBranchId = getEmp?.branchId
+            branchWise = true
+         } else if (findEmp?.type?.toLowerCase() != "sales" && findEmp?.type?.toLowerCase() != "sathi team" && !empId) {
+            console.log("else---");
+            empId = req.query?.empId
+            empBranchId = employee?.branchId
+            branchWise = true
+            isNormalEmp = true
+         }
       }
 
       if (caseAccess?.includes(req?.user?.empType?.toLowerCase()) && !empId) {
@@ -719,13 +708,13 @@ export const viewAllEmployeeCase = async (req, res) => {
             empId = employee?._id?.toString()
             empBranchId = false
             branchWise = true
-         } 
+         }
       }
 
       if (startDate && endDate) {
          const validStartDate = getValidateDate(startDate)
          if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
-            const validEndDate = getValidateDate(endDate)
+         const validEndDate = getValidateDate(endDate)
          if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
       }
 
@@ -734,36 +723,36 @@ export const viewAllEmployeeCase = async (req, res) => {
       if (startDate && endDate) {
          const start = new Date(startDate).setHours(0, 0, 0, 0);
          const end = new Date(endDate).setHours(23, 59, 59, 999);
-         
+
          matchQuery.push({
-           createdAt: {
-             $gte: new Date(start),
-             $lte: new Date(end)
-           }
+            createdAt: {
+               $gte: new Date(start),
+               $lte: new Date(end)
+            }
          });
       }
 
       if (branchWise) {
-         const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, isNormalEmp && empId, true, false,!isNormalEmp && empBranchId)
+         const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, isNormalEmp && empId, true, false, !isNormalEmp && empBranchId)
          // if (!query.success) return res.status(400).json({ success: false, message: query.message })
 
          // const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
          // const noOfCase = await Case.find(query?.query).count()
          // return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase });
 
-         if(isNormalEmp && empId){
+         if (isNormalEmp && empId) {
             matchQuery.push({ addEmployee: { $in: empId } })
          }
 
       } else {
 
          let extactMatchQuery = [
-            { referEmpId: findEmp?._id ? findEmp?._id :  employee?._id },
-            { _id: findEmp?._id ? findEmp?._id :  employee?._id }
+            { referEmpId: findEmp?._id ? findEmp?._id : employee?._id },
+            { _id: findEmp?._id ? findEmp?._id : employee?._id }
          ]
 
-         if((!findEmp && employee?.type?.toLowerCase()=="sales" && employee?.designation?.toLowerCase()=="manager") || 
-         (findEmp && findEmp?.type?.toLowerCase()=="sales" && findEmp?.designation?.toLowerCase()=="manager")){
+         if ((!findEmp && employee?.type?.toLowerCase() == "sales" && employee?.designation?.toLowerCase() == "manager") ||
+            (findEmp && findEmp?.type?.toLowerCase() == "sales" && findEmp?.designation?.toLowerCase() == "manager")) {
             extactMatchQuery.push({ type: { $regex: "sales", $options: "i" } })
             extactMatchQuery.push({ type: { $regex: "sathi team", $options: "i" } })
          }
@@ -773,49 +762,49 @@ export const viewAllEmployeeCase = async (req, res) => {
             {
                $match: {
                   $or: [
-                   ...extactMatchQuery
+                     ...extactMatchQuery
                   ]
                }
             },
             {
                "$group": {
-                   "_id": null,
-                   "shareEmpStr": { "$push": { "$toString": "$_id" } },
-                   "shareEmpObj": { "$push": "$_id" }
+                  "_id": null,
+                  "shareEmpStr": { "$push": { "$toString": "$_id" } },
+                  "shareEmpObj": { "$push": "$_id" }
                }
-           },
-           {
+            },
+            {
                "$lookup": {
                   from: "partners",
                   let: { shareEmpStr: "$shareEmpStr", shareEmpObj: "$shareEmpObj" },
                   pipeline: [
-                      {
-                          $match: {
-                              $expr: {
-                                  $or: [
-                                      { $in: ["$salesId", "$$shareEmpObj"] }, // Use ObjectId array for salesId
-                                      {
-                                          $gt: [
-                                              {
-                                                  $size: {
-                                                      $filter: {
-                                                          input: { $ifNull: ["$shareEmployee", []] }, // Ensure shareEmployee is an array
-                                                          as: "shareEmployeeId",
-                                                          cond: { $in: ["$$shareEmployeeId", "$$shareEmpStr"] }
-                                                      }
-                                                  }
-                                              },
-                                              0
-                                          ]
-                                      }
-                                  ]
-                              }
-                          }
-                      }
+                     {
+                        $match: {
+                           $expr: {
+                              $or: [
+                                 { $in: ["$salesId", "$$shareEmpObj"] }, // Use ObjectId array for salesId
+                                 {
+                                    $gt: [
+                                       {
+                                          $size: {
+                                             $filter: {
+                                                input: { $ifNull: ["$shareEmployee", []] }, // Ensure shareEmployee is an array
+                                                as: "shareEmployeeId",
+                                                cond: { $in: ["$$shareEmployeeId", "$$shareEmpStr"] }
+                                             }
+                                          }
+                                       },
+                                       0
+                                    ]
+                                 }
+                              ]
+                           }
+                        }
+                     }
                   ],
                   as: "partners"
                }
-           },
+            },
             {
                $lookup: {
                   from: "clients",
@@ -865,195 +854,203 @@ export const viewAllEmployeeCase = async (req, res) => {
 
          ])
 
-         matchQuery.push(                  {
+         matchQuery.push({
             $or: [
-              { empSaleId: { $in: extractType?.[0]?.shareEmp } },
-              { partnerId: { $in: extractType?.[0]?.allPartners } },
-              { clientId: { $in: extractType?.[0]?.allClients } },
+               { empSaleId: { $in: extractType?.[0]?.shareEmp } },
+               { partnerId: { $in: extractType?.[0]?.allPartners } },
+               { clientId: { $in: extractType?.[0]?.allClients } },
             ]
-          },)
+         },)
       }
 
-         const pipeline = [
-            {
-              $match: {
-                $and: [
+      const pipeline = [
+         {
+            $match: {
+               $and: [
                   { isPartnerReferenceCase: false },
                   { isEmpSaleReferenceCase: false },
                   { currentStatus: { $regex: statusType, $options: "i" } },
                   { isActive: true },
                   { branchId: { $regex: employee?.branchId, $options: "i" } },
                   ...matchQuery,
-                ]
-              }
-            },
-            { 
-               $project: {
-                clientId:1,
-                consultantCode:1,
-                branchId:1,
-                partnerId: 1,
-                partnerCode: 1,
-                empSaleId: 1,
-                isActive:1,
-                caseFrom:1,
-                name:1,
-                mobileNo:1,
-                email:1,
-                claimAmount:1,
-                policyNo:1,
-                fileNo:1,
-                policyType:1,
-                complaintType:1,
-                createdAt:1,
-                currentStatus:1
-               }
-             },
-            {
-               $addFields: {
-                 validPartnerIdString: {
-                   $cond: {
+               ]
+            }
+         },
+         {
+            $project: {
+               clientId: 1,
+               consultantCode: 1,
+               branchId: 1,
+               partnerId: 1,
+               partnerCode: 1,
+               empSaleId: 1,
+               isActive: 1,
+               caseFrom: 1,
+               name: 1,
+               mobileNo: 1,
+               email: 1,
+               claimAmount: 1,
+               policyNo: 1,
+               fileNo: 1,
+               policyType: 1,
+               complaintType: 1,
+               createdAt: 1,
+               currentStatus: 1
+            }
+         },
+         {
+            $addFields: {
+               validPartnerIdString: {
+                  $cond: {
                      if: {
-                       $and: [
-                         { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
-                         { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
-                         { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
-                       ]
+                        $and: [
+                           { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
+                           { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
+                           { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
+                        ]
                      },
                      then: "$partnerId",
                      else: null
-                   }
-                 }
+                  }
                }
-             },
-             {
-               $lookup: {
-                 from: 'partners',
-                 let: { partnerIdString: "$validPartnerIdString" },
-                 pipeline: [
-                   {
+            }
+         },
+         {
+            $lookup: {
+               from: 'partners',
+               let: { partnerIdString: "$validPartnerIdString" },
+               pipeline: [
+                  {
                      $match: {
-                       $expr: {
-                         $and: [
-                           { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
-                           { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
-                           { 
-                             $eq: [
-                               "$_id",
-                               { $toObjectId: "$$partnerIdString" }
-                             ]
-                           }
-                         ]
-                       }
+                        $expr: {
+                           $and: [
+                              { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
+                              { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
+                              {
+                                 $eq: [
+                                    "$_id",
+                                    { $toObjectId: "$$partnerIdString" }
+                                 ]
+                              }
+                           ]
+                        }
                      }
-                   },
-                   {
+                  },
+                  {
                      $project: {
-                       fullName: 1 // Include only the fullName field
-                     }}
-                 ],
-                 as: 'partnerDetails'
-               }
-             },
-             {'$unwind':{
-               'path':'$partnerDetails',
-               'preserveNullAndEmptyArrays':true
-             }},
-             {
-               $addFields: {
-                 validSaleEmpIdString: {
-                   $cond: {
+                        fullName: 1 // Include only the fullName field
+                     }
+                  }
+               ],
+               as: 'partnerDetails'
+            }
+         },
+         {
+            '$unwind': {
+               'path': '$partnerDetails',
+               'preserveNullAndEmptyArrays': true
+            }
+         },
+         {
+            $addFields: {
+               validSaleEmpIdString: {
+                  $cond: {
                      if: {
-                       $and: [
-                         { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
-                         { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
-                         { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
-                       ]
+                        $and: [
+                           { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
+                           { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
+                           { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
+                        ]
                      },
                      then: "$empSaleId",
                      else: null
-                   }
-                 }
+                  }
                }
-             },
-             {
-               $lookup: {
-                 from: 'employees',
-                 let: { saleEmpIdString: "$validSaleEmpIdString" },
-                 pipeline: [
-                   {
+            }
+         },
+         {
+            $lookup: {
+               from: 'employees',
+               let: { saleEmpIdString: "$validSaleEmpIdString" },
+               pipeline: [
+                  {
                      $match: {
-                       $expr: {
-                         $and: [
-                           { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
-                           { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
-                           { 
-                             $eq: [
-                               "$_id",
-                               { $toObjectId: "$$saleEmpIdString" }
-                             ]
-                           }
-                         ]
-                       }
+                        $expr: {
+                           $and: [
+                              { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
+                              { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
+                              {
+                                 $eq: [
+                                    "$_id",
+                                    { $toObjectId: "$$saleEmpIdString" }
+                                 ]
+                              }
+                           ]
+                        }
                      }
-                   },
-                   {
+                  },
+                  {
                      $project: {
-                       fullName: 1, // Include only the fullName field
-                       designation:1,
-                       type:1
-                     }}
-                 ],
-                 as: 'employeeDetails'
-               }
-             },
-             {'$unwind':{
-               'path':'$employeeDetails',
-               'preserveNullAndEmptyArrays':true
-             }},
-             {'$match':{
-                  '$or': [
-                    { name: { $regex: searchQuery, $options: "i" } },
-                    { 'partnerDetails.fullName': { $regex: searchQuery, $options: "i" } },
-                    { 'employeeDetails.fullName': { $regex: searchQuery, $options: "i" } },
-                    { consultantCode: { $regex: searchQuery, $options: "i" } },
-                    { fileNo: { $regex: searchQuery, $options: "i" } },
-                    { email: { $regex: searchQuery, $options: "i" } },
-                    { mobileNo: { $regex: searchQuery, $options: "i" } },
-                    { policyType: { $regex: searchQuery, $options: "i" } },
-                    { policyNo: { $regex: searchQuery, $options: "i" } },
-                    { caseFrom: { $regex: searchQuery, $options: "i" } },
-                    { branchId: { $regex: searchQuery, $options: "i" } },
-                  ]          
-             }},
-             {'$sort':{'createdAt':-1}},
-            {
-              $facet: {
-                cases: [
+                        fullName: 1, // Include only the fullName field
+                        designation: 1,
+                        type: 1
+                     }
+                  }
+               ],
+               as: 'employeeDetails'
+            }
+         },
+         {
+            '$unwind': {
+               'path': '$employeeDetails',
+               'preserveNullAndEmptyArrays': true
+            }
+         },
+         {
+            '$match': {
+               '$or': [
+                  { name: { $regex: searchQuery, $options: "i" } },
+                  { 'partnerDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                  { 'employeeDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                  { consultantCode: { $regex: searchQuery, $options: "i" } },
+                  { fileNo: { $regex: searchQuery, $options: "i" } },
+                  { email: { $regex: searchQuery, $options: "i" } },
+                  { mobileNo: { $regex: searchQuery, $options: "i" } },
+                  { policyType: { $regex: searchQuery, $options: "i" } },
+                  { policyNo: { $regex: searchQuery, $options: "i" } },
+                  { caseFrom: { $regex: searchQuery, $options: "i" } },
+                  { branchId: { $regex: searchQuery, $options: "i" } },
+               ]
+            }
+         },
+         { '$sort': { 'createdAt': -1 } },
+         {
+            $facet: {
+               cases: [
                   { $sort: { createdAt: -1 } },
                   { $skip: Number(pageNo) },
                   { $limit: Number(pageItemLimit) },
-                  { 
-                    $project: {
-                     validSaleEmpIdString: 0,
-                     validPartnerIdString: 0,
-                    }
+                  {
+                     $project: {
+                        validSaleEmpIdString: 0,
+                        validPartnerIdString: 0,
+                     }
                   }
-                ],
-                totalCount: [
+               ],
+               totalCount: [
                   { $count: "count" }
-                ]
-              }
+               ]
             }
-          ];
-          
-          const result = await Case.aggregate(pipeline);
-          const getAllCase = result[0].cases;
-          const noOfCase = result[0].totalCount[0]?.count || 0;
-          
+         }
+      ];
 
-         return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase });
-      
+      const result = await Case.aggregate(pipeline);
+      const getAllCase = result[0].cases;
+      const noOfCase = result[0].totalCount[0]?.count || 0;
+
+
+      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase });
+
 
    } catch (error) {
       console.log("updateAdminCase in error:", error);
@@ -1064,7 +1061,7 @@ export const viewAllEmployeeCase = async (req, res) => {
 
 export const employeeViewCaseByIdBy = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -1080,51 +1077,51 @@ export const employeeViewCaseByIdBy = async (req, res) => {
 
       const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit")
       if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
-         const [getCaseDoc, getCaseStatus, getCaseComment, getCasePaymentDetails, getCaseGroDetails,getCaseOmbudsmanDetails] = await Promise.all([
-            CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
-            CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
-            CaseComment.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }),
-            CasePaymentDetails.find({ caseId: getCase?._id, isActive: true }),
-            CasegroStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
-            CaseOmbudsmanStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
-          ]);
-          
-          // Convert `getCaseGroDetails` to a plain object if it exists
-            const caseGroDetailsObj = getCaseGroDetails ? getCaseGroDetails.toObject() : null;
-            const caseOmbudsmanDetailsObj = getCaseOmbudsmanDetails ? getCaseOmbudsmanDetails.toObject() : null;
-          const getCaseJson = getCase.toObject();
-          getCaseJson.caseDocs = getCaseDoc;
-          getCaseJson.processSteps = getCaseStatus;
-          getCaseJson.caseCommit = getCaseComment;
-          getCaseJson.casePayment = getCasePaymentDetails;
+      const [getCaseDoc, getCaseStatus, getCaseComment, getCasePaymentDetails, getCaseGroDetails, getCaseOmbudsmanDetails] = await Promise.all([
+         CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
+         CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
+         CaseComment.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }),
+         CasePaymentDetails.find({ caseId: getCase?._id, isActive: true }),
+         CasegroStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
+         CaseOmbudsmanStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
+      ]);
 
-         //  gro details
-          if(caseGroDetailsObj){
-             getCaseJson.caseGroDetails = {
-               ...caseGroDetailsObj,
-               groStatusUpdates: caseGroDetailsObj?.groStatusUpdates?.filter(ele => isOperation || ele?.isPrivate) || [],
-               queryHandling: caseGroDetailsObj?.queryHandling?.filter(ele => isOperation || ele?.isPrivate) || [],
-               queryReply: caseGroDetailsObj?.queryReply?.filter(ele => isOperation || ele?.isPrivate) || [],
-               approvalLetter: caseGroDetailsObj?.approvalLetterPrivate ? (isOperation && caseGroDetailsObj?.approvalLetter) : caseGroDetailsObj?.approvalLetter,
-             };          
-          }else{
-            getCaseJson.caseGroDetails = caseGroDetailsObj
-          }
+      // Convert `getCaseGroDetails` to a plain object if it exists
+      const caseGroDetailsObj = getCaseGroDetails ? getCaseGroDetails.toObject() : null;
+      const caseOmbudsmanDetailsObj = getCaseOmbudsmanDetails ? getCaseOmbudsmanDetails.toObject() : null;
+      const getCaseJson = getCase.toObject();
+      getCaseJson.caseDocs = getCaseDoc;
+      getCaseJson.processSteps = getCaseStatus;
+      getCaseJson.caseCommit = getCaseComment;
+      getCaseJson.casePayment = getCasePaymentDetails;
 
-         //  ombudsman status
-          if(caseOmbudsmanDetailsObj){
-            getCaseJson.caseOmbudsmanDetails = {
-              ...caseOmbudsmanDetailsObj,
-              statusUpdates: caseOmbudsmanDetailsObj?.statusUpdates?.filter(ele => isOperation || ele?.isPrivate) || [],
-              queryHandling: caseOmbudsmanDetailsObj?.queryHandling?.filter(ele => isOperation || ele?.isPrivate) || [],
-              queryReply: caseOmbudsmanDetailsObj?.queryReply?.filter(ele => isOperation || ele?.isPrivate) || [],
-              hearingSchedule: caseOmbudsmanDetailsObj?.hearingSchedule?.filter(ele => isOperation || ele?.isPrivate) || [],
-              awardPart: caseOmbudsmanDetailsObj?.awardPart?.filter(ele => isOperation || ele?.isPrivate) || [],
-              approvalLetter: caseOmbudsmanDetailsObj?.approvalLetterPrivate ? (isOperation && caseOmbudsmanDetailsObj?.approvalLetter) : caseOmbudsmanDetailsObj?.approvalLetter,
-            };          
-         }else{
-           getCaseJson.caseOmbudsmanDetails = caseOmbudsmanDetailsObj
-         }
+      //  gro details
+      if (caseGroDetailsObj) {
+         getCaseJson.caseGroDetails = {
+            ...caseGroDetailsObj,
+            groStatusUpdates: caseGroDetailsObj?.groStatusUpdates?.filter(ele => isOperation || ele?.isPrivate) || [],
+            queryHandling: caseGroDetailsObj?.queryHandling?.filter(ele => isOperation || ele?.isPrivate) || [],
+            queryReply: caseGroDetailsObj?.queryReply?.filter(ele => isOperation || ele?.isPrivate) || [],
+            approvalLetter: caseGroDetailsObj?.approvalLetterPrivate ? (isOperation && caseGroDetailsObj?.approvalLetter) : caseGroDetailsObj?.approvalLetter,
+         };
+      } else {
+         getCaseJson.caseGroDetails = caseGroDetailsObj
+      }
+
+      //  ombudsman status
+      if (caseOmbudsmanDetailsObj) {
+         getCaseJson.caseOmbudsmanDetails = {
+            ...caseOmbudsmanDetailsObj,
+            statusUpdates: caseOmbudsmanDetailsObj?.statusUpdates?.filter(ele => isOperation || ele?.isPrivate) || [],
+            queryHandling: caseOmbudsmanDetailsObj?.queryHandling?.filter(ele => isOperation || ele?.isPrivate) || [],
+            queryReply: caseOmbudsmanDetailsObj?.queryReply?.filter(ele => isOperation || ele?.isPrivate) || [],
+            hearingSchedule: caseOmbudsmanDetailsObj?.hearingSchedule?.filter(ele => isOperation || ele?.isPrivate) || [],
+            awardPart: caseOmbudsmanDetailsObj?.awardPart?.filter(ele => isOperation || ele?.isPrivate) || [],
+            approvalLetter: caseOmbudsmanDetailsObj?.approvalLetterPrivate ? (isOperation && caseOmbudsmanDetailsObj?.approvalLetter) : caseOmbudsmanDetailsObj?.approvalLetter,
+         };
+      } else {
+         getCaseJson.caseOmbudsmanDetails = caseOmbudsmanDetailsObj
+      }
 
       return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
 
@@ -1137,7 +1134,7 @@ export const employeeViewCaseByIdBy = async (req, res) => {
 
 export const employeeFindCaseByFileNo = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -1291,7 +1288,7 @@ export const employeeFindCaseByFileNo = async (req, res) => {
 
 export const empAddReferenceCaseAndMarge = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -1317,7 +1314,7 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
 
 
          const getClientCase = await Case.findById(clientCaseId)
-         if (getPartnerCase?.branchId?.trim()?.toLowerCase()!=getClientCase?.branchId?.trim()?.toLowerCase()) return res.status(404).json({ success: false, message: "Case must be from same branch" })
+         if (getPartnerCase?.branchId?.trim()?.toLowerCase() != getClientCase?.branchId?.trim()?.toLowerCase()) return res.status(404).json({ success: false, message: "Case must be from same branch" })
 
          if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
          console.log(getPartnerCase?.policyNo?.toLowerCase(), getClientCase?.policyNo?.toLowerCase(), getPartnerCase?.email?.toLowerCase(), getClientCase?.email?.toLowerCase());
@@ -1333,17 +1330,17 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
          let mergeParmeter = {
             partnerId: getPartner?._id?.toString(),
             partnerName: getPartner?.profile?.consultantName,
-            partnerCode:getPartner?.profile?.consultantCode,
+            partnerCode: getPartner?.profile?.consultantCode,
             partnerReferenceCaseDetails: {
                referenceId: getPartnerCase?._id?.toString(),
                name: getPartner?.profile?.consultantName,
-               consultantCode:getPartner?.profile?.consultantCode,
+               consultantCode: getPartner?.profile?.consultantCode,
                referenceDate: new Date(),
                by: employee?.fullName
             },
          }
 
-         if(getPartnerCase?.empSaleId && getPartnerCase?.empSaleName){
+         if (getPartnerCase?.empSaleId && getPartnerCase?.empSaleName) {
             mergeParmeter["empSaleId"] = getPartnerCase?.empSaleId
             mergeParmeter["empSaleName"] = getPartnerCase?.empSaleName
          }
@@ -1358,7 +1355,7 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
          const doc = await CaseDoc.updateMany({ caseId: partnerCaseId }, { $set: { caseMargeId: clientCaseId, isMarge: true } }, { new: true })
          const status = await CaseStatus.updateMany({ caseId: partnerCaseId }, { $set: { caseMargeId: clientCaseId, isMarge: true } }, { new: true })
          const comment = await CaseComment.updateMany({ caseId: partnerCaseId }, { $set: { caseMargeId: clientCaseId, isMarge: true } }, { new: true })
-         return res.status(200).json({ success: true, message: "Successfully add partner case reference ",});
+         return res.status(200).json({ success: true, message: "Successfully add partner case reference ", });
       }
       if (empSaleId) {
          if (!empSaleId || !empSaleCaseId) return res.status(400).json({ success: false, message: "For add sale reference empSaleId,empSaleCaseId are required" })
@@ -1385,20 +1382,20 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
          let empMergeParmeter = {
             empSaleId: getEmployee?._id?.toString(),
             empSaleName: `${getEmployee?.fullName} | ${getEmployee?.type} | ${getEmployee?.designation}`,
-            empId:getEmployee?.empId,
+            empId: getEmployee?.empId,
             // partnerId: getEmployeeCase?.partnerId || "",
             // partnerName: getEmployeeCase?.partnerName || "",
             // partnerCode:getEmployeeCase?.partnerCode || "",
             empSaleReferenceCaseDetails: {
                referenceId: getEmployeeCase?._id?.toString(),
                name: getEmployee?.fullName,
-               empId:getEmployee?.empId,
+               empId: getEmployee?.empId,
                referenceDate: new Date(),
                by: employee?.fullName
             },
          }
 
-         if(getEmployeeCase?.partnerId && getEmployeeCase?.partnerName){
+         if (getEmployeeCase?.partnerId && getEmployeeCase?.partnerName) {
             empMergeParmeter["partnerId"] = getEmployeeCase?.partnerId
             empMergeParmeter["partnerName"] = getEmployeeCase?.partnerName
             empMergeParmeter["partnerCode"] = getEmployeeCase?.partnerCode || ""
@@ -1414,7 +1411,7 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
          await CaseDoc.updateMany({ caseId: empSaleCaseId }, { $set: { caseMargeId: clientCaseId, isMarge: true } }, { new: true })
          await CaseStatus.updateMany({ caseId: empSaleCaseId }, { $set: { caseMargeId: clientCaseId, isMarge: true } }, { new: true })
          await CaseComment.updateMany({ caseId: empSaleCaseId }, { $set: { caseMargeId: clientCaseId, isMarge: true } }, { new: true })
-         return res.status(200).json({ success: true, message: "Successfully add case reference ",});
+         return res.status(200).json({ success: true, message: "Successfully add case reference ", });
       }
 
       return res.status(400).json({ success: true, message: "Failded to add case reference" });
@@ -1427,7 +1424,7 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
 
 export const empRemoveReferenceCase = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -1445,9 +1442,9 @@ export const empRemoveReferenceCase = async (req, res) => {
          const getClientCase = await Case.findById(_id)
          if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
          if (!validMongooseId(getClientCase?.partnerReferenceCaseDetails?.referenceId) && !validMongooseId(getClientCase?.partnerId)) return res.status(400).json({ success: false, message: "Not a valid partner CaseId" })
-         
+
          // if partner referance add in sale emp case
-         if(getClientCase?.partnerReferenceCaseDetails?.referenceId){
+         if (getClientCase?.partnerReferenceCaseDetails?.referenceId) {
             const updatedPartnerCase = await Case.findByIdAndUpdate(getClientCase?.partnerReferenceCaseDetails?.referenceId, { $set: { isPartnerReferenceCase: false, } }, { new: true })
             if (!updatedPartnerCase) return res.status(404).json({ success: false, message: "Partner case is not found of the added reference case" })
          }
@@ -1457,12 +1454,12 @@ export const empRemoveReferenceCase = async (req, res) => {
                $set: {
                   partnerId: "",
                   partnerName: "",
-                  partnerCode:"",
-                  empId:"",
+                  partnerCode: "",
+                  empId: "",
                   partnerReferenceCaseDetails: {},
                }
             }, { new: true })
-         if(getClientCase?.partnerReferenceCaseDetails?.referenceId && !getClientCase?.empSaleId){
+         if (getClientCase?.partnerReferenceCaseDetails?.referenceId && !getClientCase?.empSaleId) {
             await CaseDoc.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } })
             await CaseStatus.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } })
             await CaseComment.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } })
@@ -1505,45 +1502,38 @@ export const empRemoveReferenceCase = async (req, res) => {
 
 export const employeeViewAllPartner = async (req, res) => {
    try {
-      const {employee} = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
-
+      const { employee } = req
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const startDate = req.query.startDate
       const endDate = req.query.endDate
-      const searchQuery = req.query.search ? req.query.search : ""; 
+      const searchQuery = req.query.search ? req.query.search : "";
       const caseAccess = ["operation", "finance", "branch"]
-      const excludedTypes = ["sales", "operation", "finance","sathi team","branch"];
+      const excludedTypes = ["sales", "operation", "finance", "sathi team", "branch"];
       let isNormalEmp = false
-      let empId = req?.query?.empId=="false" ? false :req?.query?.empId;
+      let empId = req?.query?.empId == "false" ? false : req?.query?.empId;
       let empBranchId = false;
       let branchWise = false
       let findEmp = false
 
       //  for specific employee case 
-      console.log("spectific emp case",empId);
-      if(empId){
+      console.log("spectific emp case", empId);
+      if (empId) {
          if (!validMongooseId(empId)) return res.status(400).json({ success: false, message: "Not a valid employee Id" })
          const getEmp = await Employee.findById(empId)
          if (!getEmp) return res.status(400).json({ success: false, message: "Searching employee account not found" })
          findEmp = getEmp
-      if(caseAccess?.includes(findEmp?.type?.toLowerCase())){
-         console.log("if---");
-         empBranchId = getEmp?.branchId
-         branchWise = true
-      }else if(findEmp?.type?.toLowerCase()!= "sales" && findEmp?.type?.toLowerCase() != "sathi team"){
-         console.log("else---");
-         empId =req.query?.empId
-         empBranchId = employee?.branchId
-         branchWise = true
-         isNormalEmp =true
-      }
+         if (caseAccess?.includes(findEmp?.type?.toLowerCase())) {
+            console.log("if---");
+            empBranchId = getEmp?.branchId
+            branchWise = true
+         } else if (findEmp?.type?.toLowerCase() != "sales" && findEmp?.type?.toLowerCase() != "sathi team") {
+            console.log("else---");
+            empId = req.query?.empId
+            empBranchId = employee?.branchId
+            branchWise = true
+            isNormalEmp = true
+         }
       }
 
       // console.log("isNormal",isNormalEmp);
@@ -1554,35 +1544,35 @@ export const employeeViewAllPartner = async (req, res) => {
          empId = false
       } else {
          if (employee?.type?.toLowerCase() != "sales" && employee?.type?.toLowerCase() != "sathi team" && !empId) {
-         if (!validMongooseId(req.query?.empId)) return res.status(400).json({ success: false, message: "Not a valid employee Id" })
-            empId =req.query?.empId
+            if (!validMongooseId(req.query?.empId)) return res.status(400).json({ success: false, message: "Not a valid employee Id" })
+            empId = req.query?.empId
             empBranchId = employee?.branchId
             branchWise = true
-         } 
+         }
       }
       if (branchWise) {
          console.log("branchWise----");
          const query = getAllPartnerSearchQuery(searchQuery, true, isNormalEmp && empId, startDate, endDate, !isNormalEmp && empBranchId)
          if (!query.success) return res.status(400).json({ success: false, message: query.message })
-         const getAllPartner = await Partner.find(query.query,{
-            "branchId": 1,"salesId":1,"isActive":1,
+         const getAllPartner = await Partner.find(query.query, {
+            "branchId": 1, "salesId": 1, "isActive": 1,
             "profile.associateWithUs": 1, "profile.consultantName": 1,
             "profile.consultantCode": 1, "profile.primaryMobileNo": 1,
             "profile.primaryEmail": 1, "profile.workAssociation": 1,
             "profile.areaOfOperation": 1,
-         }).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("salesId","fullName type designation");
+         }).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("salesId", "fullName type designation");
          const noOfPartner = await Partner.count(query.query)
          return res.status(200).json({ success: true, message: "get partner data", data: getAllPartner, noOfPartner: noOfPartner });
 
       } else {
 
          let extactMatchQuery = [
-            { referEmpId: findEmp?._id ? findEmp?._id :  employee?._id },
-            { _id: findEmp?._id ? findEmp?._id :  employee?._id }
+            { referEmpId: findEmp?._id ? findEmp?._id : employee?._id },
+            { _id: findEmp?._id ? findEmp?._id : employee?._id }
          ]
 
-         if((!findEmp && employee?.type?.toLowerCase()=="sales" && employee?.designation?.toLowerCase()=="manager") || 
-         (findEmp && findEmp?.type?.toLowerCase()=="sales" && findEmp?.designation?.toLowerCase()=="manager")){
+         if ((!findEmp && employee?.type?.toLowerCase() == "sales" && employee?.designation?.toLowerCase() == "manager") ||
+            (findEmp && findEmp?.type?.toLowerCase() == "sales" && findEmp?.designation?.toLowerCase() == "manager")) {
             extactMatchQuery.push({ type: { $regex: "sales", $options: "i" } })
             extactMatchQuery.push({ type: { $regex: "sathi team", $options: "i" } })
          }
@@ -1592,7 +1582,7 @@ export const employeeViewAllPartner = async (req, res) => {
             {
                $match: {
                   $or: [
-                   ...extactMatchQuery
+                     ...extactMatchQuery
                   ]
                }
             },
@@ -1606,13 +1596,13 @@ export const employeeViewAllPartner = async (req, res) => {
             {
                $project: {
                   shareEmp: 1,
-                  shareEmpId:1,
+                  shareEmpId: 1,
                   _id: 0,
                }
             },
             {
                $project: {
-                  shareEmpId:1,
+                  shareEmpId: 1,
                   shareEmp: { $map: { input: "$shareEmp", as: "id", in: { $toString: "$$id" } } },
                }
             }
@@ -1632,7 +1622,7 @@ export const employeeViewAllPartner = async (req, res) => {
                { branchId: { $regex: employee?.branchId, $options: "i" } },
                {
                   $or: [
-                     { salesId : { $in: extractType?.[0]?.shareEmpId } },
+                     { salesId: { $in: extractType?.[0]?.shareEmpId } },
                      { shareEmployee: { $in: extractType?.[0]?.shareEmp } },
                   ]
                },
@@ -1656,13 +1646,13 @@ export const employeeViewAllPartner = async (req, res) => {
                } : {}
             ]
          };
-         const getAllPartner = await Partner.find(query,{
-            "branchId": 1,"salesId":1,"isActive":1,
+         const getAllPartner = await Partner.find(query, {
+            "branchId": 1, "salesId": 1, "isActive": 1,
             "profile.associateWithUs": 1, "profile.consultantName": 1,
             "profile.consultantCode": 1, "profile.primaryMobileNo": 1,
             "profile.primaryEmail": 1, "profile.workAssociation": 1,
             "profile.areaOfOperation": 1,
-         }).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("salesId","fullName type designation");
+         }).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("salesId", "fullName type designation");
          const noOfPartner = await Partner.count(query)
          return res.status(200).json({ success: true, message: "get case data", data: getAllPartner, noOfPartner: noOfPartner });
       }
@@ -1677,20 +1667,11 @@ export const employeeViewAllPartner = async (req, res) => {
 
 export const employeeViewPartnerById = async (req, res) => {
    try {
-      const {employee} = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
-
-
-
+      const { employee } = req
       const { _id } = req.query;
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-      const getPartner = await Partner.findById(_id).select("-password")
+      const getPartner = await Partner.findById(_id).select("-password -emailOTP")
       if (!getPartner) return res.status(404).json({ success: false, message: "Partner not found" })
       return res.status(200).json({ success: true, message: "get partner by id data", data: getPartner });
 
@@ -1703,38 +1684,15 @@ export const employeeViewPartnerById = async (req, res) => {
 
 export const employeeViewAllClient = async (req, res) => {
    try {
-      const {employee} = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
-
-      // query = ?statusType=&search=&limit=&pageNo
-      const pageItemLimit = req.query.limit ? req.query.limit : 10;
-      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
-      const searchQuery = req.query.search ? req.query.search : "";
-      const startDate = req.query.startDate ? req.query.startDate : "";
-      const endDate = req.query.endDate ? req.query.endDate : "";
-      const branchId = employee?.branchId
-
-      const query = getAllClientSearchQuery(searchQuery, true, startDate, endDate, branchId)
-      if (!query?.success) return res.status(400).json({ success: false, message: query.message })
-      const getAllClient = await Client.find(query.query, {
-         "branchId": 1,"salesId":1,"isActive":1,
-         "profile.associateWithUs": 1, "profile.consultantName": 1,
-         "profile.consultantCode": 1, "profile.primaryMobileNo": 1,
-         "profile.primaryEmail": 1, "profile.city": 1,
-         "profile.state": 1, "profile.fatherName": 1,
-         "profile.whatsappNo": 1, "profile.dob": 1,
-         "profile.address": 1, "profile.pinCode": 1, "profile.about": 1
-      }).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
-      const noOfClient = await Client.find(query.query).count()
-      return res.status(200).json({ success: true, message: "get client data", data: getAllClient, noOfClient: noOfClient });
+      const result = await getAllClientResult(req)      
+      if(result?.status==1){
+         return res.status(200).json({ success: true, message: "get client data", data: result?.data, noOfClient: result?.noOfClient});
+      }else{
+      return res.status(400).json({ success: false, message: "Something went wrong" });
+      }
 
    } catch (error) {
-      console.log("adminViewAllClient in error:", error);
+      console.log("employeeViewAllClient in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
 
    }
@@ -1743,33 +1701,20 @@ export const employeeViewAllClient = async (req, res) => {
 
 export const empClientDownload = async (req, res) => {
    try {
-      const {employee} = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const result = await getAllClientResult(req)      
+      if(result?.status==1){
+         // Generate Excel buffer
+         const excelBuffer = await getAllClientDownloadExcel(result?.data);
+         res.setHeader('Content-Disposition', 'attachment; filename="clients.xlsx"')
+         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+         res.status(200)
+         return res.send(excelBuffer)
+      }else{
+      return res.status(400).json({ success: false, message: "Something went wrong" });
+      }
 
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
-
-
-      const searchQuery = req.query.search ? req.query.search : "";
-      const startDate = req.query.startDate ? req.query.startDate : "";
-      const endDate = req.query.endDate ? req.query.endDate : "";
-      const branchId = employee?.branchId
-
-      const query = getAllClientSearchQuery(searchQuery, true, startDate, endDate, branchId)
-      if (!query?.success) return res.status(400).json({ success: false, message: query.message })
-      const getAllClient = await Client.find(query.query).select("-password").sort({ createdAt: 1 });
-
-      // Generate Excel buffer
-      const excelBuffer = await getAllClientDownloadExcel(getAllClient);
-
-      res.setHeader('Content-Disposition', 'attachment; filename="clients.xlsx"')
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.status(200)
-      res.send(excelBuffer)
    } catch (error) {
-      console.log("adminAllClientDownload in error:", error);
+      console.log("empClientDownload in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
 
    }
@@ -1777,7 +1722,7 @@ export const empClientDownload = async (req, res) => {
 
 export const employeeViewClientById = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -1855,7 +1800,7 @@ export const employeeResetForgetPassword = async (req, res) => {
 
 export const employeeAddCaseComment = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -1907,9 +1852,9 @@ export const employeeAddCaseComment = async (req, res) => {
    }
 }
 
-export const empAddOrUpdatePayment= async (req, res) => {
+export const empAddOrUpdatePayment = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -1917,35 +1862,35 @@ export const empAddOrUpdatePayment= async (req, res) => {
       // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
       // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
-      const {_id,paymentMode,caseId} = req.body
+      const { _id, paymentMode, caseId } = req.body
 
-      if(!caseId) return res.status(400).json({ success: false, message: "CaseId is required" })
+      if (!caseId) return res.status(400).json({ success: false, message: "CaseId is required" })
 
-      const findCase = await Case.findOne({_id:caseId,isActive:true})
-      if(!findCase) return res.status(400).json({ success: false, message: "Case is not found" })
+      const findCase = await Case.findOne({ _id: caseId, isActive: true })
+      if (!findCase) return res.status(400).json({ success: false, message: "Case is not found" })
 
       let isExist
-      if(_id){
+      if (_id) {
          isExist = await CasePaymentDetails.findById(_id)
-         if(!isExist) return res.status(400).json({ success: false, message: "Payment details is not found" })
-      }else{
+         if (!isExist) return res.status(400).json({ success: false, message: "Payment details is not found" })
+      } else {
          isExist = new CasePaymentDetails({
             caseId
          })
       }
 
       const updateKey = [
-         "dateOfPayment","utrNumber","bankName", "chequeNumber",
-         "chequeDate","amount","transactionDate","paymentMode"
+         "dateOfPayment", "utrNumber", "bankName", "chequeNumber",
+         "chequeDate", "amount", "transactionDate", "paymentMode"
       ]
 
-      updateKey.forEach(ele=>{
-         if(req.body[ele]){
+      updateKey.forEach(ele => {
+         if (req.body[ele]) {
             isExist[ele] = req.body[ele]
          }
       })
 
-      await  isExist.save()
+      await isExist.save()
       // send notification through email and db notification
       const notificationEmpUrl = `/employee/view case/${caseId}`
       const notificationAdminUrl = `/admin/view case/${caseId}`
@@ -1968,7 +1913,7 @@ export const empAddOrUpdatePayment= async (req, res) => {
 
 export const employeeCreateInvoice = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -1983,33 +1928,33 @@ export const employeeCreateInvoice = async (req, res) => {
       let getClient = false
       let getCase = false
       let billRef = {}
-      
+
       const { error } = validateInvoice(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      if(caseId && clientId){
+      if (caseId && clientId) {
          if (!validMongooseId(clientId) || !validMongooseId(caseId)) return res.status(400).json({ success: false, message: "caseId and clientId must be valid" })
-            getClient = await Client.findById(clientId)
-            if (!getClient) return res.status(400).json({ success: false, message: "Client not found" })
-            getCase = await Case.findById(caseId)
-            if (!getCase) return res.status(400).json({ success: false, message: "Case not found" })
+         getClient = await Client.findById(clientId)
+         if (!getClient) return res.status(400).json({ success: false, message: "Client not found" })
+         getCase = await Case.findById(caseId)
+         if (!getCase) return res.status(400).json({ success: false, message: "Case not found" })
 
          billRef = { caseId, clientId, }
-      }else{
-         billRef = { isOffice:true,paidBy:'Office'}
+      } else {
+         billRef = { isOffice: true, paidBy: 'Office' }
       }
 
 
       const billCount = await Bill.find({}).count()
-      let payload ={
-         ...req.body, 
+      let payload = {
+         ...req.body,
          ...billRef,
-         branchId: employee?.branchId, 
-         invoiceNo: `ACS-${billCount + 1}` 
+         branchId: employee?.branchId,
+         invoiceNo: `ACS-${billCount + 1}`
       }
 
 
-      const newInvoice = new Bill({ ...payload})
+      const newInvoice = new Bill({ ...payload })
       await newInvoice.save()
       return res.status(200).json({ success: true, message: "Successfully create invoice", _id: newInvoice?._id });
    } catch (error) {
@@ -2020,7 +1965,7 @@ export const employeeCreateInvoice = async (req, res) => {
 
 export const employeeViewAllInvoice = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -2049,11 +1994,11 @@ export const employeeViewAllInvoice = async (req, res) => {
          }
       ];
 
-      const getAllBill = await Bill.find(query?.query,{
-         invoiceNo:1,caseId:1,clientId:1,isPaid:1,remark:1,paidBy:1,"receiver.name":1,isOffice:1,
-         "receiver.email":1,"receiver.mobileNo":1,"receiver.state":1,paidDate:1,branchId:1,
-         totalAmt:1,createdAt:1,isActive:1
-      }).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("transactionId","-info");
+      const getAllBill = await Bill.find(query?.query, {
+         invoiceNo: 1, caseId: 1, clientId: 1, isPaid: 1, remark: 1, paidBy: 1, "receiver.name": 1, isOffice: 1,
+         "receiver.email": 1, "receiver.mobileNo": 1, "receiver.state": 1, paidDate: 1, branchId: 1,
+         totalAmt: 1, createdAt: 1, isActive: 1
+      }).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("transactionId", "-info");
       const noOfBill = await Bill.count(query?.query)
       const aggregateResult = await Bill.aggregate(aggregationPipeline);
       return res.status(200).json({ success: true, message: "get case data", data: getAllBill, noOf: noOfBill, totalAmt: aggregateResult });
@@ -2065,7 +2010,7 @@ export const employeeViewAllInvoice = async (req, res) => {
 }
 export const empDownloadAllInvoice = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -2082,12 +2027,12 @@ export const empDownloadAllInvoice = async (req, res) => {
       const query = getAllInvoiceQuery(searchQuery, startDate, endDate, false, type, employee?.branchId)
       if (!query.success) return res.status(400).json({ success: false, message: query.message })
 
-      const getAllBill = await Bill.find(query?.query).populate("transactionId","paymentMode");
+      const getAllBill = await Bill.find(query?.query).populate("transactionId", "paymentMode");
       // console.log("getAllBill",getAllBill);
-      
+
       const excelBuffer = await commonInvoiceDownloadExcel(getAllBill)
       // console.log("excelBuffer",excelBuffer);
-      
+
       res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.status(200)
@@ -2100,7 +2045,7 @@ export const empDownloadAllInvoice = async (req, res) => {
 
 export const employeeViewInvoiceById = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -2127,7 +2072,7 @@ export const employeeViewInvoiceById = async (req, res) => {
 
 export const employeeDownloadInvoiceById = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -2160,7 +2105,7 @@ export const employeeDownloadInvoiceById = async (req, res) => {
 
 export const employeeEditInvoice = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -2190,7 +2135,7 @@ export const employeeEditInvoice = async (req, res) => {
 
 export const employeeUnActiveInvoice = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -2203,7 +2148,7 @@ export const employeeUnActiveInvoice = async (req, res) => {
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
       const invoice = await Bill.findByIdAndUpdate(_id, { $set: { isActive: type } })
 
-      return res.status(200).json({ success: true, message: `Successfully ${type=="true" ? "restore" : "remove"} invoice` });
+      return res.status(200).json({ success: true, message: `Successfully ${type == "true" ? "restore" : "remove"} invoice` });
    } catch (error) {
       console.log("employee-remove invoice in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -2212,7 +2157,7 @@ export const employeeUnActiveInvoice = async (req, res) => {
 
 export const employeeRemoveInvoice = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -2237,7 +2182,7 @@ export const employeeRemoveInvoice = async (req, res) => {
 
 export const allEmployeeDashboard = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res);
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
       // const employee = await Employee.findById(req?.user?._id).select("-password")
@@ -2246,7 +2191,7 @@ export const allEmployeeDashboard = async (req, res) => {
       let filter = {}
       let extractType = []
       const caseAccess = ["operation", "finance", "branch"]
-      const excludedTypes = ["sales", "operation", "finance","sathi team","branch"];
+      const excludedTypes = ["sales", "operation", "finance", "sathi team", "branch"];
       const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
       const currentMonth = new Date().getMonth() + 1;
       const allMonths = [];
@@ -2261,21 +2206,21 @@ export const allEmployeeDashboard = async (req, res) => {
       }
 
 
-      if(caseAccess?.includes(employee?.type?.toLowerCase())){
+      if (caseAccess?.includes(employee?.type?.toLowerCase())) {
          filter = {
             createdAt: { $gte: currentYearStart },
-            isActive:true,
+            isActive: true,
             branchId: { $regex: employee?.branchId, $options: "i" },
             isPartnerReferenceCase: false,
             isEmpSaleReferenceCase: false
          }
-      }else{
+      } else {
          let extactMatchQuery = [
-            { referEmpId:employee?._id },
-            { _id:employee?._id }
+            { referEmpId: employee?._id },
+            { _id: employee?._id }
          ]
 
-         if(employee?.type?.toLowerCase()=="sales" && employee?.designation?.toLowerCase()=="manager"){
+         if (employee?.type?.toLowerCase() == "sales" && employee?.designation?.toLowerCase() == "manager") {
             extactMatchQuery.push({ type: { $regex: "sales", $options: "i" } })
             extactMatchQuery.push({ type: { $regex: "sathi team", $options: "i" } })
          }
@@ -2283,7 +2228,7 @@ export const allEmployeeDashboard = async (req, res) => {
             {
                $match: {
                   $or: [
-                   ...extactMatchQuery
+                     ...extactMatchQuery
                   ]
                }
             },
@@ -2360,43 +2305,43 @@ export const allEmployeeDashboard = async (req, res) => {
             // }
             {
                "$group": {
-                   "_id": null,
-                   "shareEmpStr": { "$push": { "$toString": "$_id" } },
-                   "shareEmpObj": { "$push": "$_id" }
+                  "_id": null,
+                  "shareEmpStr": { "$push": { "$toString": "$_id" } },
+                  "shareEmpObj": { "$push": "$_id" }
                }
-           },
-           {
+            },
+            {
                "$lookup": {
                   from: "partners",
                   let: { shareEmpStr: "$shareEmpStr", shareEmpObj: "$shareEmpObj" },
                   pipeline: [
-                      {
-                          $match: {
-                              $expr: {
-                                  $or: [
-                                      { $in: ["$salesId", "$$shareEmpObj"] }, // Use ObjectId array for salesId
-                                      {
-                                          $gt: [
-                                              {
-                                                  $size: {
-                                                      $filter: {
-                                                          input: { $ifNull: ["$shareEmployee", []] }, // Ensure shareEmployee is an array
-                                                          as: "shareEmployeeId",
-                                                          cond: { $in: ["$$shareEmployeeId", "$$shareEmpStr"] }
-                                                      }
-                                                  }
-                                              },
-                                              0
-                                          ]
-                                      }
-                                  ]
-                              }
-                          }
-                      }
+                     {
+                        $match: {
+                           $expr: {
+                              $or: [
+                                 { $in: ["$salesId", "$$shareEmpObj"] }, // Use ObjectId array for salesId
+                                 {
+                                    $gt: [
+                                       {
+                                          $size: {
+                                             $filter: {
+                                                input: { $ifNull: ["$shareEmployee", []] }, // Ensure shareEmployee is an array
+                                                as: "shareEmployeeId",
+                                                cond: { $in: ["$$shareEmployeeId", "$$shareEmpStr"] }
+                                             }
+                                          }
+                                       },
+                                       0
+                                    ]
+                                 }
+                              ]
+                           }
+                        }
+                     }
                   ],
                   as: "partners"
                }
-           },
+            },
             {
                $lookup: {
                   from: "clients",
@@ -2445,10 +2390,10 @@ export const allEmployeeDashboard = async (req, res) => {
             }
          ])
 
-      if(excludedTypes?.includes(employee?.type?.toLowerCase())){
-         filter = {
+         if (excludedTypes?.includes(employee?.type?.toLowerCase())) {
+            filter = {
                $and: [
-                  {createdAt: { $gte: currentYearStart }},
+                  { createdAt: { $gte: currentYearStart } },
                   { isPartnerReferenceCase: false },
                   { isEmpSaleReferenceCase: false },
                   { isActive: true },
@@ -2463,32 +2408,36 @@ export const allEmployeeDashboard = async (req, res) => {
                   },
                ]
             };
-      }else{
-         filter = {
-            $and: [
-               {createdAt: { $gte: currentYearStart }},
-               { isPartnerReferenceCase: false },
-               { isEmpSaleReferenceCase: false },
-               { isActive: true },
-               {addEmployee:{$in:[employee?._id?.toString()]}},
-               // { branchId: { $regex: employee?.branchId, $options: "i" } },
-            ]
+         } else {
+            filter = {
+               $and: [
+                  { createdAt: { $gte: currentYearStart } },
+                  { isPartnerReferenceCase: false },
+                  { isEmpSaleReferenceCase: false },
+                  { isActive: true },
+                  { addEmployee: { $in: [employee?._id?.toString()] } },
+                  // { branchId: { $regex: employee?.branchId, $options: "i" } },
+               ]
+            }
          }
-      }
       }
 
       const noOfPartner = await Partner.find(
-         caseAccess?.includes(employee?.type?.toLowerCase()) ? 
-         {isActive:true,branchId:{ $regex: employee?.branchId, $options: "i" }} : 
-         {$and:[{isActive:true},{branchId:{ $regex: employee?.branchId, $options: "i" }},{$or:[{ salesId: { $in: extractType?.[0]?.shareEmp || [] } },
-         { shareEmployee: { $in: extractType?.[0]?.shareEmp || [] } }
-      ]}] })
+         caseAccess?.includes(employee?.type?.toLowerCase()) ?
+            { isActive: true, branchId: { $regex: employee?.branchId, $options: "i" } } :
+            {
+               $and: [{ isActive: true }, { branchId: { $regex: employee?.branchId, $options: "i" } }, {
+                  $or: [{ salesId: { $in: extractType?.[0]?.shareEmp || [] } },
+                  { shareEmployee: { $in: extractType?.[0]?.shareEmp || [] } }
+                  ]
+               }]
+            })
          .count();
 
 
 
 
-   
+
 
       const pieChartData = await Case.aggregate([
          {
@@ -2555,7 +2504,7 @@ export const allEmployeeDashboard = async (req, res) => {
 
 export const saleEmployeeAddPartner = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -2577,7 +2526,7 @@ export const saleEmployeeAddPartner = async (req, res) => {
       const jwtString = await Jwt.sign({ ...req.body, empId: req?.user?._id, empBranchId: employee?.branchId?.trim()?.toLowerCase() }, process.env.EMPLOYEE_SECRET_KEY, { expiresIn: '24h' })
 
       const requestLink = `/partner/accept-request/${jwtString}`
-      await sendAddPartnerRequest(req.body.email,requestLink)
+      await sendAddPartnerRequest(req.body.email, requestLink)
       // console.log(requestLink, "requestLink----");
       return res.status(200).json({ success: true, message: "Successfully send add partner request" });
 
@@ -2590,7 +2539,7 @@ export const saleEmployeeAddPartner = async (req, res) => {
 
 export const saleEmployeeAddCase = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -2610,7 +2559,7 @@ export const saleEmployeeAddCase = async (req, res) => {
       const { partnerEmail, partnerCode } = req.body
       if (partnerEmail || partnerCode) {
          if (!partnerEmail) return res.status(400).json({ success: false, message: "Partner Email is required" })
-         const getPartner = await Partner.find({ email:  { $regex: partnerEmail, $options: "i" } })
+         const getPartner = await Partner.find({ email: { $regex: partnerEmail, $options: "i" } })
          if (getPartner?.length == 0) {
             return res.status(400).json({ success: false, message: "Partner not found" })
          } else {
@@ -2622,7 +2571,7 @@ export const saleEmployeeAddCase = async (req, res) => {
 
       if (req.body.clientEmail) {
          if (!req.body.clientName || !req.body.clientMobileNo) return res.status(400).json({ success: false, message: "Client name and mobileNo are required" });
-         const isClientExist = await Client.find({ email: { $regex:req.body.clientEmail, $options: "i" }  })
+         const isClientExist = await Client.find({ email: { $regex: req.body.clientEmail, $options: "i" } })
          if (!(isClientExist?.length > 0 && isClientExist[0]?.emailVerify)) {
             newClient = true
             clientDetails = {
@@ -2632,14 +2581,14 @@ export const saleEmployeeAddCase = async (req, res) => {
                empId: req?.user?._id,
                empBranchId: employee?.branchId?.trim()?.toLowerCase()
             }
-         }else{
+         } else {
             return res.status(400).json({ success: false, message: "Client account already exist" })
          }
       }
 
       req.body.empSaleId = employee?._id,
-      req.body.empSaleName = `${employee?.fullName} | ${employee?.type?.toLowerCase()} | ${employee?.designation?.toLowerCase()}`,
-      req.body.caseFrom = "team"
+         req.body.empSaleName = `${employee?.fullName} | ${employee?.type?.toLowerCase()} | ${employee?.designation?.toLowerCase()}`,
+         req.body.caseFrom = "team"
 
       const newAddCase = new Case({ ...req.body, branchId: employee?.branchId?.toLowerCase(), caseDocs: [] })
       const noOfCase = await Case.count()
@@ -2670,9 +2619,9 @@ export const saleEmployeeAddCase = async (req, res) => {
 
       const addNotification = new Notification({
          caseId: newAddCase?._id?.toString(),
-         message:`New Case file No. ${newAddCase?.fileNo} added.`,
-         branchId:employee?.branchId,
-         empIds:[req?.user?._id]
+         message: `New Case file No. ${newAddCase?.fileNo} added.`,
+         branchId: employee?.branchId,
+         empIds: [req?.user?._id]
       })
       await addNotification.save()
 
@@ -2690,10 +2639,10 @@ export const saleEmployeeAddCase = async (req, res) => {
       )
 
 
-      if(newClient && clientDetails?.clientEmail){
+      if (newClient && clientDetails?.clientEmail) {
          const jwtString = await Jwt.sign({
             ...clientDetails,
-            caseId:newAddCase?._id?.toString(),
+            caseId: newAddCase?._id?.toString(),
          }, process.env.EMPLOYEE_SECRET_KEY, { expiresIn: '24h' })
 
          const requestLink = `/client/accept-request/${jwtString}`
@@ -2713,7 +2662,7 @@ export const saleEmployeeAddCase = async (req, res) => {
 
 export const saleEmpViewPartnerReport = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -2726,7 +2675,7 @@ export const saleEmpViewPartnerReport = async (req, res) => {
 
       if (!validMongooseId(req.query.partnerId)) return res.status(400).json({ success: false, message: "Not a valid partnerId" })
       const partner = await Partner.findById(req.query.partnerId).select({
-         "branchId": 1,"salesId":1,"isActive":1,
+         "branchId": 1, "salesId": 1, "isActive": 1,
          "profile.associateWithUs": 1, "profile.consultantName": 1,
          "profile.consultantCode": 1, "profile.primaryMobileNo": 1,
          "profile.primaryEmail": 1, "profile.workAssociation": 1,
@@ -2763,214 +2712,222 @@ export const saleEmpViewPartnerReport = async (req, res) => {
 
       const matchQuery = []
 
-      
+
       if (startDate && endDate) {
          const validStartDate = getValidateDate(startDate)
          if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
-            const validEndDate = getValidateDate(endDate)
+         const validEndDate = getValidateDate(endDate)
          if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
       }
 
       if (startDate && endDate) {
          const start = new Date(startDate).setHours(0, 0, 0, 0);
          const end = new Date(endDate).setHours(23, 59, 59, 999);
-         
+
          matchQuery.push({
-           createdAt: {
-             $gte: new Date(start),
-             $lte: new Date(end)
-           }
+            createdAt: {
+               $gte: new Date(start),
+               $lte: new Date(end)
+            }
          });
       }
 
       const pipeline = [
          {
-           $match: {
-             $and: [
-               { isPartnerReferenceCase: false },
-               { isEmpSaleReferenceCase: false },
-               { currentStatus: { $regex: statusType, $options: "i" } },
-               { partnerId:  req.query.partnerId },
-               ...matchQuery,
-             ]
-           }
+            $match: {
+               $and: [
+                  { isPartnerReferenceCase: false },
+                  { isEmpSaleReferenceCase: false },
+                  { currentStatus: { $regex: statusType, $options: "i" } },
+                  { partnerId: req.query.partnerId },
+                  ...matchQuery,
+               ]
+            }
          },
-            { 
-               $project: {
-                clientId:1,
-                consultantCode:1,
-                branchId:1,
-                partnerId: 1,
-                partnerCode: 1,
-                empSaleId: 1,
-                isActive:1,
-                caseFrom:1,
-                name:1,
-                mobileNo:1,
-                email:1,
-                claimAmount:1,
-                policyNo:1,
-                fileNo:1,
-                policyType:1,
-                complaintType:1,
-                createdAt:1,
-                currentStatus:1
-               }
-             },
+         {
+            $project: {
+               clientId: 1,
+               consultantCode: 1,
+               branchId: 1,
+               partnerId: 1,
+               partnerCode: 1,
+               empSaleId: 1,
+               isActive: 1,
+               caseFrom: 1,
+               name: 1,
+               mobileNo: 1,
+               email: 1,
+               claimAmount: 1,
+               policyNo: 1,
+               fileNo: 1,
+               policyType: 1,
+               complaintType: 1,
+               createdAt: 1,
+               currentStatus: 1
+            }
+         },
          {
             $addFields: {
-              validPartnerIdString: {
-                $cond: {
-                  if: {
-                    $and: [
-                      { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
-                      { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
-                      { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
-                    ]
-                  },
-                  then: "$partnerId",
-                  else: null
-                }
-              }
-            }
-          },
-          {
-            $lookup: {
-              from: 'partners',
-              let: { partnerIdString: "$validPartnerIdString" },
-              pipeline: [
-                {
-                  $match: {
-                    $expr: {
-                      $and: [
-                        { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
-                        { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
-                        { 
-                          $eq: [
-                            "$_id",
-                            { $toObjectId: "$$partnerIdString" }
-                          ]
-                        }
-                      ]
-                    }
+               validPartnerIdString: {
+                  $cond: {
+                     if: {
+                        $and: [
+                           { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
+                           { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
+                           { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
+                        ]
+                     },
+                     then: "$partnerId",
+                     else: null
                   }
-                },
-                {
-                  $project: {
-                    fullName: 1 // Include only the fullName field
-                  }}
-              ],
-              as: 'partnerDetails'
+               }
             }
-          },
-          {'$unwind':{
-            'path':'$partnerDetails',
-            'preserveNullAndEmptyArrays':true
-          }},
-          {
+         },
+         {
+            $lookup: {
+               from: 'partners',
+               let: { partnerIdString: "$validPartnerIdString" },
+               pipeline: [
+                  {
+                     $match: {
+                        $expr: {
+                           $and: [
+                              { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
+                              { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
+                              {
+                                 $eq: [
+                                    "$_id",
+                                    { $toObjectId: "$$partnerIdString" }
+                                 ]
+                              }
+                           ]
+                        }
+                     }
+                  },
+                  {
+                     $project: {
+                        fullName: 1 // Include only the fullName field
+                     }
+                  }
+               ],
+               as: 'partnerDetails'
+            }
+         },
+         {
+            '$unwind': {
+               'path': '$partnerDetails',
+               'preserveNullAndEmptyArrays': true
+            }
+         },
+         {
             $addFields: {
-              validSaleEmpIdString: {
-                $cond: {
-                  if: {
-                    $and: [
-                      { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
-                      { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
-                      { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
-                    ]
-                  },
-                  then: "$empSaleId",
-                  else: null
-                }
-              }
-            }
-          },
-          {
-            $lookup: {
-              from: 'employees',
-              let: { saleEmpIdString: "$validSaleEmpIdString" },
-              pipeline: [
-                {
-                  $match: {
-                    $expr: {
-                      $and: [
-                        { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
-                        { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
-                        { 
-                          $eq: [
-                            "$_id",
-                            { $toObjectId: "$$saleEmpIdString" }
-                          ]
-                        }
-                      ]
-                    }
+               validSaleEmpIdString: {
+                  $cond: {
+                     if: {
+                        $and: [
+                           { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
+                           { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
+                           { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
+                        ]
+                     },
+                     then: "$empSaleId",
+                     else: null
                   }
-                },
-                {
-                  $project: {
-                    fullName: 1, // Include only the fullName field
-                    designation:1,
-                    type:1
-                  }}
-              ],
-              as: 'employeeDetails'
+               }
             }
-          },
-          {'$unwind':{
-            'path':'$employeeDetails',
-            'preserveNullAndEmptyArrays':true
-          }},
-          {'$match':{
+         },
+         {
+            $lookup: {
+               from: 'employees',
+               let: { saleEmpIdString: "$validSaleEmpIdString" },
+               pipeline: [
+                  {
+                     $match: {
+                        $expr: {
+                           $and: [
+                              { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
+                              { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
+                              {
+                                 $eq: [
+                                    "$_id",
+                                    { $toObjectId: "$$saleEmpIdString" }
+                                 ]
+                              }
+                           ]
+                        }
+                     }
+                  },
+                  {
+                     $project: {
+                        fullName: 1, // Include only the fullName field
+                        designation: 1,
+                        type: 1
+                     }
+                  }
+               ],
+               as: 'employeeDetails'
+            }
+         },
+         {
+            '$unwind': {
+               'path': '$employeeDetails',
+               'preserveNullAndEmptyArrays': true
+            }
+         },
+         {
+            '$match': {
                '$or': [
-                 { name: { $regex: searchQuery, $options: "i" } },
-                 { 'partnerDetails.fullName': { $regex: searchQuery, $options: "i" } },
-                 { 'employeeDetails.fullName': { $regex: searchQuery, $options: "i" } },
-                 { consultantCode: { $regex: searchQuery, $options: "i" } },
-                 { fileNo: { $regex: searchQuery, $options: "i" } },
-                 { email: { $regex: searchQuery, $options: "i" } },
-                 { mobileNo: { $regex: searchQuery, $options: "i" } },
-                 { policyType: { $regex: searchQuery, $options: "i" } },
-                 { caseFrom: { $regex: searchQuery, $options: "i" } },
-                 { branchId: { $regex: searchQuery, $options: "i" } },
-               ]          
-          }},
-          {'$sort':{'createdAt':-1}},
+                  { name: { $regex: searchQuery, $options: "i" } },
+                  { 'partnerDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                  { 'employeeDetails.fullName': { $regex: searchQuery, $options: "i" } },
+                  { consultantCode: { $regex: searchQuery, $options: "i" } },
+                  { fileNo: { $regex: searchQuery, $options: "i" } },
+                  { email: { $regex: searchQuery, $options: "i" } },
+                  { mobileNo: { $regex: searchQuery, $options: "i" } },
+                  { policyType: { $regex: searchQuery, $options: "i" } },
+                  { caseFrom: { $regex: searchQuery, $options: "i" } },
+                  { branchId: { $regex: searchQuery, $options: "i" } },
+               ]
+            }
+         },
+         { '$sort': { 'createdAt': -1 } },
          {
-           $facet: {
-             cases: [
-               { $sort: { createdAt: -1 } },
-               { $skip: Number(pageNo) },
-               { $limit: Number(pageItemLimit) },
-               { 
-                 $project: {
-                  validPartnerIdString: 0,
-                  validSaleEmpIdString: 0,
-                 }
-               }
-             ],
-             totalCount: [
-               { $count: "count" }
-             ],
-             totalAmt: [
-               {
-                 $group: {
-                   _id: null,
-                   totalAmtSum: { $sum: "$claimAmount" }, // Calculate the sum of totalAmt
-                   totalResolvedAmt: {
-                      $sum: { $cond: [{ $eq: ["$currentStatus", "Resolve"] }, "$claimAmount", 0] } // Calculate the sum of claimAmount for resolved cases
-                   }
-                 }
-               }
-             ]
-           }
+            $facet: {
+               cases: [
+                  { $sort: { createdAt: -1 } },
+                  { $skip: Number(pageNo) },
+                  { $limit: Number(pageItemLimit) },
+                  {
+                     $project: {
+                        validPartnerIdString: 0,
+                        validSaleEmpIdString: 0,
+                     }
+                  }
+               ],
+               totalCount: [
+                  { $count: "count" }
+               ],
+               totalAmt: [
+                  {
+                     $group: {
+                        _id: null,
+                        totalAmtSum: { $sum: "$claimAmount" }, // Calculate the sum of totalAmt
+                        totalResolvedAmt: {
+                           $sum: { $cond: [{ $eq: ["$currentStatus", "Resolve"] }, "$claimAmount", 0] } // Calculate the sum of claimAmount for resolved cases
+                        }
+                     }
+                  }
+               ]
+            }
          }
-       ];
-       
-       const result = await Case.aggregate(pipeline);
+      ];
+
+      const result = await Case.aggregate(pipeline);
       //  console.log("result",result?.[0]?.totalAmt);
-       
-       const getAllCase = result[0].cases;
-       const noOfCase = result[0].totalCount[0]?.count || 0;
-       const totalAmount = result?.[0]?.totalAmt
+
+      const getAllCase = result[0].cases;
+      const noOfCase = result[0].totalCount[0]?.count || 0;
+      const totalAmount = result?.[0]?.totalAmt
 
       return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: totalAmount, user: partner });
 
@@ -2983,7 +2940,7 @@ export const saleEmpViewPartnerReport = async (req, res) => {
 
 export const empDownloadPartnerReport = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -3023,7 +2980,7 @@ export const empDownloadPartnerReport = async (req, res) => {
 
 export const salesDownloadCaseReport = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -3179,122 +3136,128 @@ export const salesDownloadCaseReport = async (req, res) => {
             },
             {
                $addFields: {
-                 validPartnerIdString: {
-                   $cond: {
-                     if: {
-                       $and: [
-                         { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
-                         { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
-                         { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
-                       ]
-                     },
-                     then: "$partnerId",
-                     else: null
-                   }
-                 }
-               }
-             },
-             {
-               $lookup: {
-                 from: 'partners',
-                 let: { partnerIdString: "$validPartnerIdString" },
-                 pipeline: [
-                   {
-                     $match: {
-                       $expr: {
-                         $and: [
-                           { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
-                           { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
-                           { 
-                             $eq: [
-                               "$_id",
-                               { $toObjectId: "$$partnerIdString" }
-                             ]
-                           }
-                         ]
-                       }
+                  validPartnerIdString: {
+                     $cond: {
+                        if: {
+                           $and: [
+                              { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
+                              { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
+                              { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
+                           ]
+                        },
+                        then: "$partnerId",
+                        else: null
                      }
-                   },
-                   {
-                     $project: {
-                       fullName: 1 // Include only the fullName field
-                     }}
-                 ],
-                 as: 'partnerDetails'
+                  }
                }
-             },
-             {'$unwind':{
-               'path':'$partnerDetails',
-               'preserveNullAndEmptyArrays':true
-             }},
-             {
+            },
+            {
+               $lookup: {
+                  from: 'partners',
+                  let: { partnerIdString: "$validPartnerIdString" },
+                  pipeline: [
+                     {
+                        $match: {
+                           $expr: {
+                              $and: [
+                                 { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
+                                 { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
+                                 {
+                                    $eq: [
+                                       "$_id",
+                                       { $toObjectId: "$$partnerIdString" }
+                                    ]
+                                 }
+                              ]
+                           }
+                        }
+                     },
+                     {
+                        $project: {
+                           fullName: 1 // Include only the fullName field
+                        }
+                     }
+                  ],
+                  as: 'partnerDetails'
+               }
+            },
+            {
+               '$unwind': {
+                  'path': '$partnerDetails',
+                  'preserveNullAndEmptyArrays': true
+               }
+            },
+            {
                $addFields: {
-                 validSaleEmpIdString: {
-                   $cond: {
-                     if: {
-                       $and: [
-                         { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
-                         { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
-                         { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
-                       ]
-                     },
-                     then: "$empSaleId",
-                     else: null
-                   }
-                 }
-               }
-             },
-             {
-               $lookup: {
-                 from: 'employees',
-                 let: { saleEmpIdString: "$validSaleEmpIdString" },
-                 pipeline: [
-                   {
-                     $match: {
-                       $expr: {
-                         $and: [
-                           { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
-                           { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
-                           { 
-                             $eq: [
-                               "$_id",
-                               { $toObjectId: "$$saleEmpIdString" }
-                             ]
-                           }
-                         ]
-                       }
+                  validSaleEmpIdString: {
+                     $cond: {
+                        if: {
+                           $and: [
+                              { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
+                              { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
+                              { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
+                           ]
+                        },
+                        then: "$empSaleId",
+                        else: null
                      }
-                   },
-                   {
-                     $project: {
-                       fullName: 1, // Include only the fullName field
-                       designation:1,
-                       type:1
-                     }}
-                 ],
-                 as: 'employeeDetails'
+                  }
                }
-             },
-             {'$unwind':{
-               'path':'$employeeDetails',
-               'preserveNullAndEmptyArrays':true
-             }},
-             {
-               '$project':{
+            },
+            {
+               $lookup: {
+                  from: 'employees',
+                  let: { saleEmpIdString: "$validSaleEmpIdString" },
+                  pipeline: [
+                     {
+                        $match: {
+                           $expr: {
+                              $and: [
+                                 { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
+                                 { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
+                                 {
+                                    $eq: [
+                                       "$_id",
+                                       { $toObjectId: "$$saleEmpIdString" }
+                                    ]
+                                 }
+                              ]
+                           }
+                        }
+                     },
+                     {
+                        $project: {
+                           fullName: 1, // Include only the fullName field
+                           designation: 1,
+                           type: 1
+                        }
+                     }
+                  ],
+                  as: 'employeeDetails'
+               }
+            },
+            {
+               '$unwind': {
+                  'path': '$employeeDetails',
+                  'preserveNullAndEmptyArrays': true
+               }
+            },
+            {
+               '$project': {
                   caseDocs: 0,
                   processSteps: 0,
                   addEmployee: 0,
-                  __v:0,
-                  validPartnerIdString:0,
-                  validSaleEmpIdString:0
+                  __v: 0,
+                  validPartnerIdString: 0,
+                  validSaleEmpIdString: 0
                }
-             },
-             {
+            },
+            {
                $match: {
                   ...matchQuery
                }
-             },
-             {'$sort':{'createdAt':-1}},
+            },
+            { '$sort': { 'createdAt': -1 } },
          ]
 
          const getAllCase = await Case.aggregate(pipeline)
@@ -3887,7 +3850,7 @@ export const salesDownloadCaseReport = async (req, res) => {
 
 export const employeeDownloadAllPartner = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -3900,7 +3863,7 @@ export const employeeDownloadAllPartner = async (req, res) => {
 
       const searchQuery = req.query.search ? req.query.search : "";
       const caseAccess = ["operation", "finance", "branch"]
-      let empId = req?.query?.empId=="false" ? false :req?.query?.empId;
+      let empId = req?.query?.empId == "false" ? false : req?.query?.empId;
       let empBranchId = false;
       let branchWise = false
       let findEmp = false
@@ -3908,22 +3871,22 @@ export const employeeDownloadAllPartner = async (req, res) => {
 
 
       //  for specific employee case 
-      if(empId){
+      if (empId) {
          if (!validMongooseId(empId)) return res.status(400).json({ success: false, message: "Not a valid employee Id" })
          const getEmp = await Employee.findById(empId)
          if (!getEmp) return res.status(400).json({ success: false, message: "Searching employee account not found" })
          findEmp = getEmp
-      if(caseAccess?.includes(findEmp?.type?.toLowerCase())){
-         console.log("if---");
-         empBranchId = getEmp?.branchId
-         branchWise = true
-      }else if(findEmp?.type?.toLowerCase()!= "sales" && findEmp?.type?.toLowerCase() != "sathi team"){
-         console.log("else---");
-         empId =req.query?.empId
-         empBranchId = employee?.branchId
-         branchWise = true
-         isNormalEmp = true
-      }
+         if (caseAccess?.includes(findEmp?.type?.toLowerCase())) {
+            console.log("if---");
+            empBranchId = getEmp?.branchId
+            branchWise = true
+         } else if (findEmp?.type?.toLowerCase() != "sales" && findEmp?.type?.toLowerCase() != "sathi team") {
+            console.log("else---");
+            empId = req.query?.empId
+            empBranchId = employee?.branchId
+            branchWise = true
+            isNormalEmp = true
+         }
       }
 
       if (caseAccess?.includes(req?.user?.empType?.toLowerCase()) && !empId) {
@@ -3932,16 +3895,16 @@ export const employeeDownloadAllPartner = async (req, res) => {
          empId = false
       } else {
          if (employee?.type?.toLowerCase() != "sales" && employee?.type?.toLowerCase() != "sathi team" && !empId) {
-         if (!validMongooseId(req.query?.empId)) return res.status(400).json({ success: false, message: "Not a valid employee Id" })
-            empId =req.query?.empId
+            if (!validMongooseId(req.query?.empId)) return res.status(400).json({ success: false, message: "Not a valid employee Id" })
+            empId = req.query?.empId
             empBranchId = employee?.branchId
             branchWise = true
-         } 
+         }
       }
       if (branchWise) {
          const query = getAllPartnerSearchQuery(searchQuery, true, isNormalEmp && empId, startDate, endDate, !isNormalEmp && empBranchId)
          if (!query.success) return res.status(400).json({ success: false, message: query.message })
-         const getAllPartner = await Partner.find(query?.query).sort({ createdAt: -1 }).populate("salesId","fullName type designation")
+         const getAllPartner = await Partner.find(query?.query).sort({ createdAt: -1 }).populate("salesId", "fullName type designation")
          // Generate Excel buffer
          const excelBuffer = await getAllPartnerDownloadExcel(getAllPartner, findEmp?._id?.toString() || employee?._id?.toString());
          res.setHeader('Content-Disposition', 'attachment; filename="partners.xlsx"')
@@ -3952,12 +3915,12 @@ export const employeeDownloadAllPartner = async (req, res) => {
       } else {
 
          let extactMatchQuery = [
-            { referEmpId: findEmp?._id ? findEmp?._id :  employee?._id },
-            { _id: findEmp?._id ? findEmp?._id :  employee?._id }
+            { referEmpId: findEmp?._id ? findEmp?._id : employee?._id },
+            { _id: findEmp?._id ? findEmp?._id : employee?._id }
          ]
 
-         if(!findEmp && employee?.type?.toLowerCase()=="sales" && employee?.designation?.toLowerCase()=="manager" || 
-         (findEmp && findEmp?.type?.toLowerCase()=="sales" && findEmp?.designation?.toLowerCase()=="manager")){
+         if (!findEmp && employee?.type?.toLowerCase() == "sales" && employee?.designation?.toLowerCase() == "manager" ||
+            (findEmp && findEmp?.type?.toLowerCase() == "sales" && findEmp?.designation?.toLowerCase() == "manager")) {
             extactMatchQuery.push({ type: { $regex: "sales", $options: "i" } })
             extactMatchQuery.push({ type: { $regex: "sathi team", $options: "i" } })
          }
@@ -3965,7 +3928,7 @@ export const employeeDownloadAllPartner = async (req, res) => {
             {
                $match: {
                   $or: [
-                   ...extactMatchQuery
+                     ...extactMatchQuery
                   ]
                }
             },
@@ -3979,13 +3942,13 @@ export const employeeDownloadAllPartner = async (req, res) => {
             {
                $project: {
                   shareEmp: 1,
-                  shareEmpId:1,
+                  shareEmpId: 1,
                   _id: 0,
                }
             },
             {
                $project: {
-                  shareEmpId:1,
+                  shareEmpId: 1,
                   shareEmp: { $map: { input: "$shareEmp", as: "id", in: { $toString: "$$id" } } },
                }
             }
@@ -4005,8 +3968,8 @@ export const employeeDownloadAllPartner = async (req, res) => {
                { branchId: { $regex: employee?.branchId, $options: "i" } },
                {
                   $or: [
-                     { salesId : { $in: extractType?.[0]?.shareEmpId } },
-                     { shareEmployee : { $in: extractType?.[0]?.shareEmp } },
+                     { salesId: { $in: extractType?.[0]?.shareEmpId } },
+                     { shareEmployee: { $in: extractType?.[0]?.shareEmp } },
                      // { partnerId: { $in: extractType?.[0]?.allPartners } },
                   ]
                },
@@ -4030,7 +3993,7 @@ export const employeeDownloadAllPartner = async (req, res) => {
                } : {}
             ]
          };
-         const getAllPartner = await Partner.find(query).sort({ createdAt: -1 }).populate("salesId","fullName type designation")
+         const getAllPartner = await Partner.find(query).sort({ createdAt: -1 }).populate("salesId", "fullName type designation")
          // Generate Excel buffer
          const excelBuffer = await getAllPartnerDownloadExcel(getAllPartner, findEmp?._id?.toString() || employee?._id?.toString());
          res.setHeader('Content-Disposition', 'attachment; filename="partners.xlsx"')
@@ -4048,7 +4011,7 @@ export const employeeDownloadAllPartner = async (req, res) => {
 
 export const empViewAllEmployee = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -4060,39 +4023,39 @@ export const empViewAllEmployee = async (req, res) => {
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const type = req.query.type ? req.query.type : true;
-      
+
       const caseAccess = ["operation", "finance", "branch"]
       let department = false
       let query = {}
       if (caseAccess?.includes(req?.user?.empType?.toLowerCase())) {
-       query = getAllEmployeeSearchQuery(searchQuery, true, department,false, employee?.branchId)
-      }else{
+         query = getAllEmployeeSearchQuery(searchQuery, true, department, false, employee?.branchId)
+      } else {
          query = {
-            $and:[
-               {isActive:true},
-               employee?.designation?.toLowerCase()=="executive" ? { referEmpId : { $in: [employee?._id] } } : {},
-               {branchId:{ $regex:employee?.branchId, $options: "i" }},
-               employee?.designation?.toLowerCase()=="manager" ?  {
+            $and: [
+               { isActive: true },
+               employee?.designation?.toLowerCase() == "executive" ? { referEmpId: { $in: [employee?._id] } } : {},
+               { branchId: { $regex: employee?.branchId, $options: "i" } },
+               employee?.designation?.toLowerCase() == "manager" ? {
                   $or: [
-                    { type: { $regex: "sales", $options: "i" } },
-                    { type: { $regex: "sathi team", $options: "i" } },
+                     { type: { $regex: "sales", $options: "i" } },
+                     { type: { $regex: "sathi team", $options: "i" } },
                   ]
-                } : {},
+               } : {},
                {
-                 $or: [
-                   { fullName: { $regex: searchQuery, $options: "i" } },
-                   { email: { $regex: searchQuery, $options: "i" } },
-                   { mobileNo: { $regex: searchQuery, $options: "i" } },
-                   { branchId: { $regex: searchQuery, $options: "i" } },
-                   { type: { $regex: searchQuery, $options: "i" } },
-                   { designation: { $regex: searchQuery, $options: "i" } },
-                 ]
+                  $or: [
+                     { fullName: { $regex: searchQuery, $options: "i" } },
+                     { email: { $regex: searchQuery, $options: "i" } },
+                     { mobileNo: { $regex: searchQuery, $options: "i" } },
+                     { branchId: { $regex: searchQuery, $options: "i" } },
+                     { type: { $regex: searchQuery, $options: "i" } },
+                     { designation: { $regex: searchQuery, $options: "i" } },
+                  ]
                }
-             ]
+            ]
          }
       }
-   
-      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("referEmpId","fullName type designation");
+
+      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("referEmpId", "fullName type designation");
       const noOfEmployee = await Employee.find(query).count()
       return res.status(200).json({ success: true, message: "get employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
 
@@ -4105,7 +4068,7 @@ export const empViewAllEmployee = async (req, res) => {
 
 export const empDownloadAllEmployee = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -4117,40 +4080,40 @@ export const empDownloadAllEmployee = async (req, res) => {
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const type = req.query.type ? req.query.type : true;
-      
+
       const caseAccess = ["operation", "finance", "branch"]
       let department = false
       let query = {}
       if (caseAccess?.includes(req?.user?.empType?.toLowerCase())) {
-       query = getAllEmployeeSearchQuery(searchQuery, true, department,false, employee?.branchId)
-      }else{
+         query = getAllEmployeeSearchQuery(searchQuery, true, department, false, employee?.branchId)
+      } else {
          query = {
-            $and:[
-               {isActive:true},
-               employee?.designation?.toLowerCase()=="executive" ? { referEmpId : { $in: [employee?._id] } } : {},
-               {branchId:{ $regex:employee?.branchId, $options: "i" }},
-               employee?.designation?.toLowerCase()=="manager" ?  {
+            $and: [
+               { isActive: true },
+               employee?.designation?.toLowerCase() == "executive" ? { referEmpId: { $in: [employee?._id] } } : {},
+               { branchId: { $regex: employee?.branchId, $options: "i" } },
+               employee?.designation?.toLowerCase() == "manager" ? {
                   $or: [
-                    { type: { $regex: "sales", $options: "i" } },
-                    { type: { $regex: "sathi team", $options: "i" } },
+                     { type: { $regex: "sales", $options: "i" } },
+                     { type: { $regex: "sathi team", $options: "i" } },
                   ]
-                } : {},
+               } : {},
                {
-                 $or: [
-                   { fullName: { $regex: searchQuery, $options: "i" } },
-                   { email: { $regex: searchQuery, $options: "i" } },
-                   { mobileNo: { $regex: searchQuery, $options: "i" } },
-                   { branchId: { $regex: searchQuery, $options: "i" } },
-                   { type: { $regex: searchQuery, $options: "i" } },
-                   { designation: { $regex: searchQuery, $options: "i" } },
-                 ]
+                  $or: [
+                     { fullName: { $regex: searchQuery, $options: "i" } },
+                     { email: { $regex: searchQuery, $options: "i" } },
+                     { mobileNo: { $regex: searchQuery, $options: "i" } },
+                     { branchId: { $regex: searchQuery, $options: "i" } },
+                     { type: { $regex: searchQuery, $options: "i" } },
+                     { designation: { $regex: searchQuery, $options: "i" } },
+                  ]
                }
-             ]
+            ]
          }
       }
 
-      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("referEmpId","fullName type designation");
-      const excelBuffer = await getAllSathiDownloadExcel(JSON.parse(JSON.stringify(getAllEmployee)),"");
+      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("referEmpId", "fullName type designation");
+      const excelBuffer = await getAllSathiDownloadExcel(JSON.parse(JSON.stringify(getAllEmployee)), "");
       res.setHeader('Content-Disposition', 'attachment; filename="sathi.xlsx"')
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.status(200)
@@ -4164,7 +4127,7 @@ export const empDownloadAllEmployee = async (req, res) => {
 
 export const empViewSathiEmployee = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -4175,39 +4138,39 @@ export const empViewSathiEmployee = async (req, res) => {
       const searchQuery = req.query.search ? req.query.search : "";
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
-      const empId = req.query.empId 
+      const empId = req.query.empId
 
-      if(!validMongooseId(empId)) return res.status(400).json({success:false,message:"Not a valid Id"})
+      if (!validMongooseId(empId)) return res.status(400).json({ success: false, message: "Not a valid Id" })
       const getEmp = await Employee.findById(empId)
-      if(!getEmp) return res.status(400).json({success:false,message:"Employee not found"})
+      if (!getEmp) return res.status(400).json({ success: false, message: "Employee not found" })
 
       const caseAccess = ["operation", "finance", "branch"]
       let query = {}
-      console.log(caseAccess?.includes(getEmp?.type?.toLowerCase()),"----");
+      console.log(caseAccess?.includes(getEmp?.type?.toLowerCase()), "----");
       if (caseAccess?.includes(getEmp?.type?.toLowerCase())) {
-       query = getEmployeeByIdQuery(searchQuery,"sathi team",employee?.branchId)
-      }else{
+         query = getEmployeeByIdQuery(searchQuery, "sathi team", employee?.branchId)
+      } else {
          query = {
-            $and:[
-               {isActive:true},
-               getEmp?.designation?.toLowerCase()=="executive" ? { referEmpId : getEmp?._id } : {},
-               {branchId:{ $regex:employee?.branchId, $options: "i" }},
+            $and: [
+               { isActive: true },
+               getEmp?.designation?.toLowerCase() == "executive" ? { referEmpId: getEmp?._id } : {},
+               { branchId: { $regex: employee?.branchId, $options: "i" } },
                { type: { $regex: "sathi team", $options: "i" } },
                {
-                 $or: [
-                   { fullName: { $regex: searchQuery, $options: "i" } },
-                   { email: { $regex: searchQuery, $options: "i" } },
-                   { mobileNo: { $regex: searchQuery, $options: "i" } },
-                   { branchId: { $regex: searchQuery, $options: "i" } },
-                   { type: { $regex: searchQuery, $options: "i" } },
-                   { designation: { $regex: searchQuery, $options: "i" } },
-                 ]
+                  $or: [
+                     { fullName: { $regex: searchQuery, $options: "i" } },
+                     { email: { $regex: searchQuery, $options: "i" } },
+                     { mobileNo: { $regex: searchQuery, $options: "i" } },
+                     { branchId: { $regex: searchQuery, $options: "i" } },
+                     { type: { $regex: searchQuery, $options: "i" } },
+                     { designation: { $regex: searchQuery, $options: "i" } },
+                  ]
                }
-             ]
+            ]
          }
       }
-   
-      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("referEmpId","fullName type designation");
+
+      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("referEmpId", "fullName type designation");
       const noOfEmployee = await Employee.find(query).count()
       return res.status(200).json({ success: true, message: "get employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
 
@@ -4221,7 +4184,7 @@ export const empViewSathiEmployee = async (req, res) => {
 
 export const empDownloadSathiEmployee = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -4230,39 +4193,39 @@ export const empDownloadSathiEmployee = async (req, res) => {
       // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const searchQuery = req.query.search ? req.query.search : "";
-      const empId = req.query.empId 
+      const empId = req.query.empId
 
-      if(!validMongooseId(empId)) return res.status(400).json({success:false,message:"Not a valid Id"})
+      if (!validMongooseId(empId)) return res.status(400).json({ success: false, message: "Not a valid Id" })
       const getEmp = await Employee.findById(empId)
-      if(!getEmp) return res.status(400).json({success:false,message:"Employee not found"})
+      if (!getEmp) return res.status(400).json({ success: false, message: "Employee not found" })
 
       const caseAccess = ["operation", "finance", "branch"]
       let query = {}
-      console.log(caseAccess?.includes(getEmp?.type?.toLowerCase()),"----");
+      console.log(caseAccess?.includes(getEmp?.type?.toLowerCase()), "----");
       if (caseAccess?.includes(getEmp?.type?.toLowerCase())) {
-       query = getEmployeeByIdQuery(searchQuery,"sathi team",employee?.branchId)
-      }else{
+         query = getEmployeeByIdQuery(searchQuery, "sathi team", employee?.branchId)
+      } else {
          query = {
-            $and:[
-               {isActive:true},
-               getEmp?.designation?.toLowerCase()=="executive" ? { referEmpId : getEmp?._id } : {},
-               {branchId:{ $regex:employee?.branchId, $options: "i" }},
+            $and: [
+               { isActive: true },
+               getEmp?.designation?.toLowerCase() == "executive" ? { referEmpId: getEmp?._id } : {},
+               { branchId: { $regex: employee?.branchId, $options: "i" } },
                { type: { $regex: "sathi team", $options: "i" } },
                {
-                 $or: [
-                   { fullName: { $regex: searchQuery, $options: "i" } },
-                   { email: { $regex: searchQuery, $options: "i" } },
-                   { mobileNo: { $regex: searchQuery, $options: "i" } },
-                   { branchId: { $regex: searchQuery, $options: "i" } },
-                   { type: { $regex: searchQuery, $options: "i" } },
-                   { designation: { $regex: searchQuery, $options: "i" } },
-                 ]
+                  $or: [
+                     { fullName: { $regex: searchQuery, $options: "i" } },
+                     { email: { $regex: searchQuery, $options: "i" } },
+                     { mobileNo: { $regex: searchQuery, $options: "i" } },
+                     { branchId: { $regex: searchQuery, $options: "i" } },
+                     { type: { $regex: searchQuery, $options: "i" } },
+                     { designation: { $regex: searchQuery, $options: "i" } },
+                  ]
                }
-             ]
+            ]
          }
       }
-   
-      const getAllEmployee = await Employee.find(query).select("-password").sort({ createdAt: -1 }).populate("referEmpId","fullName type designation");
+
+      const getAllEmployee = await Employee.find(query).select("-password").sort({ createdAt: -1 }).populate("referEmpId", "fullName type designation");
       const excelBuffer = await getAllSathiDownloadExcel(JSON.parse(JSON.stringify(getAllEmployee)), getEmp._id?.toString());
       res.setHeader('Content-Disposition', 'attachment; filename="sathi.xlsx"')
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -4278,7 +4241,7 @@ export const empDownloadSathiEmployee = async (req, res) => {
 
 export const empChangeBranch = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -4294,16 +4257,16 @@ export const empChangeBranch = async (req, res) => {
          const getClient = await Client?.findById(_id)
          if (!getClient) return res.status(400).json({ success: false, message: "Client account not found" })
 
-         await Client.findByIdAndUpdate(_id, { branchId:branchId?.trim() })
-         await Case.updateMany({ clientId: _id }, { branchId:branchId?.trim() })
-         await Bill.updateMany({ clientId: _id }, { branchId:branchId?.trim() })
+         await Client.findByIdAndUpdate(_id, { branchId: branchId?.trim() })
+         await Case.updateMany({ clientId: _id }, { branchId: branchId?.trim() })
+         await Bill.updateMany({ clientId: _id }, { branchId: branchId?.trim() })
          return res.status(200).json({ success: true, message: `Successfully Change Branch` });
       } else {
          const getPartner = await Partner?.findById(_id)
          if (!getPartner) return res.status(400).json({ success: false, message: "Partner account not found" })
 
-         await Partner.findByIdAndUpdate(_id, { branchId:branchId?.trim() })
-         await Case.updateMany({ partnerId: _id }, { branchId:branchId?.trim() })
+         await Partner.findByIdAndUpdate(_id, { branchId: branchId?.trim() })
+         await Case.updateMany({ partnerId: _id }, { branchId: branchId?.trim() })
          return res.status(200).json({ success: true, message: `Successfully Change Branch` });
       }
 
@@ -4315,7 +4278,7 @@ export const empChangeBranch = async (req, res) => {
 
 export const empOptGetNormalEmployee = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -4328,24 +4291,24 @@ export const empOptGetNormalEmployee = async (req, res) => {
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = req.query.search ? req.query.search : "";
 
-      const excludedTypes = ["Sales", "Operation", "Finance","Sathi Team","Branch"];
+      const excludedTypes = ["Sales", "Operation", "Finance", "Sathi Team", "Branch"];
       let query = {
-         $and:[
-            {isActive:true},
-            { type: { $nin: excludedTypes }},
-            {branchId:{ $regex: employee?.branchId, $options: "i" }},
+         $and: [
+            { isActive: true },
+            { type: { $nin: excludedTypes } },
+            { branchId: { $regex: employee?.branchId, $options: "i" } },
             {
-             $or: [
-                  { fullName: { $regex: searchQuery, $options: "i" }},
-                  { email: { $regex: searchQuery, $options: "i" }},
-                  { mobileNo: { $regex: searchQuery, $options: "i" }},
-                  { type: { $regex: searchQuery, $options: "i" }},
-                  { designation: { $regex: searchQuery, $options: "i" }},
+               $or: [
+                  { fullName: { $regex: searchQuery, $options: "i" } },
+                  { email: { $regex: searchQuery, $options: "i" } },
+                  { mobileNo: { $regex: searchQuery, $options: "i" } },
+                  { type: { $regex: searchQuery, $options: "i" } },
+                  { designation: { $regex: searchQuery, $options: "i" } },
 
-              ]
+               ]
             }
          ]
-         };
+      };
       const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
       const noOfEmployee = await Employee.find(query).count()
       return res.status(200).json({ success: true, message: "get normal employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
@@ -4359,7 +4322,7 @@ export const empOptGetNormalEmployee = async (req, res) => {
 
 export const empOptShareCaseToEmployee = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -4368,7 +4331,7 @@ export const empOptShareCaseToEmployee = async (req, res) => {
       // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
 
-      
+
       const { error } = validateAdminAddEmployeeToCase(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
@@ -4384,7 +4347,7 @@ export const empOptShareCaseToEmployee = async (req, res) => {
 
 export const createOrUpdateStatement = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -4392,12 +4355,12 @@ export const createOrUpdateStatement = async (req, res) => {
       // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
       // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       const caseAccess = ["operation", "finance"]
-      if(!caseAccess.includes(employee?.type?.toLowerCase())){
+      if (!caseAccess.includes(employee?.type?.toLowerCase())) {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
 
 
-      const { _id,partnerEmail,empEmail,partnerId,empId } = req.body
+      const { _id, partnerEmail, empEmail, partnerId, empId } = req.body
       req.body.branchId = employee?.branchId
 
       let isExistStatement = {}
@@ -4407,20 +4370,20 @@ export const createOrUpdateStatement = async (req, res) => {
             return res.status(400).json({ success: false, message: "Statment is not found" })
          }
       } else {
-         if(partnerEmail || partnerId){
-            let filter ={}
-            if(partnerEmail){ filter.email={ $regex:partnerEmail, $options: "i" }} 
-            if(partnerId){ filter._id=partnerId} 
-            const findPartner = await Partner.findOne({$or:[filter] })
-            if(!findPartner) return res.status(400).json({ success: false, message: "Partner is not found" })
+         if (partnerEmail || partnerId) {
+            let filter = {}
+            if (partnerEmail) { filter.email = { $regex: partnerEmail, $options: "i" } }
+            if (partnerId) { filter._id = partnerId }
+            const findPartner = await Partner.findOne({ $or: [filter] })
+            if (!findPartner) return res.status(400).json({ success: false, message: "Partner is not found" })
             req.body.partnerId = findPartner._id?.toString()
             req.body.branchId = findPartner?.branchId
-         }else  if(empEmail || empId){
-            let filter ={}
-            if(empEmail){ filter.email={ $regex:empEmail, $options: "i" }} 
-            if(empId){ filter._id=empId} 
-            const findEmp = await Employee.findOne({$or:[filter] })
-            if(!findEmp) return res.status(400).json({ success: false, message: "Employee is not found" })
+         } else if (empEmail || empId) {
+            let filter = {}
+            if (empEmail) { filter.email = { $regex: empEmail, $options: "i" } }
+            if (empId) { filter._id = empId }
+            const findEmp = await Employee.findOne({ $or: [filter] })
+            if (!findEmp) return res.status(400).json({ success: false, message: "Employee is not found" })
             req.body.empId = findEmp._id?.toString()
             req.body.branchId = findEmp?.branchId
          }
@@ -4448,7 +4411,7 @@ export const createOrUpdateStatement = async (req, res) => {
 
 export const getStatement = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -4456,12 +4419,12 @@ export const getStatement = async (req, res) => {
       // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
       // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       const caseAccess = ["operation", "finance", "sathi team"]
-      if(!caseAccess.includes(employee?.type?.toLowerCase())){
+      if (!caseAccess.includes(employee?.type?.toLowerCase())) {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
-      
 
-      const { empId, partnerId, startDate, endDate, limit, pageNo,isPdf } = req.query
+
+      const { empId, partnerId, startDate, endDate, limit, pageNo, isPdf } = req.query
       const pageItemLimit = limit ? limit : 10;
       const page = pageNo ? (pageNo - 1) * pageItemLimit : 0;
 
@@ -4473,7 +4436,7 @@ export const getStatement = async (req, res) => {
          if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
       }
 
-      let matchQuery = [{branchId:{ $regex: employee?.branchId, $options: 'i' }}]
+      let matchQuery = [{ branchId: { $regex: employee?.branchId, $options: 'i' } }]
 
       if (startDate && endDate) {
          const start = new Date(startDate).setHours(0, 0, 0, 0);
@@ -4491,16 +4454,16 @@ export const getStatement = async (req, res) => {
 
       if (empId) {
          const emp = await Employee.findById(empId).select({
-            'fullName':1,
-            'bankName':1,
-            'bankBranchName':1,
-            'bankAccountNo':1,
-            'panNo':1,
-            'address':1,
-           'branchId':1,
-           'empId':1,
+            'fullName': 1,
+            'bankName': 1,
+            'bankBranchName': 1,
+            'bankAccountNo': 1,
+            'panNo': 1,
+            'address': 1,
+            'branchId': 1,
+            'empId': 1,
          })
-         .populate("referEmpId","fullName")
+            .populate("referEmpId", "fullName")
          if (!emp) {
             return res.status(400).json({ status: false, message: 'Employee not found' })
          }
@@ -4512,16 +4475,16 @@ export const getStatement = async (req, res) => {
 
       if (partnerId) {
          const partner = await Partner.findById(partnerId,).select({
-            'bankingDetails.bankName':1,
-            'bankingDetails.bankAccountNo':1,
-            'bankingDetails.bankBranchName':1,
-            'bankingDetails.panNo':1,
-            'bankingDetails.branchId':1,
-            'profile.consultantName':1,
-            'profile.consultantCode':1,
-            'profile.address':1,
-            'branchId':1,
-         }).populate("salesId","fullName")
+            'bankingDetails.bankName': 1,
+            'bankingDetails.bankAccountNo': 1,
+            'bankingDetails.bankBranchName': 1,
+            'bankingDetails.panNo': 1,
+            'bankingDetails.branchId': 1,
+            'profile.consultantName': 1,
+            'profile.consultantCode': 1,
+            'profile.address': 1,
+            'branchId': 1,
+         }).populate("salesId", "fullName")
          if (!partner) {
             return res.status(400).json({ status: false, message: 'Partner not found' })
          }
@@ -4535,9 +4498,9 @@ export const getStatement = async (req, res) => {
       const allStatement = await Statement.aggregate([
          {
             $match: {
-               $and:[
+               $and: [
                   ...matchQuery,
-                  {isActive:true}
+                  { isActive: true }
 
                ]
             }
@@ -4560,9 +4523,9 @@ export const getStatement = async (req, res) => {
             }
          },
          {
-            $unwind:{
-               path:'$partnerDetails',
-               preserveNullAndEmptyArrays:true
+            $unwind: {
+               path: '$partnerDetails',
+               preserveNullAndEmptyArrays: true
             }
          },
          {
@@ -4582,16 +4545,16 @@ export const getStatement = async (req, res) => {
             }
          },
          {
-            $unwind:{
-               path:'$empDetails',
-               preserveNullAndEmptyArrays:true
+            $unwind: {
+               path: '$empDetails',
+               preserveNullAndEmptyArrays: true
             }
          },
          { '$sort': { 'createdAt': -1 } },
          {
             $facet: {
                statement: [
-                  ...(isPdf=="true" ? [] : [
+                  ...(isPdf == "true" ? [] : [
                      { $skip: Number(page) },
                      { $limit: Number(pageItemLimit) }
                   ])
@@ -4606,7 +4569,7 @@ export const getStatement = async (req, res) => {
       const data = allStatement?.[0]?.statement
       const totalData = allStatement?.[0]?.total?.[0]?.count || 0
 
-      return res.status(200).json({ success: true, message: `Successfully fetch all statement`, data: { data: data,totalData, statementOf } });
+      return res.status(200).json({ success: true, message: `Successfully fetch all statement`, data: { data: data, totalData, statementOf } });
 
    } catch (error) {
       console.log("createOrUpdateStatement in error:", error);
@@ -4617,7 +4580,7 @@ export const getStatement = async (req, res) => {
 
 export const empDownloadAllStatement = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -4625,22 +4588,22 @@ export const empDownloadAllStatement = async (req, res) => {
       // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
       // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       const caseAccess = ["operation", "finance", "sathi team"]
-      if(!caseAccess.includes(employee?.type?.toLowerCase())){
+      if (!caseAccess.includes(employee?.type?.toLowerCase())) {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
 
-      
+
       const { empId, partnerId, startDate, endDate } = req.query
-      
-      
+
+
       if (startDate && endDate) {
          const validStartDate = getValidateDate(startDate)
          if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
-            const validEndDate = getValidateDate(endDate)
+         const validEndDate = getValidateDate(endDate)
          if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
-         }
-      
-      let matchQuery = [{branchId:{ $regex: employee?.branchId, $options: 'i' }}]
+      }
+
+      let matchQuery = [{ branchId: { $regex: employee?.branchId, $options: 'i' } }]
 
       if (startDate && endDate) {
          const start = new Date(startDate).setHours(0, 0, 0, 0);
@@ -4703,7 +4666,7 @@ export const empDownloadAllStatement = async (req, res) => {
                         'bankAccountNo': '$bankingDetails.bankAccountNo',
                         'bankBranchName': '$bankingDetails.bankBranchName',
                         'panNo': '$bankingDetails.panNo',
-                        'bankBranchName':'$bankingDetails.bankBranchName',
+                        'bankBranchName': '$bankingDetails.bankBranchName',
                         'consultantName': '$profile.consultantName',
                         'consultantCode': '$profile.consultantCode',
                         'address': '$profile.address',
@@ -4782,15 +4745,15 @@ export const empDownloadAllStatement = async (req, res) => {
       res.status(200)
       res.send(excelBuffer)
    } catch (error) {
-     console.log("downloadAllStatement error:",error);
-     return res.status(500).json({success:false,message:"Oops! something went wrong", error: error})
-     
+      console.log("downloadAllStatement error:", error);
+      return res.status(500).json({ success: false, message: "Oops! something went wrong", error: error })
+
    }
 }
 
 export const getAllStatement = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -4799,7 +4762,7 @@ export const getAllStatement = async (req, res) => {
       // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const caseAccess = ["operation", "finance", "sathi team"]
-      if(!caseAccess.includes(employee?.type?.toLowerCase())){
+      if (!caseAccess.includes(employee?.type?.toLowerCase())) {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
 
@@ -4815,7 +4778,7 @@ export const getAllStatement = async (req, res) => {
          if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
       }
 
-      let matchQuery =  [{branchId:{ $regex: employee?.branchId, $options: 'i' }}]
+      let matchQuery = [{ branchId: { $regex: employee?.branchId, $options: 'i' } }]
 
       if (startDate && endDate) {
          const start = new Date(startDate).setHours(0, 0, 0, 0);
@@ -4832,9 +4795,9 @@ export const getAllStatement = async (req, res) => {
       const allStatement = await Statement.aggregate([
          {
             $match: {
-               $and:[
+               $and: [
                   ...matchQuery,
-                  {isActive:true}
+                  { isActive: true }
 
                ]
             }
@@ -4856,9 +4819,9 @@ export const getAllStatement = async (req, res) => {
             }
          },
          {
-            $unwind:{
-               path:'$partnerDetails',
-               preserveNullAndEmptyArrays:true
+            $unwind: {
+               path: '$partnerDetails',
+               preserveNullAndEmptyArrays: true
             }
          },
          {
@@ -4878,9 +4841,9 @@ export const getAllStatement = async (req, res) => {
             }
          },
          {
-            $unwind:{
-               path:'$empDetails',
-               preserveNullAndEmptyArrays:true
+            $unwind: {
+               path: '$empDetails',
+               preserveNullAndEmptyArrays: true
             }
          },
          {
@@ -4893,7 +4856,7 @@ export const getAllStatement = async (req, res) => {
                         { 'partnerDetails.profile.consultantCode': { $regex: search, $options: 'i' } },
                         { 'empDetails.fullName': { $regex: search, $options: 'i' } },
                      ]
-                  } :  { isActive: true }
+                  } : { isActive: true }
                ]
             }
          },
@@ -4914,7 +4877,7 @@ export const getAllStatement = async (req, res) => {
       const data = allStatement?.[0]?.statement
       const totalData = allStatement?.[0]?.total?.[0]?.count || 0
 
-      return res.status(200).json({ success: true, message: `Successfully fetch all statement`, data: { data: data,totalData} });
+      return res.status(200).json({ success: true, message: `Successfully fetch all statement`, data: { data: data, totalData } });
 
    } catch (error) {
       console.log("createOrUpdateStatement in error:", error);
@@ -4926,23 +4889,23 @@ export const getAllStatement = async (req, res) => {
 //  notification section
 export const getAllNotification = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
       // const employee = await Employee.findById(req?.user?._id)
       // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
       // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
-      if(employee?.type?.toLowerCase()!="operation"){
+      if (employee?.type?.toLowerCase() != "operation") {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
 
-      const allNotification = await Notification.find({empIds:{$nin:[req?.user?._id]}}).populate({
-         path:"caseId",
-         select:{
-            fileNo:1
+      const allNotification = await Notification.find({ empIds: { $nin: [req?.user?._id] } }).populate({
+         path: "caseId",
+         select: {
+            fileNo: 1
          }
-      }).sort({createdAt:-1})
+      }).sort({ createdAt: -1 })
       return res.status(200).json({ success: true, message: `Successfully fetch all notification`, data: allNotification });
 
    } catch (error) {
@@ -4954,21 +4917,21 @@ export const getAllNotification = async (req, res) => {
 
 export const updateNotification = async (req, res) => {
    try {
-      const {employee} = req
+      const { employee } = req
       // const verify = await authEmployee(req, res)
       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
       // const employee = await Employee.findById(req?.user?._id)
       // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
       // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
-      if(employee?.type?.toLowerCase()!="operation"){
+      if (employee?.type?.toLowerCase() != "operation") {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
-      
-     const markNotification =req.body?.markNotification || []
- 
-      await Notification.updateMany({_id:{$in:markNotification}},{$push:{empIds:req?.user?._id}})
-      return res.status(200).json({ success: true, message: `Successfully mark as read notification`});
+
+      const markNotification = req.body?.markNotification || []
+
+      await Notification.updateMany({ _id: { $in: markNotification } }, { $push: { empIds: req?.user?._id } })
+      return res.status(200).json({ success: true, message: `Successfully mark as read notification` });
 
    } catch (error) {
       console.log("updateNotification in error:", error);

@@ -676,41 +676,22 @@ export const updateProfileDetails = async (req, res) => {
   try {
     const verify = await authPartner(req, res)
     if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-    const partner = await Partner.findById(req?.user?._id);
-    if (!partner) return res.status(404).json({ success: false, message: "Not register with us" })
-    if (!partner?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
+    const isExist = await Partner.findById(req?.user?._id);
+    if (!isExist) return res.status(404).json({ success: false, message: "Not register with us" })
+    if (!isExist?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
     const { error } = validateProfileBody(req.body);
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-    const updatePatnerDetails = await Partner.findByIdAndUpdate(req?.user?._id, {
-      $set: {
-        "profile.profilePhoto": req.body.profilePhoto,
-        "profile.consultantName": req.body.consultantName,
-        "profile.alternateEmail": req.body.alternateEmail,
-        // "profile.primaryMobileNo":req.body.primaryMobileNo,
-        "profile.alternateMobileNo": req.body.alternateMobileNo,
-        "profile.whatsupNo": req.body.whatsupNo,
-        "profile.panNo": req.body.panNo,
-        "profile.aadhaarNo": req.body.aadhaarNo,
-        "profile.dob": req.body.dob,
-        "profile.businessName": req.body.businessName,
-        "profile.companyName": req.body.companyName,
-        "profile.natureOfBusiness": req.body.natureOfBusiness,
-        "profile.designation": req.body.designation,
-        "profile.areaOfOperation": req.body.areaOfOperation,
-        "profile.workAssociation": req.body.workAssociation,
-        "profile.state": req.body.state,
-        "profile.gender": req.body.gender,
-        "profile.district": req.body.district,
-        "profile.city": req.body.city,
-        "profile.address": req.body.address,
-        "profile.pinCode": req.body.pinCode,
-        "profile.about": req.body.about,
-        "profile.kycPhoto":req.body.kycPhoto,
-        "profile.kycAadhaar":req.body.kycAadhaar,
-        "profile.kycAadhaarBack":req?.body?.kycAadhaarBack,
-        "profile.kycPan":req.body.kycPan,
-      }
-    }, { new: true })
+    const updateKeys = ["profilePhoto", "consultantName", "alternateEmail", "alternateMobileNo", "primaryMobileNo", "whatsupNo", "panNo", "aadhaarNo",
+       "dob", "designation", "areaOfOperation", "workAssociation", "state", "gender", "district", "city", "address", "pinCode", "about", "kycPhoto",
+       "kycAadhaar", "kycPan", "kycAadhaarBack", "companyName", "companyAddress", "officalContactNo", "officalEmailId"
+    ]
+
+    updateKeys?.forEach(key => {
+       if (req.body[key]) {
+          isExist.profile[key] = req.body[key]
+       }
+    })
+    await isExist.save()
     return res.status(200).json({ success: true, message: "Successfully update profile details" })
   } catch (error) {
     console.log("updatePatnerDetails: ", error);
@@ -740,24 +721,19 @@ export const updateBankingDetails = async (req, res) => {
   try {
     const verify = await authPartner(req, res)
     if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-    const partner = await Partner.findById(req?.user?._id);
-    if (!partner) return res.status(404).json({ success: false, message: "Not register with us" })
-    if (!partner?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
+    const isExist = await Partner.findById(req?.user?._id);
+    if (!isExist) return res.status(404).json({ success: false, message: "Not register with us" })
+    if (!isExist?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
     const { error } = validateBankingDetailsBody(req.body);
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-    const updatePatnerDetails = await Partner.findByIdAndUpdate(req?.user?._id, {
-      $set: {
-        "bankingDetails.bankName": req.body.bankName,
-        "bankingDetails.bankAccountNo": req.body.bankAccountNo,
-        "bankingDetails.bankBranchName": req.body.bankBranchName,
-        "bankingDetails.gstNo": req.body.gstNo,
-        "bankingDetails.panNo": req.body.panNo,
-        "bankingDetails.cancelledChequeImg": req.body.cancelledChequeImg,
-        "bankingDetails.gstCopyImg": req.body.gstCopyImg,
-        "bankingDetails.ifscCode": req.body.ifscCode,
-        "bankingDetails.upiId": req.body.upiId,
-      }
-    }, { new: true })
+    const updateKeys = ["bankName", "bankAccountNo", "bankBranchName", "gstNo", "panNo","cancelledChequeImg","gstCopyImg","ifscCode","upiId"]
+
+    updateKeys?.forEach(key => {
+       if (req.body[key]) {
+          isExist.bankingDetails[key] = req.body[key]
+       }
+    })
+    await isExist.save()
     return res.status(200).json({ success: true, message: "Successfully update banking details" })
   } catch (error) {
     console.log("updatePatnerDetails: ", error);

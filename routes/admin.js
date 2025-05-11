@@ -1,118 +1,95 @@
 import express from 'express';
 const router = express.Router();
-import { adminSignin,adminSignUp,createEmployeeAccount,adminUpdateEmployeeAccount,adminDeleteEmployeeAccount,adminResetPassword,adminSetIsActiveEmployee,changeStatusAdminCase,getSettingDetails,
-viewAllAdminCase,viewCaseByIdByAdmin,viewAllPartnerByAdmin,viewPartnerByIdByAdmin,adminSetIsActivePartner,adminViewAllEmployee,
-adminViewAllClient,adminViewClientById,adminSetIsActiveClient,adminSettingDetailsUpdate,adminAddCaseFeeClient,adminUpdateClientCaseFee,
-uploadCompanyClientTls,uploadCompanyPartnerTls,adminShareCaseToEmployee,adminAddCaseComment,
-adminAuthenticate,adminDashboard,adminUpdateCaseById,adminAddReferenceCaseAndMarge,adminDeleteCaseById,
-adminDeletePartnerById,adminDeleteClientById,adminSetIsActiveCase,
-adminEditCaseStatus,adminSetClientTag,adminSetPartnerTag,adminForgetPassword,adminResetForgetPassword,
-getAllAdmin,superAdminSetIsActiveAdmin,superAdminDeleteAdminById,adminViewPartnerReport,
-adminRemoveReferenceCase,adminEditClient,adminUpdateParnterProfile,adminUpdatePartnerBankingDetails,
-adminDeleteCaseDocById,adminViewEmpSaleReport,adminViewEmpSalePartnerReport,
-adminDownloadAllCase,adminDownloadAllPartner,adminDownloadPartnerReport,
-adminEmpSaleReportDownload,adminEmpSalePartnerReportDownload,adminAllClientDownload,
-adminGetSaleEmployee,adminSharePartnerToSaleEmp,adminGetNormalEmployee,adminRemovePartnerToSaleEmp,
-adminUploadImage,adminUploadAttachment,adminCreateInvoice,adminViewAllInvoice,adminViewInvoiceById,
-adminUnActiveInvoice,adminEditInvoice,adminRemoveInvoice,
-adminAllUnactiveCaseDoc,adminUnactiveCaseDoc,adminChangeBranch,
-adminEmployeeProfile,adminDownloadEmpSathiEmployee,adminViewEmpSathiEmployee,
-adminDownloadAllEmployee,adminPaidInvoice,adminAddPartnerRefToEmp,
-createOrUpdateStatement,getStatement,getAllStatement,getAllNotification,updateNotification,
-adminAddOrUpdatePayment,adminDownloadAllInvoice,adminDownloadAllStatement,adminFindCaseByFileNo,
-adminAddOrUpdateEmpJoiningForm,
-admingetEmpJoiningForm,
-adminCreateOrUpdateCaseForm
-} from '../controller/admin.js';
-
-
 import { adminAddJob,adminDeleteJob } from '../controller/job.js';
 import { viewAllAdminComplaint,adminRemoveComplaintById } from '../controller/complaint.js';
 import { authAdmin } from '../middleware/authentication.js';
+import * as adminController from '../controller/admin.js'
 
 //  for admin 
-router.get("/dashboard",authAdmin,adminDashboard)
-router.post("/signin", adminSignin)
-router.post("/signup", adminSignUp)
-router.get("/authenticate",adminAuthenticate)
-router.post("/resetPassword",authAdmin ,adminResetPassword)
-router.get("/getSettingDetails",authAdmin,getSettingDetails)
-router.put("/forgetPassword",adminForgetPassword)
-router.put("/resetForgetPassword",adminResetForgetPassword)
+router.get("/dashboard",authAdmin,adminController.adminDashboard)
+router.post("/signin", adminController.adminSignin)
+router.post("/signup", adminController.adminSignUp)
+router.get("/authenticate",adminController.adminAuthenticate)
+router.post("/resetPassword",authAdmin ,adminController.adminResetPassword)
+router.get("/getSettingDetails",authAdmin,adminController.getSettingDetails)
+router.put("/forgetPassword",adminController.adminForgetPassword)
+router.put("/resetForgetPassword",adminController.adminResetForgetPassword)
 
 // for super-admin
-router.get("/superAdmin/allAdmin",authAdmin,getAllAdmin)
-router.put("/superAdmin/setIsActiveAdmin",authAdmin,superAdminSetIsActiveAdmin)
-router.delete("/superAdmin/deleteAdminById",authAdmin,superAdminDeleteAdminById)
-router.put("/settingDetailsUpdate",authAdmin,adminSettingDetailsUpdate)
+router.get("/superAdmin/allAdmin",authAdmin,adminController.getAllAdmin)
+router.put("/superAdmin/setIsActiveAdmin",authAdmin,adminController.superAdminSetIsActiveAdmin)
+router.delete("/superAdmin/deleteAdminById",authAdmin,adminController.superAdminDeleteAdminById)
+router.put("/settingDetailsUpdate",authAdmin,adminController.adminSettingDetailsUpdate)
 
 // for employee
-router.post("/createEmployeeAccount",authAdmin, createEmployeeAccount)
-router.get("/employee/profile",authAdmin,adminEmployeeProfile)
-router.put("/updateEmployeeAccount",authAdmin, adminUpdateEmployeeAccount)
-router.delete("/deleteEmployeeAccount",authAdmin, adminDeleteEmployeeAccount)
-router.put("/setIsActiveEmployee",authAdmin,adminSetIsActiveEmployee)
-router.get("/adminViewAllEmployee",authAdmin,adminViewAllEmployee)
-router.get("/sale-employee",authAdmin,adminGetSaleEmployee)
-router.get("/normal-employee",authAdmin,adminGetNormalEmployee)
-router.post("/employee/adminAddOrUpdateEmpJoiningForm",authAdmin,adminAddOrUpdateEmpJoiningForm)
-router.get("/employee/admingetEmpJoiningForm",authAdmin,admingetEmpJoiningForm)
+router.post("/createEmployeeAccount",authAdmin,adminController. createEmployeeAccount)
+router.get("/employee/profile",authAdmin,adminController.adminEmployeeProfile)
+router.put("/updateEmployeeAccount",authAdmin,adminController.adminUpdateEmployeeAccount)
+router.delete("/deleteEmployeeAccount",authAdmin,adminController.adminDeleteEmployeeAccount)
+router.put("/setIsActiveEmployee",authAdmin,adminController.adminSetIsActiveEmployee)
+router.get("/adminViewAllEmployee",authAdmin,adminController.adminViewAllEmployee)
+router.get("/sale-employee",authAdmin,adminController.adminGetSaleEmployee)
+router.get("/normal-employee",authAdmin,adminController.adminGetNormalEmployee)
+router.post("/employee/adminAddOrUpdateEmpJoiningForm",authAdmin,adminController.adminAddOrUpdateEmpJoiningForm)
+router.get("/employee/admingetEmpJoiningForm",authAdmin,adminController.admingetEmpJoiningForm)
 
 
 // for partner
-router.get("/viewAllPartner",authAdmin,viewAllPartnerByAdmin)
-router.get("/viewPartnerById",authAdmin,viewPartnerByIdByAdmin)
-router.put("/updateParnterProfile",authAdmin,adminUpdateParnterProfile)
-router.put("/setPartnerTag",authAdmin,adminSetPartnerTag)
-router.put("/updatePartnerBankingDetails",authAdmin,adminUpdatePartnerBankingDetails)
-router.put("/changePartnerStatus",authAdmin,adminSetIsActivePartner)
-router.put("/addPartnerRefToEmp",authAdmin,adminAddPartnerRefToEmp)
-router.delete("/deletePartnerById",authAdmin,adminDeletePartnerById)
+router.get("/viewAllPartner",authAdmin,adminController.viewAllPartnerByAdmin)
+router.get("/viewPartnerById",authAdmin,adminController.viewPartnerByIdByAdmin)
+router.put("/updateParnterProfile",authAdmin,adminController.adminUpdateParnterProfile)
+router.put("/setPartnerTag",authAdmin,adminController.adminSetPartnerTag)
+router.put("/updatePartnerBankingDetails",authAdmin,adminController.adminUpdatePartnerBankingDetails)
+router.put("/changePartnerStatus",authAdmin,adminController.adminSetIsActivePartner)
+router.put("/addPartnerRefToEmp",authAdmin,adminController.adminAddPartnerRefToEmp)
+router.delete("/deletePartnerById",authAdmin,adminController.adminDeletePartnerById)
 
 // for client
-router.get("/ViewAllClient",authAdmin,adminViewAllClient)
-router.get("/ViewClientById",authAdmin,adminViewClientById)
-router.put("/setIsActiveClient",authAdmin,adminSetIsActiveClient)
-router.put("/setClientTag",authAdmin,adminSetClientTag)
-router.put("/editClient",authAdmin,adminEditClient)
-router.delete("/deleteClientById",authAdmin,adminDeleteClientById)
+router.get("/ViewAllClient",authAdmin,adminController.adminViewAllClient)
+router.get("/ViewClientById",authAdmin,adminController.adminViewClientById)
+router.put("/setIsActiveClient",authAdmin,adminController.adminSetIsActiveClient)
+router.put("/setClientTag",authAdmin,adminController.adminSetClientTag)
+router.put("/editClient",authAdmin,adminController.adminEditClient)
+router.delete("/deleteClientById",authAdmin,adminController.adminDeleteClientById)
 
 
 // for case
-router.get("/viewAllCase",authAdmin,viewAllAdminCase)
-router.put("/changeCaseStatus",authAdmin,changeStatusAdminCase)
-router.get("/viewCaseById",authAdmin,viewCaseByIdByAdmin)
-router.post("/updateCaseById",authAdmin,adminUpdateCaseById)
-router.post("/addOrUpdatePayment",authAdmin,adminAddOrUpdatePayment)
-router.put("/editCaseProcessById",authAdmin,adminEditCaseStatus)
-router.put("/addCaseFeeClient",authAdmin,adminAddCaseFeeClient)
-router.put("/updateClientCaseFee",authAdmin,adminUpdateClientCaseFee)
-router.put("/changeCaseIsActive",authAdmin,adminSetIsActiveCase)
-router.put("/addReferenceCaseAndMarge",authAdmin,adminAddReferenceCaseAndMarge)
-router.put("/removeReferenceCase",authAdmin,adminRemoveReferenceCase)
-router.delete("/deleteCaseById",authAdmin,adminDeleteCaseById)
-router.delete("/deleteCaseDocId",authAdmin,adminDeleteCaseDocById)
-router.post("/adminCreateOrUpdateCaseForm",authAdmin,adminCreateOrUpdateCaseForm)
+router.get("/viewAllCase",authAdmin,adminController.viewAllAdminCase)
+router.put("/changeCaseStatus",authAdmin,adminController.changeStatusAdminCase)
+router.get("/viewCaseById",authAdmin,adminController.viewCaseByIdByAdmin)
+router.post("/updateCaseById",authAdmin,adminController.adminUpdateCaseById)
+router.post("/addOrUpdatePayment",authAdmin,adminController.adminAddOrUpdatePayment)
+router.put("/editCaseProcessById",authAdmin,adminController.adminEditCaseStatus)
+router.put("/addCaseFeeClient",authAdmin,adminController.adminAddCaseFeeClient)
+router.put("/updateClientCaseFee",authAdmin,adminController.adminUpdateClientCaseFee)
+router.put("/changeCaseIsActive",authAdmin,adminController.adminSetIsActiveCase)
+router.put("/addReferenceCaseAndMarge",authAdmin,adminController.adminAddReferenceCaseAndMarge)
+router.put("/removeReferenceCase",authAdmin,adminController.adminRemoveReferenceCase)
+router.delete("/deleteCaseById",authAdmin,adminController.adminDeleteCaseById)
+router.delete("/deleteCaseDocId",authAdmin,adminController.adminDeleteCaseDocById)
+router.post("/adminCreateOrUpdateCaseForm",authAdmin,adminController.adminCreateOrUpdateCaseForm)
 
 
 // case doc
-router.put("/unActiveDoc",authAdmin,adminUnactiveCaseDoc)
-router.get("/allUnactiveCaseDoc",authAdmin,adminAllUnactiveCaseDoc)
+router.put("/unActiveDoc",authAdmin,adminController.adminUnactiveCaseDoc)
+router.get("/allUnactiveCaseDoc",authAdmin,adminController.adminAllUnactiveCaseDoc)
 
 
 // share case
-router.put("/addEmployeeToCase",authAdmin,adminShareCaseToEmployee)
-router.put("/addCaseCommit",authAdmin,adminAddCaseComment)
+router.put("/addEmployeeToCase",authAdmin,adminController.adminShareCaseToEmployee)
+router.put("/addCaseCommit",authAdmin,adminController.adminAddCaseComment)
 
 
 // share partner
-router.put("/addSharePartner",authAdmin,adminSharePartnerToSaleEmp)
-router.put("/removePartner",authAdmin,adminRemovePartnerToSaleEmp)
+router.put("/addSharePartner",authAdmin,adminController.adminSharePartnerToSaleEmp)
+router.put("/removePartner",authAdmin,adminController.adminRemovePartnerToSaleEmp)
 
+// share client
+router.put("/shareClient",authAdmin,adminController.adminShareClientToSaleEmp)
 
 //  for tnc
-router.put("/uploadCompanyClientTls",authAdmin,uploadCompanyClientTls)
-router.put("/uploadCompanyPartnerTls",authAdmin,uploadCompanyPartnerTls)
+router.put("/uploadCompanyClientTls",authAdmin,adminController.uploadCompanyClientTls)
+router.put("/uploadCompanyPartnerTls",authAdmin,adminController.uploadCompanyPartnerTls)
 
 // for job
 router.post("/addJob",authAdmin,adminAddJob)
@@ -124,55 +101,57 @@ router.delete("/adminRemoveComplaintById",authAdmin,adminRemoveComplaintById)
 
 
 // for invoice
-router.post("/createInvoice",authAdmin,adminCreateInvoice)
-router.get("/viewAllInvoice",authAdmin,adminViewAllInvoice)
-router.get("/adminDownloadAllInvoice",authAdmin,adminDownloadAllInvoice)
-router.get("/viewInvoiceById",authAdmin,adminViewInvoiceById)
-router.put("/editInvoiceById",authAdmin,adminEditInvoice)
-router.put("/paidInvoiceById",authAdmin,adminPaidInvoice)
-router.put("/unActiveInvoiceById",authAdmin,adminUnActiveInvoice)
-router.delete("/deleteInvoice",authAdmin,adminRemoveInvoice)
+router.post("/createInvoice",authAdmin,adminController.adminCreateInvoice)
+router.get("/viewAllInvoice",authAdmin,adminController.adminViewAllInvoice)
+router.get("/adminDownloadAllInvoice",authAdmin,adminController.adminDownloadAllInvoice)
+router.get("/viewInvoiceById",authAdmin,adminController.adminViewInvoiceById)
+router.put("/editInvoiceById",authAdmin,adminController.adminEditInvoice)
+router.put("/paidInvoiceById",authAdmin,adminController.adminPaidInvoice)
+router.put("/unActiveInvoiceById",authAdmin,adminController.adminUnActiveInvoice)
+router.delete("/deleteInvoice",authAdmin,adminController.adminRemoveInvoice)
 
 // for report
-router.get("/adminViewPartnerReport",authAdmin,adminViewPartnerReport)
-router.get("/adminViewEmpSaleReport",authAdmin,adminViewEmpSaleReport)
-router.get("/adminViewEmpSalePartnerReport",authAdmin,adminViewEmpSalePartnerReport)
+router.get("/adminViewPartnerReport",authAdmin,adminController.adminViewPartnerReport)
+router.get("/adminViewEmpSaleReport",authAdmin,adminController.adminViewEmpSaleReport)
+router.get("/adminViewEmpSalePartnerReport",authAdmin,adminController.adminViewEmpSalePartnerReport)
 
 // for upload
-router.post("/upload/image",authAdmin,adminUploadImage)
-router.post("/upload/attachment",authAdmin,adminUploadAttachment)
+router.post("/upload/image",authAdmin,adminController.adminUploadImage)
+router.post("/upload/attachment",authAdmin,adminController.adminUploadAttachment)
 
 // for download
-router.get("/download/allcase",authAdmin,adminDownloadAllCase)
-router.get("/download/allpartner",authAdmin,adminDownloadAllPartner)
-router.get("/download/allClient",authAdmin,adminAllClientDownload)
-router.get("/download/allEmployee",authAdmin,adminDownloadAllEmployee)
-router.get("/download/partnerReport",authAdmin,adminDownloadPartnerReport)
-router.get("/download/empSaleReport",authAdmin,adminEmpSaleReportDownload)
-router.get("/download/empSalePartnerReport",authAdmin,adminEmpSalePartnerReportDownload)
+router.get("/download/allcase",authAdmin,adminController.adminDownloadAllCase)
+router.get("/download/allpartner",authAdmin,adminController.adminDownloadAllPartner)
+router.get("/download/allClient",authAdmin,adminController.adminAllClientDownload)
+router.get("/download/allEmployee",authAdmin,adminController.adminDownloadAllEmployee)
+router.get("/download/partnerReport",authAdmin,adminController.adminDownloadPartnerReport)
+router.get("/download/empSaleReport",authAdmin,adminController.adminEmpSaleReportDownload)
+router.get("/download/empSalePartnerReport",authAdmin,adminController.adminEmpSalePartnerReportDownload)
 
 
 // for change branch
-router.put("/change-branch",authAdmin,adminChangeBranch)
+router.put("/change-branch",authAdmin,adminController.adminChangeBranch)
 
 // for sathi
-router.get("/viewEmpSathi",authAdmin,adminViewEmpSathiEmployee)
-router.get("/download/empSathi",authAdmin,adminDownloadEmpSathiEmployee)
+router.get("/viewEmpSathi",authAdmin,adminController.adminViewEmpSathiEmployee)
+router.get("/download/empSathi",authAdmin,adminController.adminDownloadEmpSathiEmployee)
 
 
 // for statement
-router.post("/createOrUpdateStatement",authAdmin,createOrUpdateStatement)
-router.get("/getAllStatement",authAdmin,getStatement)
-router.get("/getStatements",authAdmin,getAllStatement)
-router.get("/download/downloadAllStatement",authAdmin,adminDownloadAllStatement)
-router.get("/adminFindCaseByFileNo",authAdmin,adminFindCaseByFileNo)
+router.post("/createOrUpdateStatement",authAdmin,adminController.createOrUpdateStatement)
+router.get("/getAllStatement",authAdmin,adminController.getStatement)
+router.get("/getStatements",authAdmin,adminController.getAllStatement)
+router.get("/download/downloadAllStatement",authAdmin,adminController.adminDownloadAllStatement)
+router.get("/adminFindCaseByFileNo",authAdmin,adminController.adminFindCaseByFileNo)
 
 // notification
-router.get("/getAllNotification",authAdmin,getAllNotification)
-router.put("/updateNotification",authAdmin,updateNotification)
+router.get("/getAllNotification",authAdmin,adminController.getAllNotification)
+router.put("/updateNotification",authAdmin,adminController.updateNotification)
 
 
 // router.put("/updateModalSchema",adminUpdateModalSchema)
+router.put("/updatePartnerSchema",adminController.updatePartnerSchema)
+
 
 
 

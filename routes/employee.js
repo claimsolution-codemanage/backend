@@ -1,119 +1,105 @@
 import express from 'express';
 const router = express.Router();
-import { employeeResetPassword,employeeSignin,empProfile,changeStatusEmployeeCase,viewAllEmployeeCase, employeeViewCaseByIdBy,
-employeeViewAllClient,employeeViewClientById,employeeViewAllPartner,employeeViewPartnerById,employeeForgetPassword,
-employeeAuthenticate,employeeAddCaseComment,employeeResetForgetPassword,
-employeeCreateInvoice,employeeViewAllInvoice,employeeViewInvoiceById,employeeDownloadInvoiceById,
-employeeEditInvoice,allEmployeeDashboard,employeeUnActiveInvoice,employeeUpdateCaseById,
-employeeEditClient,employeeupdateParnterProfile,employeeUpdatePartnerBankingDetails,
-saleEmployeeAddPartner,saleEmployeeAddCase,employeeUploadImage,employeeUploadAttachment,
-employeeRemoveInvoice,salesDownloadCaseReport,saleEmpViewPartnerReport,empDownloadPartnerReport,
-employeeDownloadAllPartner,empViewAllEmployee,empAddReferenceCaseAndMarge,empRemoveReferenceCase,
-empChangeBranch,createSathiTeamAcc,empViewSathiEmployee,empDownloadSathiEmployee,empOptGetNormalEmployee,
-empOptShareCaseToEmployee,empDownloadAllEmployee,empClientDownload,empOpPaidInvoice,empOpGetSaleEmployee,
-empOpSharePartnerToSaleEmp,empAddPartnerRefToEmp,createOrUpdateStatement,getStatement,updateEmployeeAccount,getAllStatement,
-getAllNotification,updateNotification,empAddOrUpdatePayment,empDownloadAllInvoice,
-empDownloadAllStatement,employeeFindCaseByFileNo,
-empOpCreateOrUpdateCaseForm
-} from '../controller/employee.js';
+import * as employeeController from '../controller/employee.js'
 import { authEmployee } from '../middleware/authentication.js';
 
 
-router.post("/signin",employeeSignin)
-router.get("/authenticate",employeeAuthenticate)
-router.get("/profile",authEmployee,empProfile)
-router.post("/addSathiTeamAcc",authEmployee,createSathiTeamAcc)
-router.post("/resetPassword",authEmployee,employeeResetPassword)
-router.put("/resetForgetPassword",employeeResetForgetPassword)
-router.put("/employeeForgetPassword",employeeForgetPassword)
-router.put("/updateEmployeeAccount",authEmployee,updateEmployeeAccount)
-router.get("/view/sathiTeam",authEmployee,empViewSathiEmployee)
-router.get("/download/sathiTeam",authEmployee,empDownloadSathiEmployee)
-router.get("/operation/normalEmployee",authEmployee,empOptGetNormalEmployee)
-router.get('/opeation/sale-employee',authEmployee,empOpGetSaleEmployee)
+router.post("/signin",employeeController.employeeSignin)
+router.get("/authenticate",employeeController.employeeAuthenticate)
+router.get("/profile",authEmployee,employeeController.empProfile)
+router.post("/addSathiTeamAcc",authEmployee,employeeController.createSathiTeamAcc)
+router.post("/resetPassword",authEmployee,employeeController.employeeResetPassword)
+router.put("/resetForgetPassword",employeeController.employeeResetForgetPassword)
+router.put("/employeeForgetPassword",employeeController.employeeForgetPassword)
+router.put("/updateEmployeeAccount",authEmployee,employeeController.updateEmployeeAccount)
+router.get("/view/sathiTeam",authEmployee,employeeController.empViewSathiEmployee)
+router.get("/download/sathiTeam",authEmployee,employeeController.empDownloadSathiEmployee)
+router.get("/operation/normalEmployee",authEmployee,employeeController.empOptGetNormalEmployee)
+router.get('/opeation/sale-employee',authEmployee,employeeController.empOpGetSaleEmployee)
 
 
-router.get("/all/dashboard",authEmployee,allEmployeeDashboard)
+router.get("/all/dashboard",authEmployee,employeeController.allEmployeeDashboard)
 
 // case
-router.get("/viewAllCase",authEmployee,viewAllEmployeeCase)
-router.get("/viewCaseById",authEmployee,employeeViewCaseByIdBy)
-router.get("/employeeFindCaseByFileNo",authEmployee,employeeFindCaseByFileNo)
-router.put("/changeCaseStatus",authEmployee,changeStatusEmployeeCase)
-router.put("/addCaseComment",authEmployee,employeeAddCaseComment)
-router.put("/updateCaseById",authEmployee,employeeUpdateCaseById)
-router.put("/operation/addReferenceCaseAndMarge",authEmployee,empAddReferenceCaseAndMarge)
-router.put("/operation/removeReferenceCase",authEmployee,empRemoveReferenceCase)
-router.post("/emp/empAddOrUpdatePayment",authEmployee,empAddOrUpdatePayment)
-router.post('/opeation/empOpCreateOrUpdateCaseForm',authEmployee,empOpCreateOrUpdateCaseForm)
+router.get("/viewAllCase",authEmployee,employeeController.viewAllEmployeeCase)
+router.get("/viewCaseById",authEmployee,employeeController.employeeViewCaseByIdBy)
+router.get("/employeeFindCaseByFileNo",authEmployee,employeeController.employeeFindCaseByFileNo)
+router.put("/changeCaseStatus",authEmployee,employeeController.changeStatusEmployeeCase)
+router.put("/addCaseComment",authEmployee,employeeController.employeeAddCaseComment)
+router.put("/updateCaseById",authEmployee,employeeController.employeeUpdateCaseById)
+router.put("/operation/addReferenceCaseAndMarge",authEmployee,employeeController.empAddReferenceCaseAndMarge)
+router.put("/operation/removeReferenceCase",authEmployee,employeeController.empRemoveReferenceCase)
+router.post("/emp/empAddOrUpdatePayment",authEmployee,employeeController.empAddOrUpdatePayment)
+router.post('/opeation/empOpCreateOrUpdateCaseForm',authEmployee,employeeController.empOpCreateOrUpdateCaseForm)
 
 
 
 // client
-router.get("/viewAllClient",authEmployee,employeeViewAllClient)
-router.get("/viewClientById",authEmployee,employeeViewClientById)
-router.put("/updateClient",authEmployee,employeeEditClient)
-router.get("/download/allClient",authEmployee,empClientDownload)
+router.get("/viewAllClient",authEmployee,employeeController.employeeViewAllClient)
+router.get("/viewClientById",authEmployee,employeeController.employeeViewClientById)
+router.put("/updateClient",authEmployee,employeeController.employeeEditClient)
+router.get("/download/allClient",authEmployee,employeeController.empClientDownload)
 
 // partner
-router.get("/viewAllPartner",authEmployee,employeeViewAllPartner)
-router.get("/viewPartnerById",authEmployee,employeeViewPartnerById)
-router.put("/updatePartnerProfile",authEmployee,employeeupdateParnterProfile)
-router.put("/updatePartnerBankingDetails",authEmployee,employeeUpdatePartnerBankingDetails)
-router.put("/operation/addPartnerRefToEmp",authEmployee,empAddPartnerRefToEmp)
+router.get("/viewAllPartner",authEmployee,employeeController.employeeViewAllPartner)
+router.get("/viewPartnerById",authEmployee,employeeController.employeeViewPartnerById)
+router.put("/updatePartnerProfile",authEmployee,employeeController.employeeupdateParnterProfile)
+router.put("/updatePartnerBankingDetails",authEmployee,employeeController.employeeUpdatePartnerBankingDetails)
+router.put("/operation/addPartnerRefToEmp",authEmployee,employeeController.empAddPartnerRefToEmp)
 
 
 
 // for finance employee
-router.post("/finance/createInvoice",authEmployee,employeeCreateInvoice)
-router.get("/finance/viewAllInvoice",authEmployee,employeeViewAllInvoice)
-router.get("/finance/viewInvoiceById",authEmployee,employeeViewInvoiceById)
-router.put("/finance/editInvoiceById",authEmployee,employeeEditInvoice)
-router.put("/finance/paidInvoiceById",authEmployee,empOpPaidInvoice)
-router.get("/emp/empDownloadAllInvoice",authEmployee,empDownloadAllInvoice)
-router.put("/finance/unActiveInvoiceById",authEmployee,employeeUnActiveInvoice)
-router.get("/finance/downloadInvoiceById",authEmployee,employeeDownloadInvoiceById)
-router.delete("/finance/removeInvoiceById",authEmployee,employeeRemoveInvoice)
+router.post("/finance/createInvoice",authEmployee,employeeController.employeeCreateInvoice)
+router.get("/finance/viewAllInvoice",authEmployee,employeeController.employeeViewAllInvoice)
+router.get("/finance/viewInvoiceById",authEmployee,employeeController.employeeViewInvoiceById)
+router.put("/finance/editInvoiceById",authEmployee,employeeController.employeeEditInvoice)
+router.put("/finance/paidInvoiceById",authEmployee,employeeController.empOpPaidInvoice)
+router.get("/emp/empDownloadAllInvoice",authEmployee,employeeController.empDownloadAllInvoice)
+router.put("/finance/unActiveInvoiceById",authEmployee,employeeController.employeeUnActiveInvoice)
+router.get("/finance/downloadInvoiceById",authEmployee,employeeController.employeeDownloadInvoiceById)
+router.delete("/finance/removeInvoiceById",authEmployee,employeeController.employeeRemoveInvoice)
 
 // for sales employee
-router.post("/addPartner",authEmployee,saleEmployeeAddPartner)
-router.post("/sale/addCase",authEmployee,saleEmployeeAddCase)
-router.get("/sale/downloadCaseReport",authEmployee,salesDownloadCaseReport)
-router.get("/sale/partnerReport",authEmployee,saleEmpViewPartnerReport)
+router.post("/addPartner",authEmployee,employeeController.saleEmployeeAddPartner)
+router.post("/sale/addCase",authEmployee,employeeController.saleEmployeeAddCase)
+router.get("/sale/downloadCaseReport",authEmployee,employeeController.salesDownloadCaseReport)
+router.get("/sale/partnerReport",authEmployee,employeeController.saleEmpViewPartnerReport)
 
 
 // for upload
-router.post("/upload/image",authEmployee,employeeUploadImage)
-router.post("/upload/attachment",authEmployee,employeeUploadAttachment)
+router.post("/upload/image",authEmployee,employeeController.employeeUploadImage)
+router.post("/upload/attachment",authEmployee,employeeController.employeeUploadAttachment)
 
 // for share
-router.put("/operation/shareCase",authEmployee,empOptShareCaseToEmployee)
-router.put("/operation/addSharePartner",authEmployee,empOpSharePartnerToSaleEmp)
+router.put("/operation/shareCase",authEmployee,employeeController.empOptShareCaseToEmployee)
+router.put("/operation/addSharePartner",authEmployee,employeeController.empOpSharePartnerToSaleEmp)
+router.put("/operation/shareClient",authEmployee,employeeController.empOpShareClientToSaleEmp)
 
 // report
-router.get("/partnerReport",authEmployee,empDownloadPartnerReport)
+router.get("/partnerReport",authEmployee,employeeController.empDownloadPartnerReport)
 
 // download
-router.get("/download/allPartner",authEmployee,employeeDownloadAllPartner)
+router.get("/download/allPartner",authEmployee,employeeController.employeeDownloadAllPartner)
 
 // emphead
-router.get("/head/allEmployee",authEmployee,empViewAllEmployee)
-router.get("/download/allEmployee",authEmployee,empDownloadAllEmployee)
+router.get("/head/allEmployee",authEmployee,employeeController.empViewAllEmployee)
+router.get("/download/allEmployee",authEmployee,employeeController.empDownloadAllEmployee)
 
 
 
 // change branch
-router.put("/operation/change-branch",authEmployee,empChangeBranch)
+router.put("/operation/change-branch",authEmployee,employeeController.empChangeBranch)
 
 // for statement
-router.post("/emp/createOrUpdateStatement",authEmployee,createOrUpdateStatement)
-router.get("/emp/getAllStatement",authEmployee,getStatement)
-router.get("/emp/download/empDownloadAllStatement",authEmployee,empDownloadAllStatement)
-router.get("/emp/getStatements",authEmployee,getAllStatement)
+router.post("/emp/createOrUpdateStatement",authEmployee,employeeController.createOrUpdateStatement)
+router.get("/emp/getAllStatement",authEmployee,employeeController.getStatement)
+router.get("/emp/download/empDownloadAllStatement",authEmployee,employeeController.empDownloadAllStatement)
+router.get("/emp/getStatements",authEmployee,employeeController.getAllStatement)
 
 // notification section
-router.get("/emp/getAllNotification",authEmployee,getAllNotification)
-router.put("/emp/updateNotification",authEmployee,updateNotification)
+router.get("/emp/getAllNotification",authEmployee,employeeController.getAllNotification)
+router.put("/emp/updateNotification",authEmployee,employeeController.updateNotification)
 
 
 

@@ -108,6 +108,18 @@ const partnerSchema = new mongoose.Schema({
       aadhaarNo: {
          type: String,
       },
+      companyName: {
+         type: String,
+      },
+      companyAddress: {
+         type: String,
+      },
+      officalContactNo: {
+         type: String,
+      },
+      officalEmailId: {
+         type: String,
+      },
       dob: {
          type: Date,
       },
