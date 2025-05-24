@@ -23,6 +23,7 @@ router.get("/all/dashboard",authEmployee,employeeController.allEmployeeDashboard
 // case
 router.get("/viewAllCase",authEmployee,employeeController.viewAllEmployeeCase)
 router.get("/viewCaseById",authEmployee,employeeController.employeeViewCaseByIdBy)
+router.post("/empAddCaseFile",authEmployee,employeeController.empAddCaseFile)
 router.get("/employeeFindCaseByFileNo",authEmployee,employeeController.employeeFindCaseByFileNo)
 router.put("/changeCaseStatus",authEmployee,employeeController.changeStatusEmployeeCase)
 router.put("/addCaseComment",authEmployee,employeeController.employeeAddCaseComment)

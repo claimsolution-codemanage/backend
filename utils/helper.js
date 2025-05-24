@@ -312,6 +312,7 @@ export const getAllClientResult = async (req) => {
           "profile.address": 1,
           "profile.pinCode": 1,
           "profile.about": 1,
+          "createdAt": 1,
         },
       },
       {

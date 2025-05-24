@@ -5,6 +5,9 @@ import Statement from "../models/statement.js"
 import Bill from "../models/bill.js"
 import Client from "../models/client.js"
 import CaseOmbudsmanStatus from "../models/ombudsmanStatus.js"
+import CaseDoc from "../models/caseDoc.js";
+import * as helperFunc from "../utils/helper.js";
+
 
 const senderDetails = {
     name: "ADAKIYA CONSULTANCY SERVICES PVT.LTD",
@@ -79,6 +82,8 @@ export const createOrUpdateCaseStatusForm = async (req, res, next) => {
             })
         }
 
+        console.log("approved",approved,approved==true,isSettelment,isSettelment==true,"settelment");
+        
         if (isSettelment && isExist) {
             let isExistPaymentDetails = await CasePaymentDetails.findOne({ _id: isExist?.paymentDetailsId, isActive: true })
             console.log("isExistPaymentDetails",isExistPaymentDetails);
@@ -183,4 +188,36 @@ export const createOrUpdateCaseStatusForm = async (req, res, next) => {
         console.log("createOrUpdateCaseStatusForm error",error);
         return res.status(500).json({ status: 0, message: "Something wend wrong" })
     }
+}
+
+export const commonAddCaseFile = async (req, res) => {
+  try {
+    const { _id } = req.query
+    if (!helperFunc.validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+
+    const mycase = await Case.findById(_id)
+    if (!mycase) return res.status(404).json({ success: false, message: "Case not found" })
+
+    let bulkOps = [];
+    (req?.body?.caseDocs || [])?.forEach((doc) => {
+      bulkOps.push({
+        insertOne: {
+          document: {
+            name: doc?.docName,
+            type: doc?.docType,
+            format: doc?.docFormat,
+            url: doc?.docURL,
+            caseId: mycase._id?.toString(),
+            clientId: req?.user?._id
+          }
+        }
+      });
+    });
+    bulkOps?.length && await CaseDoc.bulkWrite(bulkOps)
+
+    return res.status(200).json({ success: true, message: "Successfully add case file" })
+  } catch (error) {
+    console.log("add case file in error:", error);
+    res.status(500).json({ success: false, message: "Internal server error", error: error });
+  }
 }

@@ -16,7 +16,8 @@ import bcrypt from 'bcrypt'
 import Jwt from "jsonwebtoken";
 import { validateEmployeeSignIn, validateEmployeeResetPassword, validateUpdateEmployeeCase, validateAddPartner, validateAddEmpCase, validateEmployeeSignUp, validateSathiTeamSignUp, validateEmployeeUpdate } from "../utils/validateEmployee.js";
 import { authEmployee, authPartner } from "../middleware/authentication.js";
-import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, getAllClientSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel, getAllClientDownloadExcel, commonInvoiceDownloadExcel, sendNotificationAndMail, getAllStatementDownloadExcel, commonDownloadCaseExcel, getAllClientResult } from "../utils/helper.js";
+import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel, getAllClientDownloadExcel, commonInvoiceDownloadExcel, sendNotificationAndMail, getAllStatementDownloadExcel, commonDownloadCaseExcel, getAllClientResult } from "../utils/helper.js";
+import * as dbFunction from "../utils/dbFunction.js"
 import { sendAddClientRequest, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import { validateAddClientCase, validateClientProfileBody } from "../utils/validateClient.js";
 import jwtDecode from "jwt-decode";
@@ -1062,15 +1063,7 @@ export const viewAllEmployeeCase = async (req, res) => {
 export const employeeViewCaseByIdBy = async (req, res) => {
    try {
       const { employee } = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       let isOperation = employee?.type?.toLowerCase() == "operation"
-
-
 
       const { _id } = req.query;
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
@@ -1132,15 +1125,18 @@ export const employeeViewCaseByIdBy = async (req, res) => {
    }
 }
 
+export const empAddCaseFile = async (req, res) => {
+  try {
+   await dbFunction.commonAddCaseFile(req,res)
+  } catch (error) {
+    console.log("add case file in error:", error);
+    res.status(500).json({ success: false, message: "Internal server error", error: error });
+  }
+}
+
 export const employeeFindCaseByFileNo = async (req, res) => {
    try {
       const { employee } = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const { fileNo } = req.query;
       const pipeline = [

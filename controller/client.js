@@ -819,10 +819,6 @@ export const clientAddCaseFile = async (req, res) => {
     const { _id } = req.query
     if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-    // const { error } = validateAddCaseFile(req.body);
-    // if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-    // if (!req.body?.docURL) return res.status(400).json({ success: false, message: "Please upload file first" })
-
     const mycase = await Case.findById(_id)
     if (!mycase) return res.status(404).json({ success: false, message: "Case not found" })
 
@@ -844,8 +840,6 @@ export const clientAddCaseFile = async (req, res) => {
     bulkOps?.length && await CaseDoc.bulkWrite(bulkOps)
 
     return res.status(200).json({ success: true, message: "Successfully add case file" })
-
-
   } catch (error) {
     console.log("updateAdminCase in error:", error);
     res.status(500).json({ success: false, message: "Internal server error", error: error });

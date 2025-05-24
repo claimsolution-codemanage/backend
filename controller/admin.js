@@ -43,6 +43,8 @@ import CasegroStatus from "../models/groStatus.js";
 import { createOrUpdateCaseStatusForm } from "../utils/dbFunction.js";
 import CaseOmbudsmanStatus from "../models/ombudsmanStatus.js";
 import ShareSection from "../models/shareSection.js";
+import * as dbFunction from "../utils/dbFunction.js"
+
 
 export const adminAuthenticate = async (req, res) => {
    try {
@@ -2030,15 +2032,6 @@ export const adminViewEmpSalePartnerReport = async (req, res) => {
 export const viewCaseByIdByAdmin = async (req, res) => {
    try {
       const {admin} = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
-
-
       const { _id } = req.query;
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
@@ -2070,17 +2063,18 @@ export const viewCaseByIdByAdmin = async (req, res) => {
    }
 }
 
+export const adminAddCaseFile = async (req, res) => {
+  try {
+   await dbFunction.commonAddCaseFile(req,res)
+  } catch (error) {
+    console.log("add case file in error:", error);
+    res.status(500).json({ success: false, message: "Internal server error", error: error });
+  }
+}
+
 export const viewAllPartnerByAdmin = async (req, res) => {
    try {
       const {admin} = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
-      // query = ?statusType=&search=&limit=&pageNo
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = req.query.search ? req.query.search : "";

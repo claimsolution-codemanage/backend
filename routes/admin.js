@@ -57,6 +57,7 @@ router.delete("/deleteClientById",authAdmin,adminController.adminDeleteClientByI
 router.get("/viewAllCase",authAdmin,adminController.viewAllAdminCase)
 router.put("/changeCaseStatus",authAdmin,adminController.changeStatusAdminCase)
 router.get("/viewCaseById",authAdmin,adminController.viewCaseByIdByAdmin)
+router.post("/adminAddCaseFile",authAdmin,adminController.adminAddCaseFile)
 router.post("/updateCaseById",authAdmin,adminController.adminUpdateCaseById)
 router.post("/addOrUpdatePayment",authAdmin,adminController.adminAddOrUpdatePayment)
 router.put("/editCaseProcessById",authAdmin,adminController.adminEditCaseStatus)
