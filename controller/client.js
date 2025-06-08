@@ -668,7 +668,7 @@ export const viewClientCaseById = async (req, res) => {
         ], isActive: true }).select("-adminId"),
       CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
       CasePaymentDetails.find({ caseId: getCase?._id, isActive: true }),
-      CasegroStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
+      CasegroStatus.findOne({ caseId: getCase?._id, isActive: true }).select("-groStatusUpdates -queryHandling -queryReply").populate("paymentDetailsId"),
       CaseOmbudsmanStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
       
     ]);
@@ -681,12 +681,14 @@ export const viewClientCaseById = async (req, res) => {
     getCaseJson.caseDocs = getCaseDoc;
     getCaseJson.processSteps = getCaseStatus;
     getCaseJson.casePayment = getCasePaymentDetails;
+    console.log("getCaseGroDetails",getCaseGroDetails);
+    
     if(caseGroDetailsObj){
        getCaseJson.caseGroDetails = {
          ...caseGroDetailsObj,
-         groStatusUpdates: caseGroDetailsObj?.groStatusUpdates?.filter(ele => ele?.isPrivate) || [],
-         queryHandling: caseGroDetailsObj?.queryHandling?.filter(ele => ele?.isPrivate) || [],
-         queryReply: caseGroDetailsObj?.queryReply?.filter(ele => ele?.isPrivate) || [],
+         groStatusUpdates: [],
+         queryHandling: [],
+         queryReply: [],
          approvalLetter: caseGroDetailsObj?.approvalLetterPrivate ? "" : caseGroDetailsObj?.approvalLetter,
        };          
     }else{
@@ -849,6 +851,7 @@ export const clientAddCaseFile = async (req, res) => {
 
 export const clientDashboard = async (req, res) => {
   try {
+    const year = Number(req.query.year || new Date().getFullYear())
     const verify = await authClient(req, res);
     if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
 
@@ -862,19 +865,20 @@ export const clientDashboard = async (req, res) => {
       fullName:client?.fullName
     }
 
-    const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
-    const currentMonth = new Date().getMonth() + 1;
-    console.log("start", currentMonth, currentYearStart);
+    let currentYear = new Date().getFullYear()
+    const currentYearStart = new Date(new Date(new Date().setFullYear(year ||  currentYear)).getFullYear(), 0, 1); // Start of the current year
+    const currentMonth = year==currentYear ?  new Date().getMonth() + 1 : 12;
     const allMonths = [];
     for (let i = 0; i < currentMonth; i++) {
       allMonths.push({
         _id: {
-          year: new Date().getFullYear(),
+          year: year || new Date().getFullYear(),
           month: i + 1
         },
         totalCases: 0
       });
     }
+    
     const pieChartData = await Case.aggregate([
       {
         '$match': {

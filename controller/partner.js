@@ -1033,6 +1033,7 @@ export const partnerAddCaseFile = async (req, res) => {
 
 export const getpartnerDashboard = async (req, res) => {
   try {
+    const year = Number(req.query.year || new Date().getFullYear())
     const verify = await authPartner(req, res);
     if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
 
@@ -1048,14 +1049,14 @@ export const getpartnerDashboard = async (req, res) => {
 
     }
 
-    const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
-    const currentMonth = new Date().getMonth() + 1;
-    console.log("start", currentMonth, currentYearStart);
+    let currentYear = new Date().getFullYear()
+    const currentYearStart = new Date(new Date(new Date().setFullYear(year ||  currentYear)).getFullYear(), 0, 1); // Start of the current year
+    const currentMonth = year==currentYear ?  new Date().getMonth() + 1 : 12;
     const allMonths = [];
     for (let i = 0; i < currentMonth; i++) {
       allMonths.push({
         _id: {
-          year: new Date().getFullYear(),
+          year: year || new Date().getFullYear(),
           month: i + 1
         },
         totalCases: 0

@@ -658,14 +658,6 @@ export const empAddPartnerRefToEmp = async (req, res) => {
 export const viewAllEmployeeCase = async (req, res) => {
    try {
       const { employee } = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
-
-      // query = ?statusType=&search=&limit=&pageNo
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = req.query.search ? req.query.search : "";
@@ -2179,22 +2171,19 @@ export const employeeRemoveInvoice = async (req, res) => {
 export const allEmployeeDashboard = async (req, res) => {
    try {
       const { employee } = req
-      // const verify = await authEmployee(req, res);
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
-      // const employee = await Employee.findById(req?.user?._id).select("-password")
-      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
+      const year = Number(req.query.year || new Date().getFullYear())
       let filter = {}
       let extractType = []
       const caseAccess = ["operation", "finance", "branch"]
       const excludedTypes = ["sales", "operation", "finance", "sathi team", "branch"];
-      const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
-      const currentMonth = new Date().getMonth() + 1;
+      let currentYear = new Date().getFullYear()
+      const currentYearStart = new Date(new Date(new Date().setFullYear(year ||  currentYear)).getFullYear(), 0, 1); // Start of the current year
+      const currentMonth = year==currentYear ?  new Date().getMonth() + 1 : 12;
       const allMonths = [];
       for (let i = 0; i < currentMonth; i++) {
          allMonths.push({
             _id: {
-               year: new Date().getFullYear(),
+               year: year || new Date().getFullYear(),
                month: i + 1
             },
             totalCases: 0

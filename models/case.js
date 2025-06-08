@@ -4,11 +4,23 @@ const caseSchema = new mongoose.Schema({
    consultantCode:{type:String},
    partnerId:{type:String},
    partnerCode:{type:String},
+   partnerObjId:{
+         type:mongoose.Schema.ObjectId,
+         ref:"Partner"
+   },
    partnerName:{type:String},
    clientId:{type:String},
+   clientObjId:{
+         type:mongoose.Schema.ObjectId,
+         ref:"Client"
+   },
    empSaleId:{type:String},
    empSaleName:{type:String},
    empId:{type:String},
+   empObjId:{
+         type:mongoose.Schema.ObjectId,
+         ref:"Employee"
+   },
    caseFrom:{type:String,required:"true"},
    acceptPayment:{type:Boolean,default:false,required:"true"},
    pendingPayment:{type:Boolean,default:false,required:"true"},

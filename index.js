@@ -1,6 +1,6 @@
-import express from "express";
 import dotenv from "dotenv";
 dotenv.config();
+import express from "express";
 const app = express();
 import mongoose from "mongoose";
 import cors from 'cors'
@@ -21,12 +21,12 @@ import path from 'path'
 
 import { backupMongoDB } from "./utils/helper.js";
 
-firebaseAdmin.initializeApp({
-	credential:firebaseAdmin.credential.cert(serviceAccount),
-	storageBucket:process.env.FIREBASE_STORAGE
-})
+// firebaseAdmin.initializeApp({
+// 	credential:firebaseAdmin.credential.cert(serviceAccount),
+// 	storageBucket:process.env.FIREBASE_STORAGE
+// })
 
-export const bucket = firebaseAdmin.storage().bucket();
+// export const bucket = firebaseAdmin.storage().bucket();
 
 mongoose
 	.connect(process.env.DB_URL)
@@ -63,7 +63,6 @@ app.use(express.json());
 // Parse application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: false }));
 
-
 app.use("/api/upload",imageUpload)
 app.use("/api/admin",admin)
 app.use("/api/employee",employee)
@@ -72,7 +71,6 @@ app.use("/api/client",client)
 app.use("/api/job",job)
 app.use("/api/complaint",complaint)
 app.use("/api/payment",payment)
-
 
 app.get("/",async(req,res)=>{
 	try {

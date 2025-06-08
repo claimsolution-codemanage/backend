@@ -1,3 +1,7 @@
+import dotenv from "dotenv";
+dotenv.config();
+import firebaseAdmin from 'firebase-admin';
+
 export const serviceAccount = {
   type: process.env.FIREBASE_type,
   project_id: process.env.FIREBASE_project_id,
@@ -11,5 +15,12 @@ export const serviceAccount = {
   client_x509_cert_url: process.env.FIREBASE_client_x509_cert_url,
   universe_domain: process.env.FIREBASE_universe_domain
 }
+
+firebaseAdmin.initializeApp({
+  credential:firebaseAdmin.credential.cert(serviceAccount),
+  storageBucket:process.env.FIREBASE_STORAGE
+})  
+
+export const bucket = firebaseAdmin.storage().bucket();
 
 

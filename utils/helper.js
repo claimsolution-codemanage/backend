@@ -5,7 +5,8 @@ import ExcelJS from 'exceljs';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import fsAsync from 'fs/promises'
 import { getStorage, getDownloadURL } from 'firebase-admin/storage';
-import { bucket } from "../index.js";
+// import { bucket } from "../index.js";
+import { bucket } from "../firebase/config.js";
 import multer from "multer";
 import {exec} from 'child_process'
 import fs from 'fs'

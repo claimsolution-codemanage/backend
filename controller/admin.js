@@ -1,36 +1,42 @@
-import Admin from "../models/admin.js";
+import axios from "axios";
+import jwtDecode from "jwt-decode";
+import { Types } from "mongoose";
+import ExcelJS from 'exceljs';
+import bcrypt from 'bcrypt';
+import { Readable } from 'stream';
+import Jwt from 'jsonwebtoken'
+// import { bucket } from "../index.js";
+import { bucket } from "../firebase/config.js";
+
+import { authAdmin } from "../middleware/authentication.js";
+
+// function import
 import {
    validateAdminSignUp, validateAdminSignIn, validateAdminResetPassword, validateUpdateAdminCase,
    validateAdminSettingDetails, validateAdminAddCaseFee, validateAdminUpdateCasePayment, validateAdminAddEmployeeToCase,
    validateEditAdminCaseStatus,validateAdminSharePartner,validateAdminRemovePartner,
 } from "../utils/validateAdmin.js";
-import bcrypt from 'bcrypt';
 import { commonDownloadCaseExcel, commonInvoiceDownloadExcel, generatePassword, getAllCaseDocQuery, getAllClientResult, getAllInvoiceQuery, getAllSathiDownloadExcel, getAllStatementDownloadExcel, getEmployeeByIdQuery, getValidateDate, sendNotificationAndMail } from "../utils/helper.js";
 import { sendAdminSigninMail, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
-import { authAdmin } from "../middleware/authentication.js";
-import Employee from "../models/employee.js";
 import { validateEmployeeSignUp } from "../utils/validateEmployee.js";
 import { validMongooseId } from "../utils/helper.js";
-import Case from "../models/case.js";
+import { validateResetPassword } from "../utils/helper.js";
 import {
    getAllPartnerSearchQuery, getAllClientSearchQuery, getAllCaseQuery,
    getAllEmployeeSearchQuery, getDownloadCaseExcel, getAllPartnerDownloadExcel,getAllClientDownloadExcel
 } from "../utils/helper.js";
-import Partner from "../models/partner.js";
-import Client from '../models/client.js'
 import { validateAddClientCase, validateClientProfileBody } from "../utils/validateClient.js";
-import { Types } from "mongoose";
-import Jwt from 'jsonwebtoken'
-import { validateResetPassword } from "../utils/helper.js";
-import jwtDecode from "jwt-decode";
 import { validateBankingDetailsBody, validateProfileBody } from "../utils/validatePatner.js";
-import axios from "axios";
-import ExcelJS from 'exceljs';
-import { Readable } from 'stream';
 import { firebaseUpload } from "../utils/helper.js";
 import { validateInvoice } from "../utils/validateEmployee.js";
+
+// model
+import Employee from "../models/employee.js";
+import Case from "../models/case.js";
+import Partner from "../models/partner.js";
+import Client from '../models/client.js'
+import Admin from "../models/admin.js";
 import Bill from "../models/bill.js";
-import { bucket } from "../index.js";
 import CaseDoc from "../models/caseDoc.js";
 import CaseStatus from "../models/caseStatus.js";
 import CaseComment from "../models/caseComment.js";
@@ -288,23 +294,19 @@ export const getSettingDetails = async (req, res) => {
 export const adminDashboard = async (req, res) => {
    try {
       const {admin} = req
-      // const verify = await authAdmin(req, res);
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
+      const year = Number(req.query.year || new Date().getFullYear())
       const noOfClient = await Client.find({ isActive: true }).count()
       const noOfPartner = await Partner.find({ isActive: true }).count()
       const noOfEmployee = await Employee.find({ isActive: true }).count()
-      const currentYearStart = new Date(new Date().getFullYear(), 0, 1); // Start of the current year
-      const currentMonth = new Date().getMonth() + 1;
-      console.log("start", currentMonth, currentYearStart);
+      let currentYear = new Date().getFullYear()
+      const currentYearStart = new Date(new Date(new Date().setFullYear(year ||  currentYear)).getFullYear(), 0, 1); // Start of the current year
+      const currentMonth = year==currentYear ?  new Date().getMonth() + 1 : 12;
+      
       const allMonths = [];
       for (let i = 0; i < currentMonth; i++) {
          allMonths.push({
             _id: {
-               year: new Date().getFullYear(),
+               year: year || new Date().getFullYear(),
                month: i + 1
             },
             totalCases: 0
@@ -376,6 +378,7 @@ export const adminDashboard = async (req, res) => {
          });
          return match || month;
       });
+      
       return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData, noOfClient, noOfPartner, noOfEmployee });
    } catch (error) {
       console.log("get dashbaord data error:", error);
@@ -5815,5 +5818,55 @@ export const updatePartnerSchema = async (req, res) => {
       console.log("getAllNotification in error:", error);
       res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
 
+   }
+}
+
+export const updateCaseSchema = async(req, res)=>{
+   try {
+      const allCases = await Case.find({})
+      let bulkOps = []
+      let bulkShareCase = []
+      allCases.forEach(ele=>{
+
+         let updateValue = {}
+
+         if(ele?.clientId) updateValue.clientObjId = ele?.clientId
+         if(ele?.partnerId) updateValue.partnerObjId = ele?.partnerId
+         if(ele?.empSaleId) updateValue.empObjId = ele?.empSaleId
+         
+         bulkOps.push({
+               updateOne:{
+                  filter:{_id:ele?._id},
+                  update:{
+                     $set:updateValue
+                  }
+               }
+            })
+      if(ele?.addEmployee?.length){
+         ele?.addEmployee?.map(async(item)=>{
+            const isExist = await ShareSection.find({caseId:ele?._id,toEmployeeId:item})
+            console.log("isExist",isExist);
+            
+            if(isExist?.length==0){
+               bulkShareCase.push({
+                  insertOne:{
+                     document:{
+                        caseId:ele?._id,
+                        toEmployeeId:item,
+                        branchId:ele?.branchId
+                     }
+                  }
+               })
+            }
+         })
+      }
+      })
+      await Case.bulkWrite(bulkOps)
+      await ShareSection.bulkWrite(bulkShareCase)
+      return res.status(200).json({ success: true, message: `Successfully update`, data: bulkShareCase });
+   } catch (error) {
+      console.log(error);
+      res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
+      
    }
 }
