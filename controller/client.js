@@ -22,6 +22,7 @@ import Notification from "../models/notification.js";
 import CasePaymentDetails from "../models/casePaymentDetails.js";
 import CasegroStatus from "../models/groStatus.js";
 import CaseOmbudsmanStatus from "../models/ombudsmanStatus.js";
+import { Types } from "mongoose";
 
 export const clientUploadImage = async (req, res) => {
   try {
@@ -212,6 +213,7 @@ export const signUpWithRequest = async (req, res) => {
         if(validMongooseId(caseId)){
           const getCase = await Case.findByIdAndUpdate(caseId,{$set:{
             clientId:newClient?._id?.toString(),
+            clientObjId:newClient?._id,
             caseFrom:"client",
             consultantCode:consultantCode
           }})
@@ -540,6 +542,7 @@ export const addNewClientCase = async (req, res) => {
     const caseFees = admin?.length > 0 ? (admin[0]?.consultantFee ? admin[0].consultantFee : 2000) : 2000
     req.body.consultantCode = client?.profile?.consultantCode
     req.body.clientId = client?._id
+    req.body.clientObjId = client?._id
     req.body.caseFrom = "client"
     // req.body.acceptPayment = true
     // req.body.pendingPayment = true
@@ -734,7 +737,7 @@ export const viewClientAllCase = async (req, res) => {
     const endDate = req.query.endDate ? req.query.endDate : "";
 
     const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, req?.user?._id, false, true)
-    console.log("query", query);
+    // console.log("query", query?.query );
     if (!query.success) return res.status(400).json({ success: false, message: query.message })
 
     //  console.log("query",query?.query);
@@ -849,81 +852,202 @@ export const clientAddCaseFile = async (req, res) => {
   }
 }
 
+// export const clientDashboard = async (req, res) => {
+//   try {
+//     const year = Number(req.query.year || new Date().getFullYear())
+//     const verify = await authClient(req, res);
+//     if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
+
+//     const client = await Client.findById(req?.user?._id);
+//     if (!client) return res.status(401).json({ success: false, message: "User account not found" });
+//     if (!client?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
+
+//     const clientNeccessaryData = {
+//       lastLogin: client?.lastLogin,
+//       recentLogin: client?.recentLogin,
+//       fullName:client?.fullName
+//     }
+
+//     let currentYear = new Date().getFullYear()
+//     const currentYearStart = new Date(new Date(new Date().setFullYear(year ||  currentYear)).getFullYear(), 0, 1); // Start of the current year
+//     const endYearStart = new Date(new Date(new Date().setFullYear((year ||  currentYear)+1)).getFullYear(), 0, 1); // Start of the current year
+//     const currentMonth = year==currentYear ?  new Date().getMonth() + 1 : 12;
+//     const allMonths = [];
+//     for (let i = 0; i < currentMonth; i++) {
+//       allMonths.push({
+//         _id: {
+//           year: year || new Date().getFullYear(),
+//           month: i + 1
+//         },
+//         totalCases: 0
+//       });
+//     }
+ 
+//     console.log("start",currentYearStart,endYearStart);
+    
+    
+//     const pieChartData = await Case.aggregate([
+//       {
+//         '$match': {
+//           'createdAt': { $gte: currentYearStart },
+//           'createdAt': { $lte: endYearStart },
+//           'clientObjId': new Types.ObjectId(req?.user?._id), // Assuming 'clientId' is the field to match
+//           'isActive': true,
+//           'isPartnerReferenceCase': false,
+//           'isEmpSaleReferenceCase': false,
+//         }
+//       },
+//       {
+//         '$group': {
+//           '_id': '$currentStatus',
+//           'totalCases': {
+//             '$sum': 1
+//           },
+//           'totalCaseAmount': {
+//             '$sum': '$claimAmount' // Assuming 'amount' is the field to sum
+//           }
+//         }
+//       },
+//       {
+//         '$group': {
+//           '_id': null,
+//           'totalCase': {
+//             '$sum': '$totalCases'
+//           },
+//           'totalCaseAmount': {
+//             '$sum': '$totalCaseAmount'
+//           },
+//           'allCase': {
+//             '$push': '$$ROOT'
+//           }
+//         }
+//       }
+//     ]);
+
+//     const graphData = await Case.aggregate([
+//       {
+//         $match: {
+//           'createdAt': { $gte: currentYearStart },
+//           'createdAt': { $lte: endYearStart },
+//           'clientObjId': new Types.ObjectId(req?.user?._id),
+//           'isActive': true,
+//           'isPartnerReferenceCase': false,
+//           'isEmpSaleReferenceCase': false,
+//         }
+//       },
+//       {
+//         $group: {
+//           _id: {
+//             year: { $year: '$createdAt' },
+//             month: { $month: '$createdAt' }
+//           },
+//           totalCases: { $sum: 1 }
+//         }
+//       },
+//       {
+//         $sort: { '_id.year': 1, '_id.month': 1 }
+//       },])
+
+//     // Merge aggregated data with the array representing all months
+//     const mergedGraphData = allMonths.map((month) => {
+//       const match = graphData.find((data) => {
+//         return data._id.year === month._id.year && data._id.month === month._id.month;
+//       });
+//       return match || month;
+//     });
+
+//     return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData, clientNeccessaryData });
+
+//   } catch (error) {
+//     console.log("get dashbaord data error:", error);
+//     res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+//   }
+// };
+
+
 export const clientDashboard = async (req, res) => {
   try {
-    const year = Number(req.query.year || new Date().getFullYear())
+    const year = Number(req.query.year || new Date().getFullYear());
+
     const verify = await authClient(req, res);
-    if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
+    if (!verify.success)
+      return res.status(401).json({ success: false, message: verify.message });
 
     const client = await Client.findById(req?.user?._id);
-    if (!client) return res.status(401).json({ success: false, message: "User account not found" });
-    if (!client?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
+    if (!client)
+      return res.status(401).json({ success: false, message: "User account not found" });
+
+    if (!client?.isActive)
+      return res.status(401).json({ success: false, message: "Account is not active" });
 
     const clientNeccessaryData = {
       lastLogin: client?.lastLogin,
       recentLogin: client?.recentLogin,
-      fullName:client?.fullName
-    }
+      fullName: client?.fullName,
+    };
 
-    let currentYear = new Date().getFullYear()
-    const currentYearStart = new Date(new Date(new Date().setFullYear(year ||  currentYear)).getFullYear(), 0, 1); // Start of the current year
-    const currentMonth = year==currentYear ?  new Date().getMonth() + 1 : 12;
+    // Define the time range for the selected year
+    const currentYear = new Date().getFullYear();
+    const currentYearStart = new Date(year, 0, 1); // Jan 1 of selected year
+    const endYearStart = new Date(year + 1, 0, 1); // Jan 1 of next year
+    const currentMonth = year === currentYear ? new Date().getMonth() + 1 : 12;
+
+    // Generate default 0-case values for each month
     const allMonths = [];
     for (let i = 0; i < currentMonth; i++) {
       allMonths.push({
         _id: {
-          year: year || new Date().getFullYear(),
+          year: year,
           month: i + 1
         },
         totalCases: 0
       });
     }
-    
+
+    // Get case distribution by currentStatus (for pie chart)
     const pieChartData = await Case.aggregate([
       {
-        '$match': {
-          'createdAt': { $gte: currentYearStart },
-          'clientId': req?.user?._id, // Assuming 'clientId' is the field to match
-          'isActive': true,
-          'isPartnerReferenceCase': false,
-          'isEmpSaleReferenceCase': false,
+        $match: {
+          createdAt: {
+            $gte: currentYearStart,
+            $lt: endYearStart,
+          },
+          clientObjId: new Types.ObjectId(req?.user?._id),
+          isActive: true,
+          isPartnerReferenceCase: false,
+          isEmpSaleReferenceCase: false,
         }
       },
       {
-        '$group': {
-          '_id': '$currentStatus',
-          'totalCases': {
-            '$sum': 1
-          },
-          'totalCaseAmount': {
-            '$sum': '$claimAmount' // Assuming 'amount' is the field to sum
-          }
+        $group: {
+          _id: '$currentStatus',
+          totalCases: { $sum: 1 },
+          totalCaseAmount: { $sum: '$claimAmount' }
         }
       },
       {
-        '$group': {
-          '_id': null,
-          'totalCase': {
-            '$sum': '$totalCases'
-          },
-          'totalCaseAmount': {
-            '$sum': '$totalCaseAmount'
-          },
-          'allCase': {
-            '$push': '$$ROOT'
-          }
+        $group: {
+          _id: null,
+          totalCase: { $sum: '$totalCases' },
+          totalCaseAmount: { $sum: '$totalCaseAmount' },
+          allCase: { $push: '$$ROOT' }
         }
       }
     ]);
 
+    // Get case counts per month (for bar/line graph)
     const graphData = await Case.aggregate([
       {
         $match: {
-          'createdAt': { $gte: currentYearStart },
-          'clientId': req?.user?._id,
-          'isActive': true,
-          'isPartnerReferenceCase': false,
-          'isEmpSaleReferenceCase': false,
+          createdAt: {
+            $gte: currentYearStart,
+            $lt: endYearStart,
+          },
+          clientObjId: new Types.ObjectId(req?.user?._id),
+          isActive: true,
+          isPartnerReferenceCase: false,
+          isEmpSaleReferenceCase: false,
         }
       },
       {
@@ -937,22 +1061,33 @@ export const clientDashboard = async (req, res) => {
       },
       {
         $sort: { '_id.year': 1, '_id.month': 1 }
-      },])
+      }
+    ]);
 
-    // Merge aggregated data with the array representing all months
+    // Merge aggregated monthly data with the full list of months
     const mergedGraphData = allMonths.map((month) => {
-      const match = graphData.find((data) => {
-        return data._id.year === month._id.year && data._id.month === month._id.month;
-      });
-      return match || month;
+      const match = graphData.find((data) =>
+        data._id.year === month._id.year && data._id.month === month._id.month
+      );
+      return {
+        ...month,
+        ...(match || {}),
+        monthName: new Date(month._id.year, month._id.month - 1)
+          .toLocaleString('default', { month: 'short' })
+      };
     });
 
-    return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData, clientNeccessaryData });
+    return res.status(200).json({
+      success: true,
+      message: "get dashboard data",
+      graphData: mergedGraphData,
+      pieChartData,
+      clientNeccessaryData
+    });
 
   } catch (error) {
-    console.log("get dashbaord data error:", error);
-    res.status(500).json({ success: false, message: "Internal server error", error: error });
-
+    console.error("get dashboard data error:", error);
+    res.status(500).json({ success: false, message: "Internal server error", error });
   }
 };
 

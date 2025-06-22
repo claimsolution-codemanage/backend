@@ -9,6 +9,9 @@ export const validateEmployeeSignUp =(body)=>{
    designation:Joi.string().required("Employee designation required"),
    branchId:Joi.string().required("Employee branch is required"),
    empId:Joi.string().required("Employee Id is required"),
+   headEmpId:Joi.string().allow('').optional(),
+   managerId:Joi.string().allow('').optional(),
+
   })
 
   return bodySchema.validate(body)

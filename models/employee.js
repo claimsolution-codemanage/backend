@@ -11,6 +11,8 @@ const employeeSchema = new mongoose.Schema({
    password:{type:String,required:"true"},
    type:{type:String,default:"Operation",required:true},
    referEmpId:{type:mongoose.Schema.ObjectId,ref:"Employee"},
+   headEmpId:{type:mongoose.Schema.ObjectId,ref:"Employee"},
+   managerId:{type:mongoose.Schema.ObjectId,ref:"Employee"},
    designation:{type:String,default:"Executive",required:true},
    bankName:{type:String,default:""},
    bankBranchName:{type:String,default:""},

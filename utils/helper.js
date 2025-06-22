@@ -16,6 +16,7 @@ import Employee from "../models/employee.js";
 import Notification from "../models/notification.js";
 import Admin from "../models/admin.js";
 import Client from "../models/client.js";
+import Partner from "../models/partner.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -60,8 +61,10 @@ export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, par
 
   let query = {
     $and: [
-      partnerId ? { partnerId: partnerId } : {},
-      clientId ? { clientId: clientId } : {},
+      // partnerId ? { partnerId: partnerId } : {},
+      // clientId ? { clientId: clientId } : {},
+      partnerId ? { partnerObjId: partnerId } : {},
+      clientId ? { clientObjId: clientId } : {},
       !empSaleId && employeeId ? { addEmployee: { $in: employeeId } } : {},
       empSaleId ? { empSaleId: empSaleId } : {},
       { isPartnerReferenceCase: false },
@@ -220,7 +223,7 @@ export const getAllClientResult = async (req) => {
       }
     }
 
-    if(employee && !["sales","branch","operation"]?.includes(employee?.type?.toLowerCase())){
+    if(employee && !["sales","branch","operation","finance"]?.includes(employee?.type?.toLowerCase())){
     return { status: 0, data: null,error:"Access deined" }
     }
 
@@ -377,6 +380,266 @@ export const getAllClientResult = async (req) => {
   } catch (error) {
     console.log("getAllClientResult error",error);
     return { status: 0, data: null,error }
+  }
+}
+
+export const getAllPartnerResult = async (req,employee=null) => {
+  try {
+    let { limit = 10, pageNo = 0, search = "", startDate = "", endDate = "",empId="" } = req.query
+    pageNo = pageNo ? (pageNo - 1) * limit : 0
+
+    const matchQuery = { }
+    console.log(req?.query?.type,"type",req?.query?.type=="false");
+    
+
+    const caseAccess = ["operation", "finance", "branch"]
+
+    //  for self employee and other employee
+    let empDetails = employee
+    if (empId && empId != "false") {
+      if (!validMongooseId(empId)) return { status: 400, data: null,message:"Not a valid employee Id" }
+      empDetails = await Employee.findById(empId)
+      if (!empDetails)  return { status: 400, data: null,message:"Searching employee account not found" }
+    }
+
+    let extactMatchQuery = []
+    
+    // manage role wise other emp case details access
+    if(empDetails){
+      const { type, designation } = empDetails
+      if (empDetails && (!caseAccess?.includes(type?.toLowerCase()) || (empId && empId != "false"))) {
+        extactMatchQuery = [
+          { referEmpId: empDetails?._id },
+          { _id: empDetails?._id }
+        ]
+  
+        if (type?.toLowerCase() == "sales" && designation?.toLowerCase() == "manager") {
+          extactMatchQuery.push({ type: { $regex: "sales", $options: "i" } })
+          extactMatchQuery.push({ type: { $regex: "sathi team", $options: "i" } })
+        }
+  
+        // extract filter options 
+        const filterPipeline = [
+          {
+            "$match": {
+              "$or": [
+                ...extactMatchQuery
+              ]
+            }
+          },
+          {
+            "$project": {
+              "referEmpId": 1,
+              "_id": 1,
+            },
+          },
+          {
+            "$lookup": {
+              "from": "sharesections",
+              "localField": "_id",
+              "foreignField": "toEmployeeId",
+              "as": "shareSection",
+              "pipeline": [
+                {
+                  "$project": {
+                    "_id": 1,
+                    "partnerId": 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            "$unwind": {
+              "path": "$shareSection",
+              "preserveNullAndEmptyArrays": true,
+            },
+          },
+          {
+            "$lookup": {
+              "from": "partners",
+              "localField": "_id",
+              "foreignField": "salesId",
+              "as": "referPartner",
+              "pipeline": [
+                {
+                  "$project": {
+                    "_id": 1,
+                  },
+                },
+              ],
+            }
+          },
+          {
+            "$unwind": {
+              "path": "$referPartner",
+              "preserveNullAndEmptyArrays": true
+            }
+          },
+          {
+            "$group": {
+              "_id": null,
+              "empIds": {
+                "$addToSet": "$_id",
+              },
+              "referPartnerIds": { "$addToSet": "$referPartner._id" },
+              "partnerIds": {
+                "$addToSet": "$shareSection.partnerId",
+              }
+            },
+          },
+          {
+            "$addFields": {
+              "allPartnerIds": {
+                "$setUnion": [
+                  "$partnerIds",
+                  "$referPartnerIds",
+                ],
+              },
+            },
+          },
+        ]
+  
+        const extactOptions = await Employee.aggregate(filterPipeline)
+        
+        matchQuery['$and'] = [{
+          $or: [
+            { empObjId: { $in: extactOptions?.[0]?.empIds } },
+            { _id: { $in: extactOptions?.[0]?.allPartnerIds } }
+          ]
+        }]
+      }
+
+        matchQuery.branchId = { $regex: empDetails?.branchId || "", $options: "i", }      
+    }
+
+    if (startDate && endDate) {
+      matchQuery.createdAt = {
+        "$gte": new Date(new Date(startDate).setHours(0, 0, 0, 0)),
+        "$lte": new Date(new Date(endDate).setHours(23, 59, 59, 999))
+      }
+    }
+
+    matchQuery.isActive = req.query?.type=="false" ? false : true
+    
+    const pipeline = [
+      {
+        "$match": {
+          ...matchQuery,
+          "$or": [
+            { "profile.consultantName": { "$regex": search, "$options": "i", }, },
+            { "profile.workAssociation": { "$regex": search, "$options": "i", }, },
+            { "profile.consultantCode": { "$regex": search, "$options": "i", }, },
+            { "profile.primaryMobileNo": { "$regex": search, "$options": "i", }, },
+            { "profile.primaryEmail": { "$regex": search, "$options": "i", }, },
+            { "profile.aadhaarNo": { "$regex": search, "$options": "i", }, },
+            { "profile.panNo": { "$regex": search, "$options": "i", }, },
+            { "branchId": { "$regex": search, "$options": "i", }, },
+          ],
+        },
+      },
+      {
+        "$project": {
+          "branchId": 1,
+          "salesId": 1,
+          "isActive": 1,
+          "profile.associateWithUs": 1,
+          "profile.consultantName": 1,
+          "profile.consultantCode": 1,
+          "profile.primaryMobileNo": 1,
+          "profile.primaryEmail": 1,
+          "profile.workAssociation": 1,
+          "profile.areaOfOperation": 1,
+          "createdAt": 1,
+        },
+      },
+      { "$sort": { "createdAt": -1, }, },
+      {
+        "$facet": {
+          "data": [
+            {
+              "$lookup": {
+                "from": "sharesections",
+                "localField": "_id",
+                "foreignField": "partnerId",
+                "as": "share",
+                "pipeline": [
+                  { "$match": { "isActive": true,"partnerId": { "$ne": null},} },
+                  {
+                    "$lookup": {
+                      "from": "employees",
+                      "localField": "toEmployeeId",
+                      "foreignField": "_id",
+                      "as": "emp",
+                      "pipeline": [
+                        {
+                          "$match": { "isActive": true, },
+                        },
+                        {
+                          "$project": {
+                            "fullName": 1,
+                            "type": 1,
+                            "designation": 1,
+                            "branchId": 1,
+                            "empId": 1,
+                          },
+                        },
+                      ],
+                    },
+                  },
+                  {
+                    "$unwind": {
+                      "path": "$emp",
+                      "preserveNullAndEmptyArrays": true,
+                    },
+                  },
+                  {
+                    "$project": { "emp": 1, },
+                  },
+                ],
+              },
+            },
+            {
+              "$lookup": {
+                "from": "employees",
+                "localField": "salesId",
+                "foreignField": "_id",
+                "as": "addedBy",
+                "pipeline": [
+                  { "$match": { "isActive": true, }, },
+                  {
+                    "$project": {
+                      "fullName": 1,
+                      "type": 1,
+                      "designation": 1,
+                      "branchId": 1,
+                      "empId": 1,
+                    },
+                  },
+                ],
+              },
+            },
+            {
+              "$unwind": {
+                "path": "$addedBy",
+                "preserveNullAndEmptyArrays": true,
+              },
+            },
+            { "$skip": Number(pageNo), },
+            { "$limit": Number(limit), },
+          ],
+          "totalCount": [
+            { "$count": "count", },
+          ],
+        },
+      },
+    ]
+
+    const result = await Partner.aggregate(pipeline)
+    return { status: 200,message:"Fetch partner list", data: result?.[0]?.data, noOfPartner: result?.[0]?.totalCount?.[0]?.count }
+  } catch (error) {
+    console.log("getAllPartnerResult error", error);
+    return { status: 500, data: null,message:"Something went wrong!", error }
   }
 }
 

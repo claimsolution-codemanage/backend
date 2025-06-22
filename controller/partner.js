@@ -23,6 +23,7 @@ import Notification from "../models/notification.js";
 import CasePaymentDetails from "../models/casePaymentDetails.js";
 import CasegroStatus from "../models/groStatus.js";
 import CaseOmbudsmanStatus from "../models/ombudsmanStatus.js";
+import { Types } from "mongoose";
 
 
 
@@ -754,6 +755,7 @@ export const addNewCase = async (req, res) => {
 
 
     req.body.partnerId = partner?._id
+    req.body.partnerObjId = partner?._id
     req.body.partnerName = partner?.profile?.consultantName
     req.body.consultantCode = partner?.profile?.consultantCode
     req.body.partnerCode = partner?.profile?.consultantCode
@@ -815,7 +817,7 @@ export const viewAllCase = async (req, res) => {
     if (!partner) return res.status(404).json({ success: false, message: "Not register with us" })
     if (!partner?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
 
-    const allPartnerCase = await Case.find({ partnerId: partner?._id })
+    const allPartnerCase = await Case.find({ partnerObjId: partner?._id })
     return res.status(201).json({ success: true, message: "Successfully get all case", data: allPartnerCase })
   } catch (error) {
     console.log("view all partner Case: ", error);
@@ -867,8 +869,93 @@ export const viewAllPartnerCase = async (req, res) => {
   }
 }
 
+// old version
+// export const partnerViewCaseById = async (req, res) => {
+//   try {
+//     const verify = await authPartner(req, res)
+//     if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+//     const partner = await Partner.findById(req?.user?._id)
+//     if (!partner) return res.status(401).json({ success: false, message: "Partner account not found" })
+//     if (!partner?.isActive) return res.status(400).json({ success: false, message: "Account is not active" })
+
+
+//     const { _id } = req.query
+//     if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+
+//     if (!partner?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
+//     const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails")
+//     if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
+
+//     const [getCaseDoc, getCaseStatus, getCasePaymentDetails, getCaseGroDetails,getCaseOmbudsmanDetails] = await Promise.all([
+//       CaseDoc.find({ 
+//         $and: [
+//           {
+//             $or: [
+//               { caseId: getCase?._id },
+//               { caseMargeId: getCase?._id }
+//             ]
+//           },
+//           {
+//             $or: [
+//               { isPrivate: false },
+//               { isPrivate: { $exists: false } }
+//             ]
+//           }
+//         ],  
+//       isActive: true }).select("-adminId"),
+//       CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
+//       CasePaymentDetails.find({ caseId: getCase?._id, isActive: true }),
+//       CasegroStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
+//       CaseOmbudsmanStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
+//     ]);
+    
+//     // Convert `getCaseGroDetails` to a plain object if it exists
+//       const caseGroDetailsObj = getCaseGroDetails ? getCaseGroDetails.toObject() : null;
+//       const caseOmbudsmanDetailsObj = getCaseOmbudsmanDetails ? getCaseOmbudsmanDetails.toObject() : null;
+
+//     const getCaseJson = getCase.toObject();
+//     getCaseJson.caseDocs = getCaseDoc;
+//     getCaseJson.processSteps = getCaseStatus;
+//     getCaseJson.casePayment = getCasePaymentDetails;
+//     if(caseGroDetailsObj){
+//        getCaseJson.caseGroDetails = {
+//          ...caseGroDetailsObj,
+//          groStatusUpdates: caseGroDetailsObj?.groStatusUpdates?.filter(ele => ele?.isPrivate) || [],
+//          queryHandling: caseGroDetailsObj?.queryHandling?.filter(ele => ele?.isPrivate) || [],
+//          queryReply: caseGroDetailsObj?.queryReply?.filter(ele => ele?.isPrivate) || [],
+//          approvalLetter: caseGroDetailsObj?.approvalLetterPrivate ? "" : caseGroDetailsObj?.approvalLetter,
+//        };          
+//     }else{
+//       getCaseJson.caseGroDetails = caseGroDetailsObj
+//     }
+
+//     //  ombudsman status
+//     if (caseOmbudsmanDetailsObj) {
+//       getCaseJson.caseOmbudsmanDetails = {
+//         ...caseOmbudsmanDetailsObj,
+//         statusUpdates: caseOmbudsmanDetailsObj?.statusUpdates?.filter(ele => ele?.isPrivate) || [],
+//         queryHandling: caseOmbudsmanDetailsObj?.queryHandling?.filter(ele => ele?.isPrivate) || [],
+//         queryReply: caseOmbudsmanDetailsObj?.queryReply?.filter(ele => ele?.isPrivate) || [],
+//         hearingSchedule: caseOmbudsmanDetailsObj?.hearingSchedule?.filter(ele => ele?.isPrivate) || [],
+//         awardPart: caseOmbudsmanDetailsObj?.awardPart?.filter(ele => ele?.isPrivate) || [],
+//         approvalLetter: caseOmbudsmanDetailsObj?.approvalLetterPrivate ? "" : caseOmbudsmanDetailsObj?.approvalLetter,
+//       };
+//     } else {
+//       getCaseJson.caseOmbudsmanDetails = caseOmbudsmanDetailsObj
+//     }
+//     return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
+
+//   } catch (error) {
+//     console.log("updateAdminCase in error:", error);
+//     res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+//   }
+// }
+
+// new version
 export const partnerViewCaseById = async (req, res) => {
-  try {
+   try {
     const verify = await authPartner(req, res)
     if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -876,79 +963,181 @@ export const partnerViewCaseById = async (req, res) => {
     if (!partner) return res.status(401).json({ success: false, message: "Partner account not found" })
     if (!partner?.isActive) return res.status(400).json({ success: false, message: "Account is not active" })
 
+      const { _id } = req.query;
 
-    const { _id } = req.query
-    if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+      if (!validMongooseId(_id)) {
+         return res.status(400).json({ success: false, message: "Not a valid id" });
+      }
 
-    if (!partner?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
-    const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails")
-    if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
+      const caseId = new Types.ObjectId(_id);
 
-    const [getCaseDoc, getCaseStatus, getCasePaymentDetails, getCaseGroDetails,getCaseOmbudsmanDetails] = await Promise.all([
-      CaseDoc.find({ 
-        $and: [
-          {
-            $or: [
-              { caseId: getCase?._id },
-              { caseMargeId: getCase?._id }
-            ]
-          },
-          {
-            $or: [
-              { isPrivate: false },
-              { isPrivate: { $exists: false } }
-            ]
-          }
-        ],  
-      isActive: true }).select("-adminId"),
-      CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
-      CasePaymentDetails.find({ caseId: getCase?._id, isActive: true }),
-      CasegroStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
-      CaseOmbudsmanStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
-    ]);
-    
-    // Convert `getCaseGroDetails` to a plain object if it exists
-      const caseGroDetailsObj = getCaseGroDetails ? getCaseGroDetails.toObject() : null;
-      const caseOmbudsmanDetailsObj = getCaseOmbudsmanDetails ? getCaseOmbudsmanDetails.toObject() : null;
+      const caseData = await Case.aggregate([
+         { $match: { _id: caseId } },
+         {
+            $lookup: {
+               from: "casedocs",
+               let: { id: "$_id" },
+               pipeline: [
+                  {
+                     $match: {
+                        $expr: {
+                           $and: [
+                              { $eq: ["$isActive", true] },
+                              { $or: [{ $eq: ["$caseId", "$$id"] }, { $eq: ["$caseMargeId", "$$id"] }] }
+                           ]
+                        }
+                     }
+                  },
+                  { $project: { adminId: 0 } }
+               ],
+               as: "caseDocs"
+            }
+         },
+         {
+            $lookup: {
+               from: "casestatuses",
+               let: { id: "$_id" },
+               pipeline: [
+                  {
+                     $match: {
+                        $expr: {
+                           $and: [
+                              { $eq: ["$isActive", true] },
+                              { $or: [{ $eq: ["$caseId", "$$id"] }, { $eq: ["$caseMargeId", "$$id"] }] }
+                           ]
+                        }
+                     }
+                  },
+                  { $project: { adminId: 0 } }
+               ],
+               as: "processSteps"
+            }
+         },
+         {
+            $lookup: {
+               from: "casecomments",
+               let: { id: "$_id" },
+               pipeline: [
+                  {
+                     $match: {
+                        $expr: {
+                           $and: [
+                              { $eq: ["$isActive", true] },
+                              { $or: [{ $eq: ["$caseId", "$$id"] }, { $eq: ["$caseMargeId", "$$id"] }] }
+                           ]
+                        }
+                     }
+                  }
+               ],
+               as: "caseCommit"
+            }
+         },
+         {
+            $lookup: {
+               from: "casepaymentdetails",
+               localField: "_id",
+               foreignField: "caseId",
+               pipeline: [{ $match: { isActive: true } }],
+               as: "casePayment"
+            }
+         },
+         {
+            $lookup: {
+               from: "casegrostatuses",
+               let: { id: "$_id" },
+               pipeline: [
+                  {
+                     $match: {
+                        $expr: {
+                           $and: [
+                              { $eq: ["$isActive", true] },
+                              { $eq: ["$caseId", "$$id"] }
+                           ]
+                        }
+                     }
+                  },
+                  {
+                     $lookup: {
+                        from: "casepaymentdetails",
+                        localField: "paymentDetailsId",
+                        foreignField: "_id",
+                        as: "paymentDetailsId"
+                     }
+                  },
+                  { $unwind: { path: "$paymentDetailsId", preserveNullAndEmptyArrays: true } }
+               ],
+               as: "caseGroDetails"
+            }
+         },
+         { $unwind: { path: "$caseGroDetails", preserveNullAndEmptyArrays: true } },
 
-    const getCaseJson = getCase.toObject();
-    getCaseJson.caseDocs = getCaseDoc;
-    getCaseJson.processSteps = getCaseStatus;
-    getCaseJson.casePayment = getCasePaymentDetails;
-    if(caseGroDetailsObj){
-       getCaseJson.caseGroDetails = {
-         ...caseGroDetailsObj,
-         groStatusUpdates: caseGroDetailsObj?.groStatusUpdates?.filter(ele => ele?.isPrivate) || [],
-         queryHandling: caseGroDetailsObj?.queryHandling?.filter(ele => ele?.isPrivate) || [],
-         queryReply: caseGroDetailsObj?.queryReply?.filter(ele => ele?.isPrivate) || [],
-         approvalLetter: caseGroDetailsObj?.approvalLetterPrivate ? "" : caseGroDetailsObj?.approvalLetter,
-       };          
-    }else{
-      getCaseJson.caseGroDetails = caseGroDetailsObj
-    }
+         {
+            $lookup: {
+               from: "caseombudsmanstatuses",
+               let: { id: "$_id" },
+               pipeline: [
+                  {
+                     $match: {
+                        $expr: {
+                           $and: [
+                              { $eq: ["$isActive", true] },
+                              { $eq: ["$caseId", "$$id"] }
+                           ]
+                        }
+                     }
+                  },
+                  {
+                     $lookup: {
+                        from: "casepaymentdetails",
+                        localField: "paymentDetailsId",
+                        foreignField: "_id",
+                        as: "paymentDetailsId"
+                     }
+                  },
+                  { $unwind: { path: "$paymentDetailsId", preserveNullAndEmptyArrays: true } }
+               ],
+               as: "caseOmbudsmanDetails"
+            }
+         },
+         { $unwind: { path: "$caseOmbudsmanDetails", preserveNullAndEmptyArrays: true } },
+      ]);
 
-    //  ombudsman status
-    if (caseOmbudsmanDetailsObj) {
-      getCaseJson.caseOmbudsmanDetails = {
-        ...caseOmbudsmanDetailsObj,
-        statusUpdates: caseOmbudsmanDetailsObj?.statusUpdates?.filter(ele => ele?.isPrivate) || [],
-        queryHandling: caseOmbudsmanDetailsObj?.queryHandling?.filter(ele => ele?.isPrivate) || [],
-        queryReply: caseOmbudsmanDetailsObj?.queryReply?.filter(ele => ele?.isPrivate) || [],
-        hearingSchedule: caseOmbudsmanDetailsObj?.hearingSchedule?.filter(ele => ele?.isPrivate) || [],
-        awardPart: caseOmbudsmanDetailsObj?.awardPart?.filter(ele => ele?.isPrivate) || [],
-        approvalLetter: caseOmbudsmanDetailsObj?.approvalLetterPrivate ? "" : caseOmbudsmanDetailsObj?.approvalLetter,
-      };
-    } else {
-      getCaseJson.caseOmbudsmanDetails = caseOmbudsmanDetailsObj
-    }
-    return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
+      if (!caseData.length) {
+         return res.status(404).json({ success: false, message: "Case not found" });
+      }
 
-  } catch (error) {
-    console.log("updateAdminCase in error:", error);
-    res.status(500).json({ success: false, message: "Internal server error", error: error });
+      const result = caseData[0];
 
-  }
-}
+      if (result.caseGroDetails) {
+         result.caseGroDetails = {
+         ...result.caseGroDetails,
+         groStatusUpdates: result.caseGroDetails?.groStatusUpdates?.filter(ele => ele?.isPrivate) || [],
+         queryHandling: result.caseGroDetails?.queryHandling?.filter(ele => ele?.isPrivate) || [],
+         queryReply: result.caseGroDetails?.queryReply?.filter(ele => ele?.isPrivate) || [],
+         approvalLetter: result.caseGroDetails?.approvalLetterPrivate ? "" : result.caseGroDetails?.approvalLetter,
+         };
+      }
+
+      if (result.caseOmbudsmanDetails) {
+         result.caseOmbudsmanDetails = {
+        ...result.caseOmbudsmanDetails,
+        statusUpdates: result.caseOmbudsmanDetails?.statusUpdates?.filter(ele => ele?.isPrivate) || [],
+        queryHandling: result.caseOmbudsmanDetails?.queryHandling?.filter(ele => ele?.isPrivate) || [],
+        queryReply: result.caseOmbudsmanDetails?.queryReply?.filter(ele => ele?.isPrivate) || [],
+        hearingSchedule: result.caseOmbudsmanDetails?.hearingSchedule?.filter(ele => ele?.isPrivate) || [],
+        awardPart: result.caseOmbudsmanDetails?.awardPart?.filter(ele => ele?.isPrivate) || [],
+        approvalLetter: result.caseOmbudsmanDetails?.approvalLetterPrivate ? "" : result.caseOmbudsmanDetails?.approvalLetter,
+         };
+      }
+
+      return res.status(200).json({ success: true, message: "get case data", data: result });
+
+   } catch (error) {
+      console.error("employeeViewCaseByIdBy error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error });
+   }
+};
+
 
 export const partnerUpdateCaseById = async (req, res) => {
   try {
@@ -1033,7 +1222,7 @@ export const partnerAddCaseFile = async (req, res) => {
 
 export const getpartnerDashboard = async (req, res) => {
   try {
-    const year = Number(req.query.year || new Date().getFullYear())
+    const year = Number(req.query.year || new Date().getFullYear());
     const verify = await authPartner(req, res);
     if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
 
@@ -1041,72 +1230,73 @@ export const getpartnerDashboard = async (req, res) => {
     if (!partner) return res.status(401).json({ success: false, message: "User account not found" });
     if (!partner?.isActive) return res.status(400).json({ success: false, message: "Account is not active" })
 
-
     const partnerNecessaryData = {
       lastLogin: partner?.lastLogin,
       recentLogin: partner?.recentLogin,
-      fullName:partner?.fullName
-
+      fullName: partner?.fullName
     }
 
-    let currentYear = new Date().getFullYear()
-    const currentYearStart = new Date(new Date(new Date().setFullYear(year ||  currentYear)).getFullYear(), 0, 1); // Start of the current year
-    const currentMonth = year==currentYear ?  new Date().getMonth() + 1 : 12;
+    // Define the time range for the selected year
+    const currentYear = new Date().getFullYear();
+    const currentYearStart = new Date(year, 0, 1); // Jan 1 of selected year
+    const endYearStart = new Date(year + 1, 0, 1); // Jan 1 of next year
+    const currentMonth = year === currentYear ? new Date().getMonth() + 1 : 12;
+
+    // Generate default 0-case values for each month
     const allMonths = [];
     for (let i = 0; i < currentMonth; i++) {
       allMonths.push({
         _id: {
-          year: year || new Date().getFullYear(),
+          year: year,
           month: i + 1
         },
         totalCases: 0
       });
     }
+
+    // Get case distribution by currentStatus (for pie chart)
     const pieChartData = await Case.aggregate([
       {
-        '$match': {
-          'createdAt': { $gte: currentYearStart },
-          'isActive': true,
-          'isPartnerReferenceCase': false,
-          'isEmpSaleReferenceCase': false,
-          'partnerId': req?.user?._id // Assuming 'partnerId' is the field to match
+        $match: {
+          createdAt: {
+            $gte: currentYearStart,
+            $lt: endYearStart,
+          },
+          partnerObjId: new Types.ObjectId(req?.user?._id),
+          isActive: true,
+          isPartnerReferenceCase: false,
+          isEmpSaleReferenceCase: false,
         }
       },
       {
-        '$group': {
-          '_id': '$currentStatus',
-          'totalCases': {
-            '$sum': 1
-          },
-          'totalCaseAmount': {
-            '$sum': '$claimAmount' // Assuming 'amount' is the field to sum
-          }
+        $group: {
+          _id: '$currentStatus',
+          totalCases: { $sum: 1 },
+          totalCaseAmount: { $sum: '$claimAmount' }
         }
       },
       {
-        '$group': {
-          '_id': null,
-          'totalCase': {
-            '$sum': '$totalCases'
-          },
-          'totalCaseAmount': {
-            '$sum': '$totalCaseAmount'
-          },
-          'allCase': {
-            '$push': '$$ROOT'
-          }
+        $group: {
+          _id: null,
+          totalCase: { $sum: '$totalCases' },
+          totalCaseAmount: { $sum: '$totalCaseAmount' },
+          allCase: { $push: '$$ROOT' }
         }
       }
     ]);
 
+    // Get case counts per month (for bar/line graph)
     const graphData = await Case.aggregate([
       {
         $match: {
-          'createdAt': { $gte: currentYearStart },
-          'partnerId': req?.user?._id,
-          'isActive': true,
-          'isPartnerReferenceCase': false,
-          'isEmpSaleReferenceCase': false,
+          createdAt: {
+            $gte: currentYearStart,
+            $lt: endYearStart,
+          },
+          partnerObjId: new Types.ObjectId(req?.user?._id),
+          isActive: true,
+          isPartnerReferenceCase: false,
+          isEmpSaleReferenceCase: false,
         }
       },
       {
@@ -1120,15 +1310,22 @@ export const getpartnerDashboard = async (req, res) => {
       },
       {
         $sort: { '_id.year': 1, '_id.month': 1 }
-      },])
+      }
+    ]);
 
-    // Merge aggregated data with the array representing all months
+    // Merge aggregated monthly data with the full list of months
     const mergedGraphData = allMonths.map((month) => {
-      const match = graphData.find((data) => {
-        return data._id.year === month._id.year && data._id.month === month._id.month;
-      });
-      return match || month;
+      const match = graphData.find((data) =>
+        data._id.year === month._id.year && data._id.month === month._id.month
+      );
+      return {
+        ...month,
+        ...(match || {}),
+        monthName: new Date(month._id.year, month._id.month - 1)
+          .toLocaleString('default', { month: 'short' })
+      };
     });
+
 
     return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData, partnerNecessaryData });
 

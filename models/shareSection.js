@@ -17,7 +17,7 @@ const shareSectionSchema = new mongoose.Schema({
         type: mongoose.Schema.ObjectId,
         ref: "Employee",
     },
-    isActive:{type:Boolean,default:false},
+    isActive:{type:Boolean,default:true},
     branchId: { type: String, default: "" }
 }, { timestamps: true });
 

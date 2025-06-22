@@ -150,9 +150,10 @@ router.get("/getAllNotification",authAdmin,adminController.getAllNotification)
 router.put("/updateNotification",authAdmin,adminController.updateNotification)
 
 
-// router.put("/updateModalSchema",adminUpdateModalSchema)
-// router.put("/updatePartnerSchema",adminController.updatePartnerSchema)
-// router.get("/updateCaseSchema",adminController.updateCaseSchema)
+// router.get("/updateModalSchema",adminController.adminUpdateModalSchema)
+router.get("/updatePartnerSchema",adminController.updatePartnerSchema)
+router.get("/updateCaseSchema",adminController.updateCaseSchema)
+router.get("/updateCaseAndMargeSchema",adminController.updateCaseAndMargeSchema)
 
 
 

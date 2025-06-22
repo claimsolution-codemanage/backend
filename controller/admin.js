@@ -16,7 +16,7 @@ import {
    validateAdminSettingDetails, validateAdminAddCaseFee, validateAdminUpdateCasePayment, validateAdminAddEmployeeToCase,
    validateEditAdminCaseStatus,validateAdminSharePartner,validateAdminRemovePartner,
 } from "../utils/validateAdmin.js";
-import { commonDownloadCaseExcel, commonInvoiceDownloadExcel, generatePassword, getAllCaseDocQuery, getAllClientResult, getAllInvoiceQuery, getAllSathiDownloadExcel, getAllStatementDownloadExcel, getEmployeeByIdQuery, getValidateDate, sendNotificationAndMail } from "../utils/helper.js";
+import { commonDownloadCaseExcel, commonInvoiceDownloadExcel, generatePassword, getAllCaseDocQuery, getAllClientResult, getAllInvoiceQuery, getAllPartnerResult, getAllSathiDownloadExcel, getAllStatementDownloadExcel, getEmployeeByIdQuery, getValidateDate, sendNotificationAndMail } from "../utils/helper.js";
 import { sendAdminSigninMail, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import { validateEmployeeSignUp } from "../utils/validateEmployee.js";
 import { validMongooseId } from "../utils/helper.js";
@@ -50,6 +50,7 @@ import { createOrUpdateCaseStatusForm } from "../utils/dbFunction.js";
 import CaseOmbudsmanStatus from "../models/ombudsmanStatus.js";
 import ShareSection from "../models/shareSection.js";
 import * as dbFunction from "../utils/dbFunction.js"
+import CaseMergeDetails from "../models/caseMergeDetails.js";
 
 
 export const adminAuthenticate = async (req, res) => {
@@ -450,35 +451,32 @@ export const adminSetIsActiveEmployee = async (req, res) => {
 export const createEmployeeAccount = async (req, res) => {
    try {
       const {admin} = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
-
       const { error } = validateEmployeeSignUp(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+      const {fullName="",email="",mobileNo="",type="",designation="",empId="",branchId="",headEmpId="",managerId=""} = req.body
 
-      const existEmployee = await Employee.find({ $or:[{email: { $regex:req.body.email, $options: "i" } },{ empId: { $regex:req.body.empId, $options: "i" } }] })
-      if (existEmployee.length > 0) return res.status(401).json({ success: false, message: "Employee account/empId already exists" })
+      const existEmployee = await Employee.findOne({ $or:[{email: { $regex:email, $options: "i" } },{ empId: { $regex:empId, $options: "i" } }] })
+      if (existEmployee) return res.status(401).json({ success: false, message: "Employee account/empId already exists" })
 
       const systemPassword = generatePassword()
       const bcryptPassword = await bcrypt.hash(systemPassword, 10)
       const newEmployee = new Employee({
-         fullName: req?.body?.fullName?.trim(),
-         empId:req.body?.empId?.trim(),
-         branchId:req?.body?.branchId?.trim(),
-         email: req?.body?.email?.trim()?.toLowerCase(),
-         mobileNo: req?.body?.mobileNo,
+         fullName:  fullName?.trim(),
+         empId: empId?.trim(),
+         branchId: branchId?.trim(),
+         email:  email?.trim()?.toLowerCase(),
+         mobileNo:  mobileNo,
          password: bcryptPassword,
-         type: req?.body?.type ? req?.body?.type : "assistant",
-         designation:req?.body?.designation ? req?.body?.designation : "executive"
+         type:  type || "assistant",
+         designation: designation || "executive"
       })
+
+      if(managerId) newEmployee.managerId = managerId
+      if(headEmpId) newEmployee.headEmpId = headEmpId
+
       try {
-         await sendEmployeeSigninMail(req.body.email, systemPassword);
-         // console.log(systemPassword,"systemPassword---------");
+         // await sendEmployeeSigninMail(req.body.email, systemPassword);
+         console.log(systemPassword,"systemPassword---------");
          await newEmployee.save()
          return res.status(200).json({ success: true, message: "Successfully create new Employee", });
       } catch (err) {
@@ -610,12 +608,6 @@ export const adminDeleteEmployeeAccount = async (req, res) => {
    try {
       const {admin} = req
       const { _id } = req.query
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
@@ -633,26 +625,132 @@ export const adminDeleteEmployeeAccount = async (req, res) => {
 
 export const adminViewAllEmployee = async (req, res) => {
    try {
-      const {admin} = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const { admin } = req
+      let { limit = 10, search = "", pageNo = 1, type = "", empType = "" } = req.query
+      pageNo = (pageNo - 1) * limit;
+      type = type || true;
+      empType = empType || false
 
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+      let matchQuery = []
 
-      // query = ?statusType=&search=&limit=&pageNo
-      const pageItemLimit = req.query?.limit ? req.query?.limit : 10;
-      const pageNo = req.query?.pageNo ? (req.query?.pageNo - 1) * pageItemLimit : 0;
-      const searchQuery = req.query?.search ? req.query?.search : "";
-      const type = req.query?.type ? req.query?.type : true;
-      const empType = req.query?.empType ? req.query?.empType :false
+      const pipeline = [
+         {
+            "$match": {
+               "isActive": true,
+               ...(empType ? { "type": { "$regex": empType, "$options": "i" } } : {}),
+               "$or": [
+                  { "fullName": { "$regex": search, "$options": "i", }, },
+                  { "email": { "$regex": search, "$options": "i", }, },
+                  { "mobileNo": { "$regex": search, "$options": "i", }, },
+                  { "type": { "$regex": search, "$options": "i", }, },
+                  { "designation": { "$regex": search, "$options": "i", }, },
+               ],
+            },
+         },
+         {
+            "$lookup": {
+               "from": 'employees',
+               "localField": "referEmpId",
+               "foreignField": "_id",
+               "pipeline": [
+                  {
+                     "$project": {
+                        "fullName": 1,
+                        "type": 1,
+                        "designation": 1,
 
-      const query = getAllEmployeeSearchQuery(searchQuery,type,empType)
-      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("referEmpId","fullName type designation");
-      const noOfEmployee = await Employee.find(query).count()
-      return res.status(200).json({ success: true, message: "get employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
+                     }
+                  }
+               ],
+               "as": 'referEmpId'
+            }
+         },
+         {
+            '$unwind': {
+               'path': '$referEmpId',
+               'preserveNullAndEmptyArrays': true
+            }
+         },
+         {
+            "$lookup": {
+               "from": 'employees',
+               "localField": "headEmpId",
+               "foreignField": "_id",
+               "pipeline": [
+                  {
+                     "$project": {
+                        "fullName": 1,
+                        "type": 1,
+                        "designation": 1,
 
+                     }
+                  }
+               ],
+               "as": 'headEmpId'
+            }
+         },
+         {
+            '$unwind': {
+               'path': '$headEmpId',
+               'preserveNullAndEmptyArrays': true
+            }
+         },
+         {
+            "$lookup": {
+               "from": 'employees',
+               "localField": "managerId",
+               "foreignField": "_id",
+               "pipeline": [
+                  {
+                     "$project": {
+                        "fullName": 1,
+                        "type": 1,
+                        "designation": 1,
+
+                     }
+                  }
+               ],
+               "as": 'managerId'
+            }
+         },
+         {
+            '$unwind': {
+               'path': '$managerId',
+               'preserveNullAndEmptyArrays': true
+            }
+         },
+         {
+            "$project": {
+               "fullName": 1,
+               "email": 1,
+               "empId":1,
+               "mobileNo": 1,
+               "type": 1,
+               "designation": 1,
+               "branchId": 1,
+               "referEmpId": 1,
+               "createdAt": 1,
+               "managerId":1,
+               "headEmpId":1
+            },
+         },
+         {
+            "$facet": {
+               "data": [
+                  { "$sort": { "createdAt": -1, }, },
+                  { "$skip": Number(pageNo), },
+                  { "$limit": Number(limit), },
+               ],
+               "totalCount": [
+                  { "$count": "count", },
+               ],
+            },
+         },
+      ]
+      const result = await Employee.aggregate(pipeline)
+      console.log("data",result?.[0]?.data);
+      
+      return res.status(200).json({ success: true, message: "get sale employee data", data: result?.[0]?.data || [], noOfEmployee: result?.[0]?.totalCount?.[0]?.count || 0 });
    } catch (error) {
       console.log("adminViewAllEmployee in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -694,10 +792,8 @@ export const adminDownloadAllEmployee = async (req, res) => {
 export const adminGetSaleEmployee = async (req, res) => {
    try {
       const {admin} = req
-      let {limit,search,pageNo} = req.query
-      const pageItemLimit = limit || 50;
-      pageNo = pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
-      const searchQuery = search || "";
+      let {limit=50,search="",pageNo=1} = req.query
+      pageNo =(pageNo - 1) * limit;
 
       const pipeline =[
          {
@@ -706,11 +802,11 @@ export const adminGetSaleEmployee = async (req, res) => {
              type: { $regex: "sales", $options: "i", },
              branchId: { $regex: "",  $options: "i",  },
              $or: [
-               {fullName: {$regex: searchQuery, $options: "i", },  },
-               {email: {$regex: searchQuery, $options: "i", },  },
-               {mobileNo: {$regex: searchQuery, $options: "i", },  },
-               {type: {$regex: searchQuery, $options: "i", },  },
-               {designation: {$regex: searchQuery, $options: "i", },  },
+               {fullName: {$regex: search, $options: "i", },  },
+               {email: {$regex: search, $options: "i", },  },
+               {mobileNo: {$regex: search, $options: "i", },  },
+               {type: {$regex: search, $options: "i", },  },
+               {designation: {$regex: search, $options: "i", },  },
              ],
            },
          },
@@ -728,8 +824,8 @@ export const adminGetSaleEmployee = async (req, res) => {
            $facet: {
              data: [
                {$sort: { createdAt: -1, }, },
-               { $skip: 0, },
-               { $limit: 10, },
+               { $skip: Number(pageNo), },
+               { $limit: Number(limit), },
              ],
              totalCount: [
                {$count: "count",  },
@@ -748,46 +844,85 @@ export const adminGetSaleEmployee = async (req, res) => {
 
 export const adminGetNormalEmployee = async (req, res) => {
    try {
-      const {admin} = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const { admin } = req
+      let { limit = 10, pageNo = 1, search = "", isAddEmp = "" } = req.query
+      pageNo = (pageNo - 1) * limit;
 
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
-      // query = ?statusType=&search=&limit=&pageNo
-      const pageItemLimit = req.query.limit ? req.query.limit : 10;
-      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
-      const searchQuery = req.query.search ? req.query.search : "";
-
-      const excludedTypes = ["Sales", "Operation", "Finance","Sathi Team","Branch"];
+      let excludedTypes = ["Sales", "Operation", "Finance", "Sathi Team", "Branch"];
+      if (isAddEmp == "true") {
+         excludedTypes = ["Operation", "Finance"]
+      }
       let query = {
-         $and:[
-            {isActive:true},
-            { type: { $nin: excludedTypes }},
+         $and: [
+            { isActive: true },
+            { type: { $nin: excludedTypes } },
             {
-             $or: [
-                  { fullName: { $regex: searchQuery, $options: "i" }},
-                  { email: { $regex: searchQuery, $options: "i" }},
-                  { mobileNo: { $regex: searchQuery, $options: "i" }},
-                  { type: { $regex: searchQuery, $options: "i" }},
-                  { designation: { $regex: searchQuery, $options: "i" }},
+               $or: [
+                  { fullName: { $regex: search, $options: "i" } },
+                  { email: { $regex: search, $options: "i" } },
+                  { mobileNo: { $regex: search, $options: "i" } },
+                  { type: { $regex: search, $options: "i" } },
+                  { designation: { $regex: search, $options: "i" } },
 
-              ]
+               ]
             }
          ]
-         };
-      const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
-      const noOfEmployee = await Employee.find(query).count()
-      return res.status(200).json({ success: true, message: "get normal employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
+      };
+      const pipeline = [
+         {
+            "$match": {
+               "$and": [
+                  { "isActive": true },
+                  { "type": { "$nin": excludedTypes } },
+                  {
+                     "$or": [
+                        { "fullName": { "$regex": search, "$options": "i" } },
+                        { "email": { "$regex": search, "$options": "i" } },
+                        { "mobileNo": { "$regex": search, "$options": "i" } },
+                        { "type": { "$regex": search, "$options": "i" } },
+                        { "designation": { "$regex": search, "$options": "i" } },
+                        { "branchId": { "$regex": search, "$options": "i" } },
+                     ]
+                  }
+               ]
+            }
 
+         },
+         {
+            "$project": {
+               "fullName": 1,
+               "email": 1,
+               "mobileNo": 1,
+               "type": 1,
+               "designation": 1,
+               "branchId": 1,
+            },
+         },
+         {
+            "$facet": {
+               "data": [
+                  { "$sort": { "createdAt": -1, }, },
+                  { "$skip": Number(pageNo), },
+                  { "$limit": Number(limit), },
+               ],
+               "totalCount": [
+                  { "$count": "count", },
+               ],
+            },
+         },
+      ]
+      const result = await Employee.aggregate(pipeline)
+      // const getAllEmployee = await Employee.find(query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
+      // const noOfEmployee = await Employee.find(query).count()
+      // return res.status(200).json({ success: true, message: "get normal employee data", data: getAllEmployee, noOfEmployee: noOfEmployee });
+      return res.status(200).json({ success: true, message: "get sale employee data", data: result?.[0]?.data || [], noOfEmployee: result?.[0]?.totalCount?.[0]?.count || 0 });
    } catch (error) {
       console.log("adminViewAllEmployee in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
 
    }
 }
+
 
 export const changeStatusAdminCase = async (req, res) => {
    try {
@@ -890,238 +1025,403 @@ export const adminEditCaseStatus = async (req, res) => {
    }
 }
 
-export const viewAllAdminCase = async (req, res) => {
-   try {
-      const {admin} = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+// old version
+// export const viewAllAdminCase = async (req, res) => {
+//    try {
+//       const {admin} = req
 
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+//       const pageItemLimit = req.query.limit ? req.query.limit : 10;
+//       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+//       const searchQuery = req.query.search ? req.query.search : "";
+//       const statusType = req.query.status ? req.query.status : "";
+//       const startDate = req.query.startDate ? req.query.startDate : "";
+//       const endDate = req.query.endDate ? req.query.endDate : "";
+//       const type = req?.query?.type ? req.query.type : true
+//       const isReject = req?.query?.isReject=="true" ? {$in:["Reject"]} : {$nin:["Reject"]}
 
-      // query = ?statusType=&search=&limit=&pageNo
-      const pageItemLimit = req.query.limit ? req.query.limit : 10;
-      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
-      const searchQuery = req.query.search ? req.query.search : "";
-      const statusType = req.query.status ? req.query.status : "";
-      const startDate = req.query.startDate ? req.query.startDate : "";
-      const endDate = req.query.endDate ? req.query.endDate : "";
-      const type = req?.query?.type ? req.query.type : true
-      const isReject = req?.query?.isReject=="true" ? {$in:["Reject"]} : {$nin:["Reject"]}
+//       const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type,false,false,isReject)
+//       // if (!query.success) return res.status(400).json({ success: false, message: query.message })
+//       // console.log("query", query?.query);
 
-      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, false, false, false, type,false,false,isReject)
-      // if (!query.success) return res.status(400).json({ success: false, message: query.message })
-      // console.log("query", query?.query);
-
-      const matchQuery = []
+//       const matchQuery = []
 
       
+//       if (startDate && endDate) {
+//          const validStartDate = getValidateDate(startDate)
+//          if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+//             const validEndDate = getValidateDate(endDate)
+//          if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+//       }
+
+//       if (startDate && endDate) {
+//          const start = new Date(startDate).setHours(0, 0, 0, 0);
+//          const end = new Date(endDate).setHours(23, 59, 59, 999);
+         
+//          matchQuery.push({
+//            createdAt: {
+//              $gte: new Date(start),
+//              $lte: new Date(end)
+//            }
+//          });
+//       }
+
+//       const pipeline = [
+//          {
+//            $match: {
+//              $and: [
+//                { isPartnerReferenceCase: false },
+//                { isEmpSaleReferenceCase: false },
+//                { currentStatus: { $regex: statusType, $options: "i" } },
+//                { isActive: Boolean(req.query.type == "true" ? true :false) },
+//                req?.query?.isReject=="true" ? {currentStatus:{$in:["Reject"]}} : {currentStatus:{$nin:["Reject"]}},
+//                ...matchQuery,
+//              ]
+//            }
+//          },
+//          {
+//             $addFields: {
+//               validPartnerIdString: {
+//                 $cond: {
+//                   if: {
+//                     $and: [
+//                       { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
+//                       { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
+//                       { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
+//                     ]
+//                   },
+//                   then: "$partnerId",
+//                   else: null
+//                 }
+//               }
+//             }
+//           },
+//           {
+//             $lookup: {
+//               from: 'partners',
+//               let: { partnerIdString: "$validPartnerIdString" },
+//               pipeline: [
+//                 {
+//                   $match: {
+//                     $expr: {
+//                       $and: [
+//                         { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
+//                         { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
+//                         { 
+//                           $eq: [
+//                             "$_id",
+//                             { $toObjectId: "$$partnerIdString" }
+//                           ]
+//                         }
+//                       ]
+//                     }
+//                   }
+//                 },
+//                 {
+//                   $project: {
+//                     fullName: 1 // Include only the fullName field
+//                   }}
+//               ],
+//               as: 'partnerDetails'
+//             }
+//           },
+//           {'$unwind':{
+//             'path':'$partnerDetails',
+//             'preserveNullAndEmptyArrays':true
+//           }},
+//           {
+//             $addFields: {
+//               validSaleEmpIdString: {
+//                 $cond: {
+//                   if: {
+//                     $and: [
+//                       { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
+//                       { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
+//                       { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
+//                     ]
+//                   },
+//                   then: "$empSaleId",
+//                   else: null
+//                 }
+//               }
+//             }
+//           },
+//           {
+//             $lookup: {
+//               from: 'employees',
+//               let: { saleEmpIdString: "$validSaleEmpIdString" },
+//               pipeline: [
+//                 {
+//                   $match: {
+//                     $expr: {
+//                       $and: [
+//                         { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
+//                         { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
+//                         { 
+//                           $eq: [
+//                             "$_id",
+//                             { $toObjectId: "$$saleEmpIdString" }
+//                           ]
+//                         }
+//                       ]
+//                     }
+//                   }
+//                 },
+//                 {
+//                   $project: {
+//                     fullName: 1, // Include only the fullName field
+//                     designation:1,
+//                     type:1
+//                   }}
+//               ],
+//               as: 'employeeDetails'
+//             }
+//           },
+//           {'$unwind':{
+//             'path':'$employeeDetails',
+//             'preserveNullAndEmptyArrays':true
+//           }},
+//           {'$match':{
+//                '$or': [
+//                  { name: { $regex: searchQuery, $options: "i" } },
+//                  { 'partnerDetails.fullName': { $regex: searchQuery, $options: "i" } },
+//                  { 'employeeDetails.fullName': { $regex: searchQuery, $options: "i" } },
+//                  { consultantCode: { $regex: searchQuery, $options: "i" } },
+//                  { fileNo: { $regex: searchQuery, $options: "i" } },
+//                  { email: { $regex: searchQuery, $options: "i" } },
+//                  { mobileNo: { $regex: searchQuery, $options: "i" } },
+//                  { policyType: { $regex: searchQuery, $options: "i" } },
+//                  { caseFrom: { $regex: searchQuery, $options: "i" } },
+//                  { branchId: { $regex: searchQuery, $options: "i" } },
+//                ]          
+//           }},
+//           {'$sort':{'createdAt':-1}},
+//          {
+//            $facet: {
+//              cases: [
+//                { $sort: { createdAt: -1 } },
+//                { $skip: Number(pageNo) },
+//                { $limit: Number(pageItemLimit) },
+//                { 
+//                  $project: {
+//                    caseDocs: 0,
+//                    processSteps: 0,
+//                    addEmployee: 0,
+//                    caseCommit: 0,
+//                    partnerReferenceCaseDetails: 0
+//                  }
+//                }
+//              ],
+//              totalCount: [
+//                { $count: "count" }
+//              ],
+//              totalAmt: [
+//                {
+//                  $group: {
+//                    _id: null,
+//                    totalAmtSum: { $sum: "$claimAmount" }
+//                  }
+//                }
+//              ]
+//            }
+//          }
+//        ];
+       
+//        const result = await Case.aggregate(pipeline);
+//        const getAllCase = result[0].cases;
+//        const noOfCase = result[0].totalCount[0]?.count || 0;
+//        const totalAmount = result?.[0]?.totalAmt
+       
+//       return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: totalAmount });
+
+//    } catch (error) {
+//       console.log("updateAdminCase in error:", error);
+//       res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+//    }
+// }
+
+// new version
+export const viewAllAdminCase = async (req, res) => {
+   try {
+      const { admin } = req
+      let { limit = 10, pageNo = 1, search = "", status = "", startDate = "", endDate = "", empId = "",type,isReject } = req.query
+      const skip = (pageNo - 1) * limit;
+
+      let matchQuery = []
       if (startDate && endDate) {
          const validStartDate = getValidateDate(startDate)
          if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
-            const validEndDate = getValidateDate(endDate)
+         const validEndDate = getValidateDate(endDate)
          if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
       }
 
+                     
+      matchQuery.push({ isActive: Boolean(type == "true" ? true :false) })
+      matchQuery.push(isReject=="true" ? {currentStatus:{$in:["Reject"]}} : {currentStatus:{$nin:["Reject"]}})
+
+      //  date-wise filter
       if (startDate && endDate) {
          const start = new Date(startDate).setHours(0, 0, 0, 0);
          const end = new Date(endDate).setHours(23, 59, 59, 999);
-         
          matchQuery.push({
-           createdAt: {
-             $gte: new Date(start),
-             $lte: new Date(end)
-           }
+            createdAt: {
+               $gte: new Date(start),
+               $lte: new Date(end)
+            }
          });
       }
 
+
       const pipeline = [
          {
-           $match: {
-             $and: [
-               { isPartnerReferenceCase: false },
-               { isEmpSaleReferenceCase: false },
-               { currentStatus: { $regex: statusType, $options: "i" } },
-               { isActive: Boolean(req.query.type == "true" ? true :false) },
-               req?.query?.isReject=="true" ? {currentStatus:{$in:["Reject"]}} : {currentStatus:{$nin:["Reject"]}},
-               ...matchQuery,
-             ]
-           }
+            "$match": {
+               "$and": [
+                  { "isPartnerReferenceCase": false },
+                  { "isEmpSaleReferenceCase": false },
+                  { "currentStatus": { "$regex": status, "$options": "i" } },
+                  { "isActive": true },
+                  ...matchQuery,
+               ]
+            }
          },
          {
-            $addFields: {
-              validPartnerIdString: {
-                $cond: {
-                  if: {
-                    $and: [
-                      { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
-                      { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
-                      { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
-                    ]
-                  },
-                  then: "$partnerId",
-                  else: null
-                }
-              }
+            "$project": {
+               "clientId": 1,
+               "consultantCode": 1,
+               "branchId": 1,
+               "partnerId": 1,
+               "partnerCode": 1,
+               "empSaleId": 1,
+               "isActive": 1,
+               "caseFrom": 1,
+               "name": 1,
+               "mobileNo": 1,
+               "email": 1,
+               "claimAmount": 1,
+               "policyNo": 1,
+               "fileNo": 1,
+               "policyType": 1,
+               "complaintType": 1,
+               "createdAt": 1,
+               "currentStatus": 1,
+               "empObjId": 1,
+               "partnerObjId": 1,
+               "clientObjId": 1,
             }
-          },
-          {
-            $lookup: {
-              from: 'partners',
-              let: { partnerIdString: "$validPartnerIdString" },
-              pipeline: [
-                {
-                  $match: {
-                    $expr: {
-                      $and: [
-                        { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
-                        { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
-                        { 
-                          $eq: [
-                            "$_id",
-                            { $toObjectId: "$$partnerIdString" }
-                          ]
-                        }
-                      ]
-                    }
-                  }
-                },
-                {
-                  $project: {
-                    fullName: 1 // Include only the fullName field
-                  }}
-              ],
-              as: 'partnerDetails'
-            }
-          },
-          {'$unwind':{
-            'path':'$partnerDetails',
-            'preserveNullAndEmptyArrays':true
-          }},
-          {
-            $addFields: {
-              validSaleEmpIdString: {
-                $cond: {
-                  if: {
-                    $and: [
-                      { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
-                      { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
-                      { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
-                    ]
-                  },
-                  then: "$empSaleId",
-                  else: null
-                }
-              }
-            }
-          },
-          {
-            $lookup: {
-              from: 'employees',
-              let: { saleEmpIdString: "$validSaleEmpIdString" },
-              pipeline: [
-                {
-                  $match: {
-                    $expr: {
-                      $and: [
-                        { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
-                        { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
-                        { 
-                          $eq: [
-                            "$_id",
-                            { $toObjectId: "$$saleEmpIdString" }
-                          ]
-                        }
-                      ]
-                    }
-                  }
-                },
-                {
-                  $project: {
-                    fullName: 1, // Include only the fullName field
-                    designation:1,
-                    type:1
-                  }}
-              ],
-              as: 'employeeDetails'
-            }
-          },
-          {'$unwind':{
-            'path':'$employeeDetails',
-            'preserveNullAndEmptyArrays':true
-          }},
-          {'$match':{
-               '$or': [
-                 { name: { $regex: searchQuery, $options: "i" } },
-                 { 'partnerDetails.fullName': { $regex: searchQuery, $options: "i" } },
-                 { 'employeeDetails.fullName': { $regex: searchQuery, $options: "i" } },
-                 { consultantCode: { $regex: searchQuery, $options: "i" } },
-                 { fileNo: { $regex: searchQuery, $options: "i" } },
-                 { email: { $regex: searchQuery, $options: "i" } },
-                 { mobileNo: { $regex: searchQuery, $options: "i" } },
-                 { policyType: { $regex: searchQuery, $options: "i" } },
-                 { caseFrom: { $regex: searchQuery, $options: "i" } },
-                 { branchId: { $regex: searchQuery, $options: "i" } },
-               ]          
-          }},
-          {'$sort':{'createdAt':-1}},
+         },
          {
-           $facet: {
-             cases: [
-               { $sort: { createdAt: -1 } },
-               { $skip: Number(pageNo) },
-               { $limit: Number(pageItemLimit) },
-               { 
-                 $project: {
-                   caseDocs: 0,
-                   processSteps: 0,
-                   addEmployee: 0,
-                   caseCommit: 0,
-                   partnerReferenceCaseDetails: 0
-                 }
-               }
-             ],
-             totalCount: [
-               { $count: "count" }
-             ],
-             totalAmt: [
+            "$lookup": {
+               "from": 'partners',
+               "localField": "partnerObjId",
+               "foreignField": "_id",
+               "pipeline": [
+                  {
+                     "$project": {
+                        "fullName": 1, // Include only the fullName field,
+                        "profile.consultantName":1,
+                        "profile.consultantCode":1,
+                     }
+                  }
+               ],
+               "as": 'partnerDetails'
+            }
+         },
+         {
+            '$unwind': {
+               'path': '$partnerDetails',
+               'preserveNullAndEmptyArrays': true
+            }
+         },
+         {
+            "$lookup": {
+               "from": 'clients',
+               "localField": "clientObjId",
+               "foreignField": "_id",
+               "pipeline": [
+                  {
+                     "$project": {
+                        "fullName": 1, // Include only the fullName field
+                         "profile.consultantName":1,
+                        "profile.consultantCode":1,
+                     }
+                  }
+               ],
+               "as": 'clientDetails'
+            }
+         },
+         {
+            '$unwind': {
+               'path': '$clientDetails',
+               'preserveNullAndEmptyArrays': true
+            }
+         },
+         {
+            "$lookup": {
+               "from": 'employees',
+               "localField": "empObjId",
+               "foreignField": "_id",
+               "as": 'employeeDetails',
+               "pipeline": [
+                  {
+                     "$project": {
+                        "fullName": 1, // Include only the fullName field
+                        "designation": 1,
+                        "type": 1
+                     }
+                  }
+               ]
+            }
+         },
+         {
+            '$unwind': {
+               'path': '$employeeDetails',
+               'preserveNullAndEmptyArrays': true
+            }
+         },
+         {
+            '$match': {
+               '$or': [
+                  { "name": { "$regex": search, "$options": "i" } },
+                  { 'partnerDetails.fullName': { "$regex": search, "$options": "i" } },
+                  { 'employeeDetails.fullName': { "$regex": search, "$options": "i" } },
+                  { "consultantCode": { "$regex": search, "$options": "i" } },
+                  { "fileNo": { "$regex": search, "$options": "i" } },
+                  { "email": { "$regex": search, "$options": "i" } },
+                  { "mobileNo": { "$regex": search, "$options": "i" } },
+                  { "policyType": { "$regex": search, "$options": "i" } },
+                  { "policyNo": { "$regex": search, "$options": "i" } },
+                  { "caseFrom": { "$regex": search, "$options": "i" } },
+                  { "branchId": { "$regex": search, "$options": "i" } },
+               ]
+            }
+         },
+         { '$sort': { 'createdAt': -1 } },
+         {
+            "$facet": {
+               "cases": [
+                  { "$skip": Number(skip) },
+                  { "$limit": Number(limit) },
+               ],
+               "totalCount": [
+                  { "$count": "count" }
+               ],
+               "totalAmt": [
                {
-                 $group: {
-                   _id: null,
-                   totalAmtSum: { $sum: "$claimAmount" }
+                 "$group": {
+                   "_id": null,
+                   "totalAmtSum": { "$sum": "$claimAmount" }
                  }
                }
              ]
-           }
+            }
          }
-       ];
-       
-       const result = await Case.aggregate(pipeline);
-      //  console.log("result",result?.[0]?.totalAmtSum);
-       
-       const getAllCase = result[0].cases;
-       const noOfCase = result[0].totalCount[0]?.count || 0;
-       const totalAmount = result?.[0]?.totalAmt
-       
+      ];
 
-      // const aggregationPipeline = [
-      //    { $match: query?.query }, // Match the documents based on the query
-      //    {
-      //       $group: {
-      //          _id: null,
-      //          totalAmtSum: { $sum: "$claimAmount" } // Calculate the sum of totalAmt
-      //       }
-      //    }
-      // ];
-      // console.log("query", query);
-
-      // const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
-      // const noOfCase = await Case.find(query?.query).count()
-      
-      // const aggregateResult = await Case.aggregate(aggregationPipeline);
-
-      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: totalAmount });
+      const result = await Case.aggregate(pipeline);
+      const getAllCase = result[0].cases;
+      const noOfCase = result[0].totalCount[0]?.count || 0;
+      const totalAmount = result?.[0]?.totalAmt
+      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase,totalAmt: totalAmount });
 
    } catch (error) {
       console.log("updateAdminCase in error:", error);
@@ -1130,15 +1430,10 @@ export const viewAllAdminCase = async (req, res) => {
    }
 }
 
+
 export const adminViewPartnerReport = async (req, res) => {
    try {
       const {admin} = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
       if (!validMongooseId(req.query.partnerId)) return res.status(400).json({ success: false, message: "Not a valid partnerId" })
       const partner = await Partner.findById(req.query.partnerId).select("-password")
       if (!partner) return res.status(404).json({ success: false, message: "Parnter not found" })
@@ -1908,13 +2203,6 @@ export const adminViewEmpSaleReport = async (req, res) => {
 export const adminViewEmpSalePartnerReport = async (req, res) => {
    try {
       const {admin} = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
       const { empSaleId } = req.query
       if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid salesId" })
       const empSale = await Employee.findById(empSaleId).select("-password")
@@ -2075,22 +2363,41 @@ export const adminAddCaseFile = async (req, res) => {
   }
 }
 
+// old version
+// export const viewAllPartnerByAdmin = async (req, res) => {
+//    try {
+//       const {admin} = req
+//       const pageItemLimit = req.query.limit ? req.query.limit : 10;
+//       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+//       const searchQuery = req.query.search ? req.query.search : "";
+//       const type = req?.query?.type ? req.query.type : true;
+//       const startDate = req.query.startDate ? req.query.startDate : "";
+//       const endDate = req.query.endDate ? req.query.endDate : "";
+
+//       const query = getAllPartnerSearchQuery(searchQuery, type, false, startDate, endDate)
+//       if (!query.success) return res.status(400).json({ success: false, message: query.message })
+//       const getAllPartner = await Partner.find(query.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("salesId","fullName type designation");
+//       const noOfPartner = await Partner.find(query.query).count()
+//       return res.status(200).json({ success: true, message: "get partner data", data: getAllPartner, noOfPartner: noOfPartner });
+
+//    } catch (error) {
+//       console.log("viewAllPartnerByAdmin in error:", error);
+//       res.status(500).json({ success: false, message: "Internal server error", error: error });
+
+//    }
+// }
+
 export const viewAllPartnerByAdmin = async (req, res) => {
    try {
       const {admin} = req
-      const pageItemLimit = req.query.limit ? req.query.limit : 10;
-      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
-      const searchQuery = req.query.search ? req.query.search : "";
-      const type = req?.query?.type ? req.query.type : true;
-      const startDate = req.query.startDate ? req.query.startDate : "";
-      const endDate = req.query.endDate ? req.query.endDate : "";
-
-      const query = getAllPartnerSearchQuery(searchQuery, type, false, startDate, endDate)
-      if (!query.success) return res.status(400).json({ success: false, message: query.message })
-      const getAllPartner = await Partner.find(query.query).select("-password").skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("salesId","fullName type designation");
-      const noOfPartner = await Partner.find(query.query).count()
-      return res.status(200).json({ success: true, message: "get partner data", data: getAllPartner, noOfPartner: noOfPartner });
-
+        const result = await getAllPartnerResult(req,null)      
+       if(result?.status==200){
+          return res.status(200).json({ success: true, message: result?.message, data: result?.data, noOfPartner: result?.noOfPartner});
+       }else if(result?.message){
+       return res.status(result.status).json({ success: false, message:result?.message });
+       } else{
+       return res.status(500).json({ success: false, message: "Something went wrong" });
+       }
    } catch (error) {
       console.log("viewAllPartnerByAdmin in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -2576,66 +2883,114 @@ export const adminUpdateClientCaseFee = async (req, res) => {
    }
 }
 
+// old version
+// export const adminShareCaseToEmployee = async (req, res) => {
+//    try {
+//       const {admin} = req      
+//       const { error } = validateAdminAddEmployeeToCase(req.body)
+//       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+//       const updateCase = req.body?.shareCase?.map(caseShare => Case.findByIdAndUpdate(caseShare, { $push: { addEmployee: { $each: req?.body?.shareEmployee } } }, { new: true }))
+//       console.log("updateCase", updateCase);
+//       const allUpdateCase = await Promise.all(updateCase)
+//       return res.status(200).json({ success: true, message: "Successfully employee add to case" });
+//    } catch (error) {
+//       console.log("adminSetCaseFee in error:", error);
+//       return res.status(500).json({ success: false, message: "Internal server error", error: error });
+//    }
+// }
+
+// new version
 export const adminShareCaseToEmployee = async (req, res) => {
    try {
-      const {admin} = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
-
-      
+      const { admin } = req
       const { error } = validateAdminAddEmployeeToCase(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      const updateCase = req.body?.shareCase?.map(caseShare => Case.findByIdAndUpdate(caseShare, { $push: { addEmployee: { $each: req?.body?.shareEmployee } } }, { new: true }))
-      console.log("updateCase", updateCase);
-      const allUpdateCase = await Promise.all(updateCase)
+      const {shareCase=[],shareEmployee=[]} = req.body
+      let bulkOps = []
+      for (const toEmployeeId of shareEmployee) {
+         const exists = await ShareSection.find({toEmployeeId,caseId:{$in:shareCase}},{caseId:1})
+         let filter = shareClients?.filter(caseId=>!exists?.map(ele=>ele?.caseId?.toString())?.includes(caseId)) 
+         filter?.forEach(caseId=>{
+            bulkOps.push({
+               insertOne:{
+                  document:{
+                     caseId,
+                     toEmployeeId
+                  }
+               }
+            })
+         })
+      }   
+      await ShareSection.bulkWrite(bulkOps)
       return res.status(200).json({ success: true, message: "Successfully employee add to case" });
    } catch (error) {
-      console.log("adminSetCaseFee in error:", error);
+      console.log("empOptShareCaseToEmployee  in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }
 
 
+// old version
+// export const adminSharePartnerToSaleEmp = async (req, res) => {
+//    try {
+//       const {admin} = req
+      
+//       const { error } = validateAdminSharePartner(req.body)
+//       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+//       const updatePartners = req.body?.sharePartners?.map(async(casePartners) =>{
+//          const getPartner = await Partner.findById(casePartners)
+//          if(getPartner){
+//             const filterShareEmp =  req.body.shareEmployee.filter(empId => !getPartner?.shareEmployee?.includes(empId));
+//             return Partner.findByIdAndUpdate(casePartners, { $push: { shareEmployee: { $each: filterShareEmp } } }, { new: true })
+//          }
+//       }
+
+
+//          )
+//       console.log("updatePartners", updatePartners);
+//       try {
+//          const allUpdatePartner = await Promise.all(updatePartners)
+//          return res.status(200).json({ success: true, message: "Successfully share partner" });
+//       } catch (error) {
+//          return res.status(400).json({ success: false, message: "Failed to share" })
+//       }
+
+//    } catch (error) {
+//       console.log("adminSetCaseFee in error:", error);
+//       return res.status(500).json({ success: false, message: "Internal server error", error: error });
+//    }
+// }
+
 export const adminSharePartnerToSaleEmp = async (req, res) => {
    try {
-      const {admin} = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+      const { admin } = req
 
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
-      
       const { error } = validateAdminSharePartner(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-
-      const updatePartners = req.body?.sharePartners?.map(async(casePartners) =>{
-         const getPartner = await Partner.findById(casePartners)
-         if(getPartner){
-            const filterShareEmp =  req.body.shareEmployee.filter(empId => !getPartner?.shareEmployee?.includes(empId));
-            return Partner.findByIdAndUpdate(casePartners, { $push: { shareEmployee: { $each: filterShareEmp } } }, { new: true })
-         }
-      }
-
-
-         )
-      console.log("updatePartners", updatePartners);
-      try {
-         const allUpdatePartner = await Promise.all(updatePartners)
-         return res.status(200).json({ success: true, message: "Successfully share partner" });
-      } catch (error) {
-         return res.status(400).json({ success: false, message: "Failed to share" })
-      }
+      const {sharePartners=[],shareEmployee=[]} = req.body
+      let bulkOps = []
+      for (const toEmployeeId of shareEmployee) {
+         const exists = await ShareSection.find({toEmployeeId,partnerId:{$in:sharePartners}},{partnerId:1})
+         let filter = sharePartners?.filter(partnerId=>!exists?.map(ele=>ele?.partnerId?.toString())?.includes(partnerId)) 
+         filter?.forEach(partnerId=>{
+            bulkOps.push({
+               insertOne:{
+                  document:{
+                     partnerId,
+                     toEmployeeId
+                  }
+               }
+            })
+         })
+      }   
+      await ShareSection.bulkWrite(bulkOps)
+      return res.status(200).json({ success: true, message: "Successfully share partner" });
 
    } catch (error) {
-      console.log("adminSetCaseFee in error:", error);
+      console.log("empOp share partner in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }
@@ -2736,236 +3091,354 @@ export const adminAddCaseComment = async (req, res) => {
    }
 }
 
+// old version
+// export const adminAddReferenceCaseAndMarge = async (req, res) => {
+//    try {
+//       const {admin} = req
+//       // const verify = await authAdmin(req, res)
+//       // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+
+//       // const admin = await Admin.findById(req?.user?._id)
+//       // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
+//       // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
+
+
+//       const { partnerId, partnerCaseId, empSaleId, empSaleCaseId, clientCaseId } = req?.query
+//       if (!validMongooseId(clientCaseId)) return res.status(400).json({ success: false, message: "Not a valid clientCaseId" })
+
+//       if (!partnerId && !empSaleId) return res.status(400).json({ success: false, message: "For add case refernce must provide partnerId or employeeId" })
+//       if (partnerId) {
+//          if (!partnerId || !partnerCaseId) return res.status(400).json({ success: false, message: "For add partner reference partnerId,partnerCaseId are required" })
+//          if (!validMongooseId(partnerId)) return res.status(400).json({ success: false, message: "Not a valid partnerId" })
+//          if (!validMongooseId(partnerCaseId)) return res.status(400).json({ success: false, message: "Not a valid partnerCaseId" })
+
+//          const getPartner = await Partner.findById(partnerId)
+//          if (!getPartner) return res.status(404).json({ success: false, message: "Partner Not found" })
+
+//          const getPartnerCase = await Case.findById(partnerCaseId)
+//          if (!getPartnerCase) return res.status(404).json({ success: false, message: "Partner case Not found" })
+
+
+//          const getClientCase = await Case.findById(clientCaseId)
+//          if(getPartnerCase?.branchId?.toLowerCase()!=getClientCase?.branchId?.toLowerCase()) return res.status(404).json({ success: false, message: "Case must be from same branch" })
+
+//          if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
+//          console.log(getPartnerCase?.policyNo?.toLowerCase(), getClientCase?.policyNo?.toLowerCase(), getPartnerCase?.email?.toLowerCase(), getClientCase?.email?.toLowerCase());
+
+//          if (getPartnerCase?.policyNo?.toLowerCase() != getClientCase?.policyNo?.toLowerCase() || getPartnerCase?.email?.toLowerCase() != getClientCase?.email?.toLowerCase()) {
+//             return res.status(404).json({ success: false, message: "Partner and client must have same policyNo and emailId" })
+//          }
+
+//          if (getClientCase?.partnerReferenceCaseDetails?._id) {
+//             return res.status(404).json({ success: false, message: "Case already have the partner case reference" })
+//          }
+
+//          let mergeParmeter = {
+//             partnerId: getPartner?._id?.toString(),
+//             partnerName: getPartner?.profile?.consultantName,
+//             partnerCode:getPartner?.profile?.consultantCode,
+//             partnerReferenceCaseDetails: {
+//                referenceId: getPartnerCase?._id?.toString(),
+//                name: getPartner?.profile?.consultantName,
+//                consultantCode:getPartner?.profile?.consultantCode,
+//                referenceDate: new Date(),
+//                by: admin?.fullName
+//             },
+//          }
+
+//          if(getPartnerCase?.empSaleId && getPartnerCase?.empSaleName){
+//             mergeParmeter["empSaleId"] = getPartnerCase?.empSaleId
+//             mergeParmeter["empSaleName"] = getPartnerCase?.empSaleName
+//          }
+
+//          const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
+//             {
+//                $set: {
+//                   ...mergeParmeter
+//                   // partnerId: getPartner?._id?.toString(),
+//                   // partnerName: getPartner?.profile?.consultantName,
+//                   // partnerCode:getPartner?.profile?.consultantCode,
+//                   // empSaleId: getPartnerCase?.empSaleId || "",
+//                   // empSaleName: getPartnerCase?.empSaleName || "",
+//                   // partnerReferenceCaseDetails: {
+//                   //    referenceId: getPartnerCase?._id?.toString(),
+//                   //    name: getPartner?.profile?.consultantName,
+//                   //    consultantCode:getPartner?.profile?.consultantCode,
+//                   //    referenceDate: new Date(),
+//                   //    by: admin?.fullName
+//                   // },
+//                }
+//             }, { new: true })
+//          await Case.findByIdAndUpdate(getPartnerCase?._id, { $set: { isPartnerReferenceCase: true, } })
+//          const doc = await CaseDoc.updateMany({caseId:partnerCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
+//          const status = await CaseStatus.updateMany({caseId:partnerCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
+//          const comment = await CaseComment.updateMany({caseId:partnerCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
+//          return res.status(200).json({ success: true, message: "Successfully add partner case reference ", data: updateAndMergeCase,doc,status,comment,partnerCaseId,clientCaseId });
+//       }
+//       if (empSaleId) {
+//          if (!empSaleId || !empSaleCaseId) return res.status(400).json({ success: false, message: "For add sale reference empSaleId,empSaleCaseId are required" })
+//          if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid empSaleId" })
+//          if (!validMongooseId(empSaleCaseId)) return res.status(400).json({ success: false, message: "Not a valid empSaleCaseId" })
+
+//          const getEmployee = await Employee.findById(empSaleId)
+//          if (!getEmployee) return res.status(404).json({ success: false, message: "Employee Not found" })
+
+//          const getEmployeeCase = await Case.findById(empSaleCaseId)
+//          if (!getEmployeeCase) return res.status(404).json({ success: false, message: "Employee case Not found" })
+
+
+//          const getClientCase = await Case.findById(clientCaseId)
+//          if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
+
+//             if(getEmployeeCase?.branchId?.toLowerCase()!=getClientCase?.branchId?.toLowerCase()) return res.status(404).json({ success: false, message: "Case must be from same branch" })
+
+//          if (getEmployeeCase?.policyNo?.toLowerCase() != getClientCase?.policyNo?.toLowerCase() || getEmployeeCase?.email?.toLowerCase() != getClientCase?.email?.toLowerCase()) {
+//             return res.status(404).json({ success: false, message: "sale-employee and client must have same policyNo and emailId" })
+//          }
+
+//          let empMergeParmeter = {
+//             empSaleId: getEmployee?._id?.toString(),
+//             empSaleName: `${getEmployee?.fullName} | ${getEmployee?.type} | ${getEmployee?.designation}`,
+//             empId:getEmployee?.empId,
+//             empSaleReferenceCaseDetails: {
+//                referenceId: getEmployeeCase?._id?.toString(),
+//                name: getEmployee?.fullName,
+//                empId:getEmployee?.empId,
+//                referenceDate: new Date(),
+//                by: admin?.fullName
+//             },
+//          }
+
+//          if(getEmployeeCase?.partnerId && getEmployeeCase?.partnerName){
+//             empMergeParmeter["partnerId"] = getEmployeeCase?.partnerId
+//             empMergeParmeter["partnerName"] = getEmployeeCase?.partnerName
+//             empMergeParmeter["partnerCode"] = getEmployeeCase?.partnerCode || ""
+//          }
+
+//          const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
+//             {
+//                $set: {
+//                   ...empMergeParmeter
+//                   // empSaleId: getEmployee?._id?.toString(),
+//                   // empSaleName:`${getEmployee?.fullName} | ${getEmployee?.type} | ${getEmployee?.designation}`,
+//                   // empId:getEmployee?.empId,
+//                   // partnerId: getEmployeeCase?.partnerId || "",
+//                   // partnerName: getEmployeeCase?.partnerName || "",
+//                   // partnerCode:getEmployeeCase?.partnerCode || "",
+//                   // empSaleReferenceCaseDetails: {
+//                   //    referenceId: getEmployeeCase?._id?.toString(),
+//                   //    name: getEmployee?.fullName,
+//                   //    empId:getEmployee?.empId,
+//                   //    referenceDate: new Date(),
+//                   //    by: admin?.fullName
+//                   // },
+//                }
+//             }, { new: true })
+//          await Case.findByIdAndUpdate(getEmployeeCase?._id, { $set: { isEmpSaleReferenceCase: true, } })
+//          await CaseDoc.updateMany({caseId:empSaleCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
+//          await CaseStatus.updateMany({caseId:empSaleCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
+//          await CaseComment.updateMany({caseId:empSaleCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
+//          return res.status(200).json({ success: true, message: "Successfully add case reference ", data: updateAndMergeCase });
+//       }
+
+//       return res.status(400).json({ success: true, message: "Failded to add case reference" });
+//    } catch (error) {
+//       console.log("adminAddRefenceCaseAndMarge in error:", error);
+//       return res.status(500).json({ success: false, message: "Internal server error", error: error });
+//    }
+// }
+
+// new version
 export const adminAddReferenceCaseAndMarge = async (req, res) => {
    try {
-      const {admin} = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
-
+      const { admin } = req
       const { partnerId, partnerCaseId, empSaleId, empSaleCaseId, clientCaseId } = req?.query
+
       if (!validMongooseId(clientCaseId)) return res.status(400).json({ success: false, message: "Not a valid clientCaseId" })
 
       if (!partnerId && !empSaleId) return res.status(400).json({ success: false, message: "For add case refernce must provide partnerId or employeeId" })
-      if (partnerId) {
-         if (!partnerId || !partnerCaseId) return res.status(400).json({ success: false, message: "For add partner reference partnerId,partnerCaseId are required" })
-         if (!validMongooseId(partnerId)) return res.status(400).json({ success: false, message: "Not a valid partnerId" })
-         if (!validMongooseId(partnerCaseId)) return res.status(400).json({ success: false, message: "Not a valid partnerCaseId" })
+      if (!validMongooseId(partnerId) && !validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid partnerId/ empSaleId" })
+      if (!validMongooseId(partnerCaseId) && !validMongooseId(empSaleCaseId)) return res.status(400).json({ success: false, message: "Not a valid merge caseId" })
 
-         const getPartner = await Partner.findById(partnerId)
-         if (!getPartner) return res.status(404).json({ success: false, message: "Partner Not found" })
+      let Model
+      if (partnerId) Model = Partner
+      if (empSaleId) Model = Employee
+      const findModel = await Model.findById(partnerId || empSaleId)
+      if (!findModel) return res.status(404).json({ success: false, message: `${partnerId ? "Partner" : "Employee"} Not found` })
 
-         const getPartnerCase = await Case.findById(partnerCaseId)
-         if (!getPartnerCase) return res.status(404).json({ success: false, message: "Partner case Not found" })
-
-
-         const getClientCase = await Case.findById(clientCaseId)
-         if(getPartnerCase?.branchId?.toLowerCase()!=getClientCase?.branchId?.toLowerCase()) return res.status(404).json({ success: false, message: "Case must be from same branch" })
-
-         if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
-         console.log(getPartnerCase?.policyNo?.toLowerCase(), getClientCase?.policyNo?.toLowerCase(), getPartnerCase?.email?.toLowerCase(), getClientCase?.email?.toLowerCase());
-
-         if (getPartnerCase?.policyNo?.toLowerCase() != getClientCase?.policyNo?.toLowerCase() || getPartnerCase?.email?.toLowerCase() != getClientCase?.email?.toLowerCase()) {
-            return res.status(404).json({ success: false, message: "Partner and client must have same policyNo and emailId" })
-         }
-
-         if (getClientCase?.partnerReferenceCaseDetails?._id) {
-            return res.status(404).json({ success: false, message: "Case already have the partner case reference" })
-         }
-
-         let mergeParmeter = {
-            partnerId: getPartner?._id?.toString(),
-            partnerName: getPartner?.profile?.consultantName,
-            partnerCode:getPartner?.profile?.consultantCode,
-            partnerReferenceCaseDetails: {
-               referenceId: getPartnerCase?._id?.toString(),
-               name: getPartner?.profile?.consultantName,
-               consultantCode:getPartner?.profile?.consultantCode,
-               referenceDate: new Date(),
-               by: admin?.fullName
-            },
-         }
-
-         if(getPartnerCase?.empSaleId && getPartnerCase?.empSaleName){
-            mergeParmeter["empSaleId"] = getPartnerCase?.empSaleId
-            mergeParmeter["empSaleName"] = getPartnerCase?.empSaleName
-         }
-
-         const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
-            {
-               $set: {
-                  ...mergeParmeter
-                  // partnerId: getPartner?._id?.toString(),
-                  // partnerName: getPartner?.profile?.consultantName,
-                  // partnerCode:getPartner?.profile?.consultantCode,
-                  // empSaleId: getPartnerCase?.empSaleId || "",
-                  // empSaleName: getPartnerCase?.empSaleName || "",
-                  // partnerReferenceCaseDetails: {
-                  //    referenceId: getPartnerCase?._id?.toString(),
-                  //    name: getPartner?.profile?.consultantName,
-                  //    consultantCode:getPartner?.profile?.consultantCode,
-                  //    referenceDate: new Date(),
-                  //    by: admin?.fullName
-                  // },
-               }
-            }, { new: true })
-         await Case.findByIdAndUpdate(getPartnerCase?._id, { $set: { isPartnerReferenceCase: true, } })
-         const doc = await CaseDoc.updateMany({caseId:partnerCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
-         const status = await CaseStatus.updateMany({caseId:partnerCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
-         const comment = await CaseComment.updateMany({caseId:partnerCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
-         return res.status(200).json({ success: true, message: "Successfully add partner case reference ", data: updateAndMergeCase,doc,status,comment,partnerCaseId,clientCaseId });
-      }
-      if (empSaleId) {
-         if (!empSaleId || !empSaleCaseId) return res.status(400).json({ success: false, message: "For add sale reference empSaleId,empSaleCaseId are required" })
-         if (!validMongooseId(empSaleId)) return res.status(400).json({ success: false, message: "Not a valid empSaleId" })
-         if (!validMongooseId(empSaleCaseId)) return res.status(400).json({ success: false, message: "Not a valid empSaleCaseId" })
-
-         const getEmployee = await Employee.findById(empSaleId)
-         if (!getEmployee) return res.status(404).json({ success: false, message: "Employee Not found" })
-
-         const getEmployeeCase = await Case.findById(empSaleCaseId)
-         if (!getEmployeeCase) return res.status(404).json({ success: false, message: "Employee case Not found" })
+      const isExistMergeTo = await Case.findById(partnerCaseId || empSaleCaseId).select("policyNo branchId empObjId partnerObjId email")
+      if (!isExistMergeTo) return res.status(404).json({ success: false, message: "Partner case Not found" })
 
 
-         const getClientCase = await Case.findById(clientCaseId)
-         if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
+      const getClientCase = await Case.findById(clientCaseId).select("policyNo branchId empObjId partnerObjId clientObjId email")
+      if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
 
-            if(getEmployeeCase?.branchId?.toLowerCase()!=getClientCase?.branchId?.toLowerCase()) return res.status(404).json({ success: false, message: "Case must be from same branch" })
+      if (isExistMergeTo?.branchId?.trim()?.toLowerCase() != getClientCase?.branchId?.trim()?.toLowerCase()) return res.status(404).json({ success: false, message: "Case must be from same branch" })
 
-         if (getEmployeeCase?.policyNo?.toLowerCase() != getClientCase?.policyNo?.toLowerCase() || getEmployeeCase?.email?.toLowerCase() != getClientCase?.email?.toLowerCase()) {
-            return res.status(404).json({ success: false, message: "sale-employee and client must have same policyNo and emailId" })
-         }
-
-         let empMergeParmeter = {
-            empSaleId: getEmployee?._id?.toString(),
-            empSaleName: `${getEmployee?.fullName} | ${getEmployee?.type} | ${getEmployee?.designation}`,
-            empId:getEmployee?.empId,
-            empSaleReferenceCaseDetails: {
-               referenceId: getEmployeeCase?._id?.toString(),
-               name: getEmployee?.fullName,
-               empId:getEmployee?.empId,
-               referenceDate: new Date(),
-               by: admin?.fullName
-            },
-         }
-
-         if(getEmployeeCase?.partnerId && getEmployeeCase?.partnerName){
-            empMergeParmeter["partnerId"] = getEmployeeCase?.partnerId
-            empMergeParmeter["partnerName"] = getEmployeeCase?.partnerName
-            empMergeParmeter["partnerCode"] = getEmployeeCase?.partnerCode || ""
-         }
-
-         const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
-            {
-               $set: {
-                  ...empMergeParmeter
-                  // empSaleId: getEmployee?._id?.toString(),
-                  // empSaleName:`${getEmployee?.fullName} | ${getEmployee?.type} | ${getEmployee?.designation}`,
-                  // empId:getEmployee?.empId,
-                  // partnerId: getEmployeeCase?.partnerId || "",
-                  // partnerName: getEmployeeCase?.partnerName || "",
-                  // partnerCode:getEmployeeCase?.partnerCode || "",
-                  // empSaleReferenceCaseDetails: {
-                  //    referenceId: getEmployeeCase?._id?.toString(),
-                  //    name: getEmployee?.fullName,
-                  //    empId:getEmployee?.empId,
-                  //    referenceDate: new Date(),
-                  //    by: admin?.fullName
-                  // },
-               }
-            }, { new: true })
-         await Case.findByIdAndUpdate(getEmployeeCase?._id, { $set: { isEmpSaleReferenceCase: true, } })
-         await CaseDoc.updateMany({caseId:empSaleCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
-         await CaseStatus.updateMany({caseId:empSaleCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
-         await CaseComment.updateMany({caseId:empSaleCaseId},{$set:{caseMargeId:clientCaseId,isMarge:true}},{new:true})
-         return res.status(200).json({ success: true, message: "Successfully add case reference ", data: updateAndMergeCase });
+      if (isExistMergeTo?.policyNo?.toLowerCase() != getClientCase?.policyNo?.toLowerCase() || isExistMergeTo?.email?.toLowerCase() != getClientCase?.email?.toLowerCase()) {
+         return res.status(404).json({ success: false, message: "Both case must have same policyNo and emailId" })
       }
 
-      return res.status(400).json({ success: true, message: "Failded to add case reference" });
+      if ((partnerId && getClientCase?.isPartnerReferenceCase) || (empSaleId && getClientCase?.isEmpSaleReferenceCase)) {
+         return res.status(404).json({ success: false, message: `Case already have the ${partnerId ? "partner" : "employee"} case reference` })
+      }
+
+      let mergeParmeter = {}
+      let bulkOps = []
+
+      if(isExistMergeTo?.partnerObjId){
+         mergeParmeter["partnerObjId"] = isExistMergeTo?.partnerObjId
+         bulkOps.push({
+            insertOne:{
+               document:{
+                  mergeCaseId:isExistMergeTo?._id,
+                  caseId:getClientCase?._id,
+                  partnerId:isExistMergeTo?.partnerObjId,
+                  byEmpId:employee?._id
+               }
+            }
+         })
+      }
+
+      if (isExistMergeTo?.empObjId) {
+         mergeParmeter["empObjId"] = isExistMergeTo?.empObjId
+            bulkOps.push({
+            insertOne:{
+               document:{
+                  mergeCaseId:isExistMergeTo?._id,
+                  caseId:getClientCase?._id,
+                  empId:isExistMergeTo?.empObjId,
+                  byEmpId:employee?._id
+               }
+            }
+         })
+      }
+
+      await Promise.all([
+         CaseMergeDetails.bulkWrite(bulkOps),
+         Case.findByIdAndUpdate(getClientCase?._id, { $set: { ...mergeParmeter } }, { new: true }),
+         Case.findByIdAndUpdate(isExistMergeTo?._id, { $set: partnerId ? { isPartnerReferenceCase: true, } : { isEmpSaleReferenceCase: true } }),
+         CaseDoc.updateMany({ caseId: partnerCaseId || empSaleCaseId }, { $set: { caseMargeId: clientCaseId, isMarge: true } }, { new: true }),
+         CaseStatus.updateMany({ caseId: partnerCaseId || empSaleCaseId }, { $set: { caseMargeId: clientCaseId, isMarge: true } }, { new: true }),
+         CaseComment.updateMany({ caseId: partnerCaseId || empSaleCaseId }, { $set: { caseMargeId: clientCaseId, isMarge: true } }, { new: true })
+      ])
+      return res.status(200).json({ success: true, message: "Successfully add case reference ", });
+
    } catch (error) {
       console.log("adminAddRefenceCaseAndMarge in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }
 
+// old version
+// export const adminRemoveReferenceCase = async (req, res) => {
+//    try {
+//       const {admin} = req
+//       const { type, _id } = req?.query
 
+//       if (!type) return res.status(400).json({ success: false, message: "Please select the type of reference to remove" })
+//       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid CaseId" })
+
+//       if (type?.toLowerCase() == "partner") {
+//          const getClientCase = await Case.findById(_id)
+//          if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
+//          if (!validMongooseId(getClientCase?.partnerReferenceCaseDetails?.referenceId) && !validMongooseId(getClientCase?.partnerId)) return res.status(400).json({ success: false, message: "Not a valid partner ID /CaseId" })
+
+//          if(getClientCase?.partnerReferenceCaseDetails?.referenceId){
+//             const updatedPartnerCase = await Case.findByIdAndUpdate(getClientCase?.partnerReferenceCaseDetails?.referenceId, { $set: { isPartnerReferenceCase: false, } }, { new: true })
+//             if (!updatedPartnerCase) return res.status(404).json({ success: false, message: "Partner case is not found of the added reference case" })
+//          }
+
+//          const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
+//             {
+//                $set: {
+//                   partnerId: "",
+//                   partnerName: "",
+//                   partnerCode:"",
+//                   partnerReferenceCaseDetails: {},
+//                }
+//             }, { new: true })
+//             if(getClientCase?.partnerReferenceCaseDetails?.referenceId && !getClientCase?.empSaleId){
+//                await CaseDoc.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
+//                await CaseStatus.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
+//                await CaseComment.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
+//             }
+
+//          return res.status(200).json({ success: true, message: "Successfully remove partner reference case" })
+//       }
+//       if (type?.toLowerCase() == "sale-emp") {
+//          const getClientCase = await Case.findById(_id)
+//          if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
+//          if (!validMongooseId(getClientCase?.empSaleReferenceCaseDetails?.referenceId)) return res.status(400).json({ success: false, message: "Not a valid employee CaseId" })
+
+//          const updatedPartnerCase = await Case.findByIdAndUpdate(getClientCase?.empSaleReferenceCaseDetails?.referenceId, { $set: { isEmpSaleReferenceCase: false, } }, { new: true })
+//          if (!updatedPartnerCase) return res.status(404).json({ success: false, message: "Employee  case is not found of the added reference case" })
+
+//          const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
+//             {
+//                $set: {
+//                   empSaleId: "",
+//                   empSaleName: "",
+//                   empId:"",
+//                   empSaleReferenceCaseDetails: {},
+//                }
+//             }, { new: true })
+//             await CaseDoc.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
+//             await CaseStatus.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
+//             await CaseComment.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
+
+//          return res.status(200).json({ success: true, message: "Successfully remove employee reference case" })
+//       }
+
+//       return res.status(400).json({ success: false, message: "Not a valid type" })
+//    } catch (error) {
+//       console.log("adminRemoveRefenceCase in error:", error);
+//       return res.status(500).json({ success: false, message: "Internal server error", error: error });
+//    }
+// }
+
+// new version
 export const adminRemoveReferenceCase = async (req, res) => {
    try {
-      const {admin} = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
+      const { admin } = req
 
       const { type, _id } = req?.query
-
       if (!type) return res.status(400).json({ success: false, message: "Please select the type of reference to remove" })
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid CaseId" })
 
-      if (type?.toLowerCase() == "partner") {
          const getClientCase = await Case.findById(_id)
-         if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
-         if (!validMongooseId(getClientCase?.partnerReferenceCaseDetails?.referenceId) && !validMongooseId(getClientCase?.partnerId)) return res.status(400).json({ success: false, message: "Not a valid partner ID /CaseId" })
-
-         if(getClientCase?.partnerReferenceCaseDetails?.referenceId){
-            const updatedPartnerCase = await Case.findByIdAndUpdate(getClientCase?.partnerReferenceCaseDetails?.referenceId, { $set: { isPartnerReferenceCase: false, } }, { new: true })
-            if (!updatedPartnerCase) return res.status(404).json({ success: false, message: "Partner case is not found of the added reference case" })
+         if (!getClientCase) return res.status(404).json({ success: false, message: "Case not found" })
+         
+         let filterOptions = {isActive:true}
+         let updateMergeParameter = type?.toLowerCase() == "partner" ? { isPartnerReferenceCase: false, } : {isEmpSaleReferenceCase:false}
+         let updateClientCaseParameter = type?.toLowerCase() == "partner" ? { partnerObjId: ""} : {empObjId:""}
+         if(type?.toLowerCase() == "partner"){
+            filterOptions.partnerId = getClientCase?.partnerObjId
+         }else if(type?.toLowerCase() == "sale-emp"){
+            filterOptions.empId = getClientCase?.empObjId
+         }else {
+            return res.status(400).json({ success: false, message: "Not a valid type" })
          }
 
-         const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
-            {
-               $set: {
-                  partnerId: "",
-                  partnerName: "",
-                  partnerCode:"",
-                  partnerReferenceCaseDetails: {},
-               }
-            }, { new: true })
-            if(getClientCase?.partnerReferenceCaseDetails?.referenceId && !getClientCase?.empSaleId){
-               await CaseDoc.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
-               await CaseStatus.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
-               await CaseComment.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
-            }
+         filterOptions.caseId = getClientCase?._id
+         const mergeCase = await CaseMergeDetails.findOne(filterOptions).select("mergeCaseId")
+         if(!mergeCase) return res.status(404).json({ success: false, message: "Merge case not found" })
 
-         return res.status(200).json({ success: true, message: "Successfully remove partner reference case" })
-      }
-      if (type?.toLowerCase() == "sale-emp") {
-         const getClientCase = await Case.findById(_id)
-         if (!getClientCase) return res.status(404).json({ success: false, message: "Client case Not found" })
-         if (!validMongooseId(getClientCase?.empSaleReferenceCaseDetails?.referenceId)) return res.status(400).json({ success: false, message: "Not a valid employee CaseId" })
-
-         const updatedPartnerCase = await Case.findByIdAndUpdate(getClientCase?.empSaleReferenceCaseDetails?.referenceId, { $set: { isEmpSaleReferenceCase: false, } }, { new: true })
-         if (!updatedPartnerCase) return res.status(404).json({ success: false, message: "Employee  case is not found of the added reference case" })
-
-         const updateAndMergeCase = await Case.findByIdAndUpdate(getClientCase?._id,
-            {
-               $set: {
-                  empSaleId: "",
-                  empSaleName: "",
-                  empId:"",
-                  empSaleReferenceCaseDetails: {},
-               }
-            }, { new: true })
-            await CaseDoc.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
-            await CaseStatus.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
-            await CaseComment.updateMany({caseMargeId:_id},{$set:{caseMargeId:"",isMarge:false}})
-
-         return res.status(200).json({ success: true, message: "Successfully remove employee reference case" })
-      }
-
-      return res.status(400).json({ success: false, message: "Not a valid type" })
+         await Promise.all([
+            Case.findByIdAndUpdate(mergeCase?.mergeCaseId, { $set: updateMergeParameter }, { new: true }), // remove ref. from merge case of partner /emp
+            Case.findByIdAndUpdate(getClientCase?._id, { $unset: updateClientCaseParameter }, { new: true }), // remove partnerObjId / empObjId
+            CaseMergeDetails.findByIdAndDelete(mergeCase?._id), // delete merge details
+            CaseDoc.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } }),
+            CaseStatus.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } }),
+            CaseComment.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } }),
+         ])
+         return res.status(200).json({ success: true, message: "Successfully remove reference case" })
    } catch (error) {
       console.log("adminRemoveRefenceCase in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }
+
 
 
 export const adminUnactiveCaseDoc = async (req, res) => {
@@ -5802,24 +6275,93 @@ export const admingetEmpJoiningForm = async (req, res) => {
    }
 }
 
+// export const updatePartnerSchema = async (req, res) => {
+//    try {
+//       const allSharepartner = await Partner.find({shareEmployee:{$exists:true}},{shareEmployee:1}).sort({createdAt:-1})
+//       let bulkOps = []
+//       for (const partner of allSharepartner) {
+//          for (const ele of partner?.shareEmployee) {
+//             const isExist = await ShareSection.findOne({partnerId:partner?._id,toEmployeeId:ele})
+//               console.log("isExist",isExist);
+//               if(!isExist){
+//                  bulkOps?.push({insertOne:{document:{partnerId:partner?._id,toEmployeeId:ele}}})
+//               }
+            
+//          }
+//       }
+      
+//       await ShareSection.bulkWrite(bulkOps)
+//       return res.status(200).json({ success: true, message: `Successfully fetch all notification`, data: bulkOps });
+
+//    } catch (error) {
+//       console.log("getAllNotification in error:", error);
+//       res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
+
+//    }
+// }
+
 export const updatePartnerSchema = async (req, res) => {
-   try {
-      const allSharepartner = await Partner.find({shareEmployee:{$exists:true}},{shareEmployee:1}).sort({createdAt:-1})
-      let bulkOps = []
-      allSharepartner?.forEach(partner=>{
-         partner?.shareEmployee?.forEach(ele=>{
-            bulkOps?.push({insertOne:{document:{partnerId:partner?._id,toEmployeeId:ele}}})
-         })
-      })
-      // await ShareSection.bulkWrite(bulkOps)
-      return res.status(200).json({ success: true, message: `Successfully fetch all notification`, data: bulkOps });
+  try {
+    const allSharepartner = await Partner.find(
+      { shareEmployee: { $exists: true, $ne: [] } },
+      { shareEmployee: 1 }
+    ).sort({ createdAt: -1 });
 
-   } catch (error) {
-      console.log("getAllNotification in error:", error);
-      res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
+    const bulkOps = [];
 
-   }
-}
+    // Step 1: Flatten all combinations of partnerId and toEmployeeId
+    const pairsToInsert = [];
+    for (const partner of allSharepartner) {
+      for (const ele of partner?.shareEmployee) {
+        pairsToInsert.push({ partnerId: partner._id.toString(), toEmployeeId: ele.toString() });
+      }
+    }
+
+    // Step 2: Get existing ones
+    const existing = await ShareSection.find({
+      $or: pairsToInsert.map(p => ({ partnerId: p.partnerId, toEmployeeId: p.toEmployeeId })),
+    }, { partnerId: 1, toEmployeeId: 1 });
+
+    const existingSet = new Set(
+      existing.map(e => `${e.partnerId}_${e.toEmployeeId}`)
+    );
+
+    // Step 3: Prepare bulk inserts
+    for (const pair of pairsToInsert) {
+      const key = `${pair.partnerId}_${pair.toEmployeeId}`;
+      if (!existingSet.has(key)) {
+        bulkOps.push({
+          insertOne: {
+            document: {
+              partnerId: pair.partnerId,
+              toEmployeeId: pair.toEmployeeId
+            }
+          }
+        });
+      }
+    }
+
+    // Step 4: Execute only if there are operations
+    if (bulkOps.length > 0) {
+      await ShareSection.bulkWrite(bulkOps);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Inserted ${bulkOps.length} new records into ShareSection.`,
+      data: bulkOps
+    });
+
+  } catch (error) {
+    console.error("updatePartnerSchema error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Oops! something went wrong",
+      error: error.message || error
+    });
+  }
+};
+
 
 export const updateCaseSchema = async(req, res)=>{
    try {
@@ -5868,5 +6410,70 @@ export const updateCaseSchema = async(req, res)=>{
       console.log(error);
       res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
       
+   }
+}
+
+export const updateCaseAndMargeSchema = async (req, res) => {
+   try {
+      const { admin } = req
+
+      const allCases = await Case.find({})
+      let bulkOps = []
+      allCases.forEach(ele => {
+         //  partner reference
+         if (ele?.partnerReferenceCaseDetails?.referenceId && ele?.partnerObjId) {
+            bulkOps.push({
+               insertOne: {
+                  document: {
+                     caseId: ele?._id,
+                     mergeCaseId: ele?.partnerReferenceCaseDetails?.referenceId,
+                     partnerId: ele?.partnerObjId
+                  }
+               }
+            })
+            if (ele?.empObjId) {
+               bulkOps.push({
+                  insertOne: {
+                     document: {
+                        caseId: ele?._id,
+                        mergeCaseId: ele?.partnerReferenceCaseDetails?.referenceId,
+                        empId: ele?.empObjId
+                     }
+                  }
+               })
+            }
+         }
+
+         //  emp reference
+         if (ele?.empSaleReferenceCaseDetails?.referenceId && ele?.empObjId) {
+            bulkOps.push({
+               insertOne: {
+                  document: {
+                     caseId: ele?._id,
+                     mergeCaseId: ele?.empSaleReferenceCaseDetails?.referenceId,
+                     empId: ele?.empObjId
+                  }
+               }
+            })
+
+            if (ele?.partnerObjId) {
+               bulkOps.push({
+                  insertOne: {
+                     document: {
+                        caseId: ele?._id,
+                        mergeCaseId: ele?.partnerReferenceCaseDetails?.referenceId,
+                        partnerId: ele?.partnerObjId
+                     }
+                  }
+               })
+            }
+         }
+      })
+      await CaseMergeDetails.bulkWrite(bulkOps)
+
+      return res.status(400).json({ success: true, message: "Success" });
+   } catch (error) {
+      console.log("adminAddRefenceCaseAndMarge in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }
