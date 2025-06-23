@@ -475,8 +475,8 @@ export const createEmployeeAccount = async (req, res) => {
       if(headEmpId) newEmployee.headEmpId = headEmpId
 
       try {
-         // await sendEmployeeSigninMail(req.body.email, systemPassword);
-         console.log(systemPassword,"systemPassword---------");
+         await sendEmployeeSigninMail(req.body.email, systemPassword);
+         // console.log(systemPassword,"systemPassword---------");
          await newEmployee.save()
          return res.status(200).json({ success: true, message: "Successfully create new Employee", });
       } catch (err) {
