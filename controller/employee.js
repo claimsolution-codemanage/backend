@@ -353,27 +353,31 @@ export const empOpSharePartnerToSaleEmp = async (req, res) => {
       const { error } = validateAdminSharePartner(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
       const {sharePartners=[],shareEmployee=[]} = req.body
-      let bulkOps = []
-      for (const toEmployeeId of shareEmployee) {
-         const exists = await ShareSection.find({toEmployeeId,partnerId:{$in:sharePartners}},{partnerId:1})
-         let filter = sharePartners?.filter(partnerId=>!exists?.map(ele=>ele?.partnerId?.toString())?.includes(partnerId)) 
-         filter?.forEach(partnerId=>{
-            bulkOps.push({
-               insertOne:{
-                  document:{
-                     partnerId,
-                     toEmployeeId
-                  }
-               }
-            })
-         })
-      }   
-      await ShareSection.bulkWrite(bulkOps)
+      // let bulkOps = []
+      // for (const toEmployeeId of shareEmployee) {
+      //    const exists = await ShareSection.find({toEmployeeId,partnerId:{$in:sharePartners}},{partnerId:1})
+      //    let filter = sharePartners?.filter(partnerId=>!exists?.map(ele=>ele?.partnerId?.toString())?.includes(partnerId)) 
+      //    filter?.forEach(partnerId=>{
+      //       bulkOps.push({
+      //          insertOne:{
+      //             document:{
+      //                partnerId,
+      //                toEmployeeId
+      //             }
+      //          }
+      //       })
+      //    })
+      // }   
+      // await ShareSection.bulkWrite(bulkOps)
+      
+      // show in added by
+      if(!shareEmployee[0]) return res.status(400).json({ success: true, message: "Please add employee to share" });
+      await Partner.updateMany({_id:{$in:sharePartners}},{$set:{salesId:shareEmployee[0]}})
       return res.status(200).json({ success: true, message: "Successfully share partner" });
 
    } catch (error) {
       console.log("empOp share partner in error:", error);
-      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+      return res.status(500).json({ success: false, message: "Something went wrong!", error: error });
    }
 }
 
@@ -1540,7 +1544,10 @@ export const employeeViewCaseByIdBy = async (req, res) => {
                         $expr: {
                            $and: [
                               { $eq: ["$isActive", true] },
-                              { $or: [{ $eq: ["$caseId", "$$id"] }, { $eq: ["$caseMargeId", "$$id"] }] }
+                              { $or: [
+                                 { $eq: ["$caseId", "$$id"] }, 
+                                 { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
+                              ] }
                            ]
                         }
                      }
@@ -1560,7 +1567,10 @@ export const employeeViewCaseByIdBy = async (req, res) => {
                         $expr: {
                            $and: [
                               { $eq: ["$isActive", true] },
-                              { $or: [{ $eq: ["$caseId", "$$id"] }, { $eq: ["$caseMargeId", "$$id"] }] }
+                              { $or: [
+                                 { $eq: ["$caseId", "$$id"] }, 
+                                 { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
+                              ] }
                            ]
                         }
                      }
@@ -1580,7 +1590,10 @@ export const employeeViewCaseByIdBy = async (req, res) => {
                         $expr: {
                            $and: [
                               { $eq: ["$isActive", true] },
-                              { $or: [{ $eq: ["$caseId", "$$id"] }, { $eq: ["$caseMargeId", "$$id"] }] }
+                              { $or: [
+                                 { $eq: ["$caseId", "$$id"] }, 
+                                 { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
+                              ] }
                            ]
                         }
                      }
@@ -4959,16 +4972,29 @@ export const empViewAllEmployee = async (req, res) => {
       const {designation="",referEmpId="",branchId=""} = employee
       matchQuery.push({ branchId: { $regex: branchId, $options: "i" } })
       if(!caseAccess?.includes(employee?.type?.toLowerCase())){
-      if(designation?.toLowerCase() == "executive") matchQuery.push({ referEmpId: { $in: [employee?._id] } })
-      if(designation?.toLowerCase() == "manager"){
-         matchQuery.push(
-             {$or: [
+         if (designation?.toLowerCase() == "executive") {
+            matchQuery.push(
+               {
+                  $or: [
+                     { referEmpId: { $in: [employee?._id] } },
+                     { headEmpId: employee?._id },
+                     { managerId: employee?._id },
+                  ]
+               }
+            )
+         }
+         if (designation?.toLowerCase() == "manager") {
+            matchQuery.push(
+               {
+                  $or: [
                      { type: { $regex: "sales", $options: "i" } },
                      { type: { $regex: "sathi team", $options: "i" } },
-                  ]}
-         )
-      }
-      
+                     { headEmpId: employee?._id },
+                     { managerId: employee?._id },
+                  ]
+               }
+            )
+         }
       }
 
       const pipeline = [

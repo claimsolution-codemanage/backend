@@ -512,6 +512,54 @@ export const adminEmployeeProfile = async (req,res)=>{
             }
          },
          {
+            '$lookup': {
+               'from': 'employees',
+               'localField': 'headEmpId',
+               'foreignField': '_id',
+               'as': 'headEmpDetails',
+               'pipeline':[
+                  {
+                     '$project': {
+                        "fullName":1,
+                        "type":1,
+                        "designation":1,
+                        "branchId":1,
+                     }  
+                  }
+               ]
+            }
+         },
+         {
+            '$unwind': {
+               'path': '$headEmpDetails',
+               'preserveNullAndEmptyArrays': true
+            }
+         },
+         {
+            '$lookup': {
+               'from': 'employees',
+               'localField': 'managerId',
+               'foreignField': '_id',
+               'as': 'managerDetails',
+               'pipeline':[
+                  {
+                     '$project': {
+                        "fullName":1,
+                        "type":1,
+                        "designation":1,
+                        "branchId":1,
+                     }  
+                  }
+               ]
+            }
+         },
+         {
+            '$unwind': {
+               'path': '$managerDetails',
+               'preserveNullAndEmptyArrays': true
+            }
+         },
+         {
             '$project': {
                'password': 0,
                "updatedAt":0,
@@ -565,7 +613,7 @@ export const adminUpdateEmployeeAccount = async (req, res) => {
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
       const updateKeys = ["fullName","type","branchId","designation","bankName","bankBranchName","bankAccountNo","panNo","address",
-         "profileImg","dob","gender", "district","city", "state","pinCode"
+         "profileImg","dob","gender", "district","city", "state","pinCode","headEmpId","managerId"
       ]
 
       const isExist = await Employee.findOne({_id})
@@ -2971,22 +3019,26 @@ export const adminSharePartnerToSaleEmp = async (req, res) => {
       const { error } = validateAdminSharePartner(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
       const {sharePartners=[],shareEmployee=[]} = req.body
-      let bulkOps = []
-      for (const toEmployeeId of shareEmployee) {
-         const exists = await ShareSection.find({toEmployeeId,partnerId:{$in:sharePartners}},{partnerId:1})
-         let filter = sharePartners?.filter(partnerId=>!exists?.map(ele=>ele?.partnerId?.toString())?.includes(partnerId)) 
-         filter?.forEach(partnerId=>{
-            bulkOps.push({
-               insertOne:{
-                  document:{
-                     partnerId,
-                     toEmployeeId
-                  }
-               }
-            })
-         })
-      }   
-      await ShareSection.bulkWrite(bulkOps)
+      // let bulkOps = []
+      // for (const toEmployeeId of shareEmployee) {
+      //    const exists = await ShareSection.find({toEmployeeId,partnerId:{$in:sharePartners}},{partnerId:1})
+      //    let filter = sharePartners?.filter(partnerId=>!exists?.map(ele=>ele?.partnerId?.toString())?.includes(partnerId)) 
+      //    filter?.forEach(partnerId=>{
+      //       bulkOps.push({
+      //          insertOne:{
+      //             document:{
+      //                partnerId,
+      //                toEmployeeId
+      //             }
+      //          }
+      //       })
+      //    })
+      // }   
+      // await ShareSection.bulkWrite(bulkOps)
+      // return res.status(200).json({ success: true, message: "Successfully share partner" });
+
+      if(!shareEmployee[0]) return res.status(400).json({ success: true, message: "Please add employee to share" });
+      await Partner.updateMany({_id:{$in:sharePartners}},{$set:{salesId:shareEmployee[0]}})
       return res.status(200).json({ success: true, message: "Successfully share partner" });
 
    } catch (error) {

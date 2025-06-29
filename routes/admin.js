@@ -22,7 +22,7 @@ router.delete("/superAdmin/deleteAdminById",authAdmin,adminController.superAdmin
 router.put("/settingDetailsUpdate",authAdmin,adminController.adminSettingDetailsUpdate)
 
 // for employee
-router.post("/createEmployeeAccount",authAdmin,adminController. createEmployeeAccount)
+router.post("/createEmployeeAccount",authAdmin,adminController.createEmployeeAccount)
 router.get("/employee/profile",authAdmin,adminController.adminEmployeeProfile)
 router.put("/updateEmployeeAccount",authAdmin,adminController.adminUpdateEmployeeAccount)
 router.delete("/deleteEmployeeAccount",authAdmin,adminController.adminDeleteEmployeeAccount)

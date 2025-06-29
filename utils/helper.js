@@ -409,8 +409,11 @@ export const getAllPartnerResult = async (req,employee=null) => {
       const { type, designation } = empDetails
       if (empDetails && (!caseAccess?.includes(type?.toLowerCase()) || (empId && empId != "false"))) {
         extactMatchQuery = [
+          { _id: empDetails?._id },
           { referEmpId: empDetails?._id },
-          { _id: empDetails?._id }
+          { headEmpId: empDetails?._id },
+          { managerId: empDetails?._id },
+
         ]
   
         if (type?.toLowerCase() == "sales" && designation?.toLowerCase() == "manager") {
