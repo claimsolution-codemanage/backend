@@ -55,6 +55,7 @@ router.post("/finance/createInvoice",authEmployee,employeeController.employeeCre
 router.get("/finance/viewAllInvoice",authEmployee,employeeController.employeeViewAllInvoice)
 router.get("/finance/viewInvoiceById",authEmployee,employeeController.employeeViewInvoiceById)
 router.put("/finance/editInvoiceById",authEmployee,employeeController.employeeEditInvoice)
+router.put("/finance/editInvoiceNo",authEmployee,employeeController.employeeEditInvoiceNo)
 router.put("/finance/paidInvoiceById",authEmployee,employeeController.empOpPaidInvoice)
 router.get("/emp/empDownloadAllInvoice",authEmployee,employeeController.empDownloadAllInvoice)
 router.put("/finance/unActiveInvoiceById",authEmployee,employeeController.employeeUnActiveInvoice)

@@ -36,20 +36,6 @@ const caseSchema = new mongoose.Schema({
    empSaleReferenceCaseDetails:{
       type:Object,default:{}
    },
-
-   // paymentDetails:{
-   //    type:[{
-   //       typeFees:{type:String,default:"consultant"},
-   //       caseFees:{type:Number,default:2000,required:true},
-   //       mode:{type:String,default:""},
-   //       collectBy:{type:String,default:""},
-   //       onDate:{type:String,default:""},
-   //       orderId:{type:String,default:""},
-   //       referenceId:{type:String,default:""},
-   //       verify:{type:String,default:""},
-   //       completed:{type:Boolean,default:false,required:true},
-   //    }]
-   // },
    name:{type:String,required:"true"},
    fatherName:{type:String},
    email:{type:String},

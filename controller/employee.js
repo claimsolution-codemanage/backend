@@ -1733,68 +1733,42 @@ export const employeeFindCaseByFileNo = async (req, res) => {
       const { fileNo } = req.query;
       const pipeline = [
          {
-            $match: {
+            '$match': {
                fileNo: fileNo || ""
             }
          },
          {
-            $project: {
-               clientId: 1,
-               name: 1,
-               fileNo: 1,
-               claimAmount: 1,
-               policyNo: 1,
-               insuranceCompanyName: 1,
-               partnerId: 1,
-               empSaleId: 1,
+            '$project': {
+               'clientObjId': 1,
+               'partnerObjId': 1,
+               'empObjId': 1,
+               'name': 1,
+               'email':1,
+               'mobileNo':1,
+               'address':1,
+               'pinCode':1,
+               'city':1,
+               'state':1,
+               'fileNo': 1,
+               'policyNo': 1,
+               'claimAmount': 1,
+               'insuranceCompanyName': 1,
             }
          },
          {
-            $addFields: {
-               validPartnerIdString: {
-                  $cond: {
-                     if: {
-                        $and: [
-                           { $eq: [{ $type: "$partnerId" }, "string"] }, // Ensure partnerId is of type string
-                           { $ne: ["$partnerId", ""] }, // Ensure partnerId is not an empty string
-                           { $eq: [{ $strLenCP: "$partnerId" }, 24] } // Ensure it has exactly 24 characters
-                        ]
-                     },
-                     then: "$partnerId",
-                     else: null
-                  }
-               }
-            }
-         },
-         {
-            $lookup: {
-               from: 'partners',
-               let: { partnerIdString: "$validPartnerIdString" },
-               pipeline: [
+            '$lookup': {
+               'from': 'partners',
+               "localField": "partnerObjId",
+               "foreignField": "_id",
+               "as": "partnerDetails",
+               'pipeline': [
                   {
-                     $match: {
-                        $expr: {
-                           $and: [
-                              { $ne: ["$$partnerIdString", null] }, // Ensure partnerIdString is not null
-                              { $ne: ["$$partnerIdString", ""] }, // Ensure partnerIdString is not an empty string
-                              {
-                                 $eq: [
-                                    "$_id",
-                                    { $toObjectId: "$$partnerIdString" }
-                                 ]
-                              }
-                           ]
-                        }
-                     }
-                  },
-                  {
-                     $project: {
-                        fullName: 1, // Include only the fullName field,
-                        email: 1
+                     '$project': {
+                        'fullName': 1, // Include only the fullName field,
+                        'email': 1
                      }
                   }
                ],
-               as: 'partnerDetails'
             }
          },
          {
@@ -1803,54 +1777,22 @@ export const employeeFindCaseByFileNo = async (req, res) => {
                'preserveNullAndEmptyArrays': true
             }
          },
-         {
-            $addFields: {
-               validSaleEmpIdString: {
-                  $cond: {
-                     if: {
-                        $and: [
-                           { $eq: [{ $type: "$empSaleId" }, "string"] }, // Ensure partnerId is of type string
-                           { $ne: ["$empSaleId", ""] }, // Ensure partnerId is not an empty string
-                           { $eq: [{ $strLenCP: "$empSaleId" }, 24] } // Ensure it has exactly 24 characters
-                        ]
-                     },
-                     then: "$empSaleId",
-                     else: null
-                  }
-               }
-            }
-         },
-         {
-            $lookup: {
-               from: 'employees',
-               let: { saleEmpIdString: "$validSaleEmpIdString" },
-               pipeline: [
+           {
+            '$lookup': {
+               'from': 'employees',
+               "localField": "empObjId",
+               "foreignField": "_id",
+               "as": "employeeDetails",
+               'pipeline': [
                   {
-                     $match: {
-                        $expr: {
-                           $and: [
-                              { $ne: ["$$saleEmpIdString", null] }, // Ensure partnerIdString is not null
-                              { $ne: ["$$saleEmpIdString", ""] }, // Ensure partnerIdString is not an empty string
-                              {
-                                 $eq: [
-                                    "$_id",
-                                    { $toObjectId: "$$saleEmpIdString" }
-                                 ]
-                              }
-                           ]
-                        }
-                     }
-                  },
-                  {
-                     $project: {
-                        fullName: 1, // Include only the fullName field
-                        designation: 1,
-                        type: 1,
-                        email: 1,
+                     '$project': {
+                        'fullName': 1, // Include only the fullName field,
+                        'email': 1,
+                        'designation': 1,
+                        'type': 1,
                      }
                   }
                ],
-               as: 'employeeDetails'
             }
          },
          {
@@ -2824,12 +2766,6 @@ export const employeeDownloadInvoiceById = async (req, res) => {
 export const employeeEditInvoice = async (req, res) => {
    try {
       const { employee } = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "finance" && employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
 
       const { _id } = req.query;
@@ -2851,15 +2787,29 @@ export const employeeEditInvoice = async (req, res) => {
    }
 }
 
+export const employeeEditInvoiceNo = async (req, res) => {
+   try {
+      const { employee } = req
+      if (employee?.type?.toLowerCase() != "finance" && employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
+
+      const { _id, invoiceNo } = req.body;
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+
+      const isExist = await Bill.findById(_id)
+      if (!isExist) return res.status(400).json({ success: true, message: "Invoice not found" });
+      isExist.invoiceNo = invoiceNo
+      await isExist.save()
+
+      return res.status(200).json({ success: true, message: "Successfully update invoice no" });
+   } catch (error) {
+      console.log("invoice no in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
 export const employeeUnActiveInvoice = async (req, res) => {
    try {
       const { employee } = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "finance" && employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
 
       const { _id, type } = req.query;
