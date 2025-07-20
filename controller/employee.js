@@ -296,12 +296,6 @@ export const empOpGetSaleEmployee = async (req, res) => {
 export const empOpCreateOrUpdateCaseForm = async (req, res, next) => {
    try {
       const { employee } = req
-      // const verify =  await authEmployee(req,res)
-      // if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
 
       await createOrUpdateCaseStatusForm(req, res, next)

@@ -840,49 +840,52 @@ export const adminDownloadAllEmployee = async (req, res) => {
 export const adminGetSaleEmployee = async (req, res) => {
    try {
       const { admin } = req
-      let { limit = 50, search = "", pageNo = 1 } = req.query
-      pageNo = (pageNo - 1) * limit;
 
-      const pipeline = [
+     let {limit,search,pageNo} = req.query
+      const pageItemLimit = limit || 50;
+      pageNo = pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const searchQuery = search || "";
+
+      const pipeline =[
          {
-            $match: {
-               isActive: true,
-               type: { $regex: "sales", $options: "i", },
-               branchId: { $regex: "", $options: "i", },
-               $or: [
-                  { fullName: { $regex: search, $options: "i", }, },
-                  { email: { $regex: search, $options: "i", }, },
-                  { mobileNo: { $regex: search, $options: "i", }, },
-                  { type: { $regex: search, $options: "i", }, },
-                  { designation: { $regex: search, $options: "i", }, },
-               ],
-            },
+           $match: {
+             isActive: true,
+             type: { $regex: "sales", $options: "i", },
+             $or: [
+               {fullName: {$regex: searchQuery, $options: "i", },  },
+               {email: {$regex: searchQuery, $options: "i", },  },
+               {mobileNo: {$regex: searchQuery, $options: "i", },  },
+               {type: {$regex: searchQuery, $options: "i", },  },
+               {designation: {$regex: searchQuery, $options: "i", },  },
+             ],
+           },
          },
          {
-            $project: {
-               fullName: 1,
-               email: 1,
-               mobileNo: 1,
-               type: 1,
-               designation: 1,
-               branchId: 1,
-            },
+           $project: {
+             fullName: 1,
+             email: 1,
+             mobileNo: 1,
+             type: 1,
+             designation: 1,
+             branchId: 1,
+           },
          },
          {
-            $facet: {
-               data: [
-                  { $sort: { createdAt: -1, }, },
-                  { $skip: Number(pageNo), },
-                  { $limit: Number(limit), },
-               ],
-               totalCount: [
-                  { $count: "count", },
-               ],
-            },
+           $facet: {
+             data: [
+               {$sort: { createdAt: -1, }, },
+               { $skip: 0, },
+               { $limit: 10, },
+             ],
+             totalCount: [
+               {$count: "count",  },
+             ],
+           },
          },
-      ]
+       ]
       const result = await Employee.aggregate(pipeline)
       return res.status(200).json({ success: true, message: "get sale employee data", data: result?.[0]?.data || [], noOfEmployee: result?.[0]?.totalCount?.[0]?.count || 0 });
+
    } catch (error) {
       console.log("adminViewAllEmployee in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });

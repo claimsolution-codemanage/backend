@@ -34,6 +34,8 @@ const ombudsmanStatusSchema = new mongoose.Schema({
             {
                 date: { type: Date, default: new Date() },
                 remarks: { type: String, default: "" },
+                byCourier: { type: Boolean, default: false },
+                byMail: { type: Boolean, default: false },
                 isPrivate: { type: Boolean, default: false },
                 attachment: { type: String, default: "" },
             }
