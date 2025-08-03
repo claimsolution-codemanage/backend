@@ -5328,17 +5328,12 @@ export const adminPaidInvoice = async (req, res) => {
       const { _id } = req.body;
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-      const { remark } = req.body
-      if (!remark) return res.status(400).json({ success: false, message: "Remark is required" })
+      const { remark = "", status } = req.body
+      if (!status) return res.status(400).json({ success: false, message: "Status is required" })
 
-      const getInvoice = await Bill.findById(_id)
-      if (!getInvoice?.isPaid) {
-         const invoice = await Bill.findByIdAndUpdate(_id, { $set: { remark: remark, isPaid: true, paidBy: "admin", paidDate: new Date() } })
-         return res.status(200).json({ success: true, message: "Successfully paid invoice" });
-      } else {
-         return res.status(400).json({ success: true, message: "Invoice already paid" });
-      }
-
+      const invoice = await Bill.findByIdAndUpdate(_id, { $set: { remark: remark, isPaid: status == "paid" ? true : false, paidBy: "admin", paidDate: new Date() } })
+      if (!invoice) return res.status(404).json({ success: true, message: "Details not found" });
+      return res.status(200).json({ success: true, message: "Successfully update invoice" });
 
    } catch (error) {
       console.log("admin-Paid-Invoice in error:", error);
@@ -5823,15 +5818,7 @@ export const getStatement = async (req, res) => {
 export const adminDownloadAllStatement = async (req, res) => {
    try {
       const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
       const { empId, partnerId, startDate, endDate } = req.query
-
 
       if (startDate && endDate) {
          const validStartDate = getValidateDate(startDate)
@@ -5988,15 +5975,29 @@ export const adminDownloadAllStatement = async (req, res) => {
    }
 }
 
+export const adminChangeStatementStatus = async (req, res) => {
+   try {
+      const { admin } = req
+
+      const { _id } = req.body;
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+
+      const { remark = "", status } = req.body
+      if (!status) return res.status(400).json({ success: false, message: "Status is required" })
+
+      const invoice = await Statement.findByIdAndUpdate(_id, { $set: { remark: remark, isPaid: status == "paid" ? true : false, paidBy: "operation", paidDate: new Date() } })
+      if (!invoice) return res.status(404).json({ success: true, message: "Details not found" });
+      return res.status(200).json({ success: true, message: "Successfully update statement" });
+   } catch (error) {
+      console.log("admin-Paid-statement in error:", error);
+      return res.status(500).json({ success: false, message: "Something went wrong", error: error });
+   }
+}
+
+
 export const getAllStatement = async (req, res) => {
    try {
       const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       const { search, startDate, endDate, limit, pageNo } = req.query
       const pageItemLimit = limit ? limit : 10;
@@ -6045,8 +6046,38 @@ export const getAllStatement = async (req, res) => {
                      $project: {
                         'profile.consultantName': 1,
                         'profile.consultantCode': 1,
+                        'bankingDetails.bankName': 1,
+                        'bankingDetails.bankAccountNo': 1,
+                        'bankingDetails.bankBranchName': 1,
+                        'bankingDetails.panNo': 1,
+                        'bankingDetails.branchId': 1,
+                        'profile.consultantName': 1,
+                        'profile.consultantCode': 1,
+                        'profile.address': 1,
+                        'branchId': 1,
                      }
-                  }
+                  },
+                  {
+                     "$lookup": {
+                        from: 'employees',
+                        localField: 'salesId',
+                        foreignField: '_id',
+                        as: 'salesId',
+                        pipeline: [
+                           {
+                              "$project": {
+                                 "fullName": 1
+                              }
+                           }
+                        ]
+                     }
+                  },
+                  {
+                     $unwind: {
+                        path: '$salesId',
+                        preserveNullAndEmptyArrays: true
+                     }
+                  },
                ]
             }
          },
@@ -6067,20 +6098,48 @@ export const getAllStatement = async (req, res) => {
                      $project: {
                         'fullName': 1,
                         'type': 1,
+                        'bankName': 1,
+                        'bankBranchName': 1,
+                        'bankAccountNo': 1,
+                        'panNo': 1,
+                        'address': 1,
+                        'branchId': 1,
+                        'empId': 1,
                      }
-                  }
+                  },
+                  {
+                     "$lookup": {
+                        "from": 'employees',
+                        "localField": 'referEmpId',
+                        "foreignField": '_id',
+                        "as": 'referEmpId',
+                        "pipeline": [
+                           {
+                              "$project": {
+                                 "fullName": 1
+                              }
+                           }
+                        ]
+                     }
+                  },
+                  {
+                     "$unwind": {
+                        "path": '$referEmpId',
+                        "preserveNullAndEmptyArrays": true
+                     }
+                  },       
                ]
             }
          },
          {
-            $unwind: {
-               path: '$empDetails',
-               preserveNullAndEmptyArrays: true
+            "$unwind": {
+               "path": '$empDetails',
+               "preserveNullAndEmptyArrays": true
             }
          },
          {
-            $match: {
-               $and: [
+            "$match": {
+               "$and": [
                   // Regex-based search after lookup
                   search ? {
                      $or: [

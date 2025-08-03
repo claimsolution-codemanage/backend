@@ -17,11 +17,11 @@ const statementSchema = new mongoose.Schema({
    utrDetails:{type:String},
    fileUrl:{type:String},
    isActive:{type:Boolean,default:true},
-   branchId:{
-      type:String,
-      default:"",
-   }
-
+   remark: {type:String}, 
+   isPaid:{type:Boolean}, 
+   paidBy: {type:String}, 
+   paidDate: {type:Date},
+   branchId:{type:String,default:"", }
 },{timestamps:true});
 
 

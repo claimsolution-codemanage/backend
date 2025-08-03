@@ -25,7 +25,7 @@ import { validateInvoice } from "../utils/validateEmployee.js";
 import { invoiceHtmlToPdfBuffer } from "../utils/createPdf/invoice.js";
 import { validateBankingDetailsBody, validateProfileBody } from "../utils/validatePatner.js";
 import { sendAddPartnerRequest } from "../utils/sendMail.js";
-import { firebaseUpload,getAllInvoiceQuery,validateResetPassword } from "../utils/helper.js";
+import { firebaseUpload, getAllInvoiceQuery, validateResetPassword } from "../utils/helper.js";
 import { validateAdminAddEmployeeToCase, validateAdminSharePartner } from "../utils/validateAdmin.js";
 import { createOrUpdateCaseStatusForm } from "../utils/dbFunction.js";
 import { Types } from "mongoose";
@@ -205,30 +205,18 @@ export const createSathiTeamAcc = async (req, res) => {
 export const empOpPaidInvoice = async (req, res) => {
    try {
       const { employee } = req
-      // const verify =  await authEmployee(req,res)
-      // if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
 
 
       const { _id } = req.body;
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-      const { remark } = req.body
-      if (!remark) return res.status(400).json({ success: false, message: "Remark is required" })
+      const { remark = "", status } = req.body
+      if (!status) return res.status(400).json({ success: false, message: "Status is required" })
 
-      const getInvoice = await Bill.findById(_id)
-      if (!getInvoice?.isPaid) {
-         const invoice = await Bill.findByIdAndUpdate(_id, { $set: { remark: remark, isPaid: true, paidBy: "operation", paidDate: new Date() } })
-         return res.status(200).json({ success: true, message: "Successfully paid invoice" });
-      } else {
-         return res.status(400).json({ success: true, message: "Invoice already paid" });
-      }
-
-
+      const invoice = await Bill.findByIdAndUpdate(_id, { $set: { remark: remark, isPaid: status == "paid" ? true : false, paidBy: "operation", paidDate: new Date() } })
+      if (!invoice) return res.status(404).json({ success: true, message: "Details not found" });
+      return res.status(200).json({ success: true, message: "Successfully update invoice" });
    } catch (error) {
       console.log("emp-op-Paid-Invoice in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -240,49 +228,49 @@ export const empOpGetSaleEmployee = async (req, res) => {
       const { employee } = req
       if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
 
-      let {limit,search,pageNo} = req.query
+      let { limit, search, pageNo } = req.query
       const pageItemLimit = limit || 50;
       pageNo = pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = search || "";
 
-      const pipeline =[
+      const pipeline = [
          {
-           $match: {
-             isActive: true,
-             type: { $regex: "sales", $options: "i", },
-             branchId: { $regex: employee?.branchId || "",  $options: "i",  },
-             $or: [
-               {fullName: {$regex: searchQuery, $options: "i", },  },
-               {email: {$regex: searchQuery, $options: "i", },  },
-               {mobileNo: {$regex: searchQuery, $options: "i", },  },
-               {type: {$regex: searchQuery, $options: "i", },  },
-               {designation: {$regex: searchQuery, $options: "i", },  },
-             ],
-           },
+            $match: {
+               isActive: true,
+               type: { $regex: "sales", $options: "i", },
+               branchId: { $regex: employee?.branchId || "", $options: "i", },
+               $or: [
+                  { fullName: { $regex: searchQuery, $options: "i", }, },
+                  { email: { $regex: searchQuery, $options: "i", }, },
+                  { mobileNo: { $regex: searchQuery, $options: "i", }, },
+                  { type: { $regex: searchQuery, $options: "i", }, },
+                  { designation: { $regex: searchQuery, $options: "i", }, },
+               ],
+            },
          },
          {
-           $project: {
-             fullName: 1,
-             email: 1,
-             mobileNo: 1,
-             type: 1,
-             designation: 1,
-             branchId: 1,
-           },
+            $project: {
+               fullName: 1,
+               email: 1,
+               mobileNo: 1,
+               type: 1,
+               designation: 1,
+               branchId: 1,
+            },
          },
          {
-           $facet: {
-             data: [
-               {$sort: { createdAt: -1, }, },
-               { $skip: 0, },
-               { $limit: 10, },
-             ],
-             totalCount: [
-               {$count: "count",  },
-             ],
-           },
+            $facet: {
+               data: [
+                  { $sort: { createdAt: -1, }, },
+                  { $skip: 0, },
+                  { $limit: 10, },
+               ],
+               totalCount: [
+                  { $count: "count", },
+               ],
+            },
          },
-       ]
+      ]
       const result = await Employee.aggregate(pipeline)
       return res.status(200).json({ success: true, message: "get sale employee data", data: result?.[0]?.data || [], noOfEmployee: result?.[0]?.totalCount?.[0]?.count || 0 });
 
@@ -329,7 +317,7 @@ export const empOpCreateOrUpdateCaseForm = async (req, res, next) => {
 //       } catch (error) {
 //          return res.status(400).json({ success: false, message: "Failed to share" })
 //       }
-      
+
 
 //    } catch (error) {
 //       console.log("empOp share partner in error:", error);
@@ -346,7 +334,7 @@ export const empOpSharePartnerToSaleEmp = async (req, res) => {
 
       const { error } = validateAdminSharePartner(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-      const {sharePartners=[],shareEmployee=[]} = req.body
+      const { sharePartners = [], shareEmployee = [] } = req.body
       // let bulkOps = []
       // for (const toEmployeeId of shareEmployee) {
       //    const exists = await ShareSection.find({toEmployeeId,partnerId:{$in:sharePartners}},{partnerId:1})
@@ -363,10 +351,10 @@ export const empOpSharePartnerToSaleEmp = async (req, res) => {
       //    })
       // }   
       // await ShareSection.bulkWrite(bulkOps)
-      
+
       // show in added by
-      if(!shareEmployee[0]) return res.status(400).json({ success: true, message: "Please add employee to share" });
-      await Partner.updateMany({_id:{$in:sharePartners}},{$set:{salesId:shareEmployee[0]}})
+      if (!shareEmployee[0]) return res.status(400).json({ success: true, message: "Please add employee to share" });
+      await Partner.updateMany({ _id: { $in: sharePartners } }, { $set: { salesId: shareEmployee[0] } })
       return res.status(200).json({ success: true, message: "Successfully share partner" });
 
    } catch (error) {
@@ -380,22 +368,22 @@ export const empOpShareClientToSaleEmp = async (req, res) => {
       const { employee } = req
       if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
 
-      const {shareClients=[],shareEmployee=[]} = req.body
+      const { shareClients = [], shareEmployee = [] } = req.body
       let bulkOps = []
       for (const toEmployeeId of shareEmployee) {
-         const exists = await ShareSection.find({toEmployeeId,clientId:{$in:shareClients}},{clientId:1})
-         let filter = shareClients?.filter(clientId=>!exists?.map(ele=>ele?.clientId?.toString())?.includes(clientId)) 
-         filter?.forEach(clientId=>{
+         const exists = await ShareSection.find({ toEmployeeId, clientId: { $in: shareClients } }, { clientId: 1 })
+         let filter = shareClients?.filter(clientId => !exists?.map(ele => ele?.clientId?.toString())?.includes(clientId))
+         filter?.forEach(clientId => {
             bulkOps.push({
-               insertOne:{
-                  document:{
+               insertOne: {
+                  document: {
                      clientId,
                      toEmployeeId
                   }
                }
             })
          })
-      }   
+      }
       await ShareSection.bulkWrite(bulkOps)
       return res.status(200).json({ success: true, message: "Successfully share clients" });
 
@@ -874,7 +862,7 @@ export const empAddPartnerRefToEmp = async (req, res) => {
 
 //          ])
 //          console.log("extractType?.[0]",extractType?.[0]);
-         
+
 
 //          matchQuery.push({
 //             $or: [
@@ -1085,7 +1073,7 @@ export const empAddPartnerRefToEmp = async (req, res) => {
 export const viewAllEmployeeCase = async (req, res) => {
    try {
       const { employee } = req
-      let { limit = 10, pageNo = 1, search = "", status = "", startDate = "", endDate = "", empId = "",isReject="" } = req.query
+      let { limit = 10, pageNo = 1, search = "", status = "", startDate = "", endDate = "", empId = "", isReject = "" } = req.query
       const skip = (pageNo - 1) * limit;
       const caseAccess = ["operation", "finance", "branch"]
 
@@ -1101,8 +1089,8 @@ export const viewAllEmployeeCase = async (req, res) => {
       let matchQuery = []
       let extactMatchQuery = []
 
-      matchQuery.push({ isActive: Boolean(req.query.type == "true" ? true :false) })
-      matchQuery.push(isReject=="true" ? {currentStatus:{$in:["Reject"]}} : {currentStatus:{$nin:["Reject"]}})
+      matchQuery.push({ isActive: Boolean(req.query.type == "true" ? true : false) })
+      matchQuery.push(isReject == "true" ? { currentStatus: { $in: ["Reject"] } } : { currentStatus: { $nin: ["Reject"] } })
 
 
       // manage role wise other emp case details access
@@ -1183,7 +1171,7 @@ export const viewAllEmployeeCase = async (req, res) => {
                   "empIds": {
                      "$addToSet": "$_id",
                   },
-                  "referPartnerIds": { "$addToSet": "$referPartner._id"},
+                  "referPartnerIds": { "$addToSet": "$referPartner._id" },
                   "partnerIds": {
                      "$addToSet": "$shareSection.partnerId",
                   },
@@ -1209,14 +1197,14 @@ export const viewAllEmployeeCase = async (req, res) => {
 
          const extactOptions = await Employee.aggregate(filterPipeline)
 
-         console.log("extactOptions",extactOptions[0]);
-         
+         console.log("extactOptions", extactOptions[0]);
+
 
          matchQuery.push({
             $or: [
                { empObjId: { $in: extactOptions?.[0]?.empIds } },
                // {partnerObjId: { $in: extactOptions?.[0]?.partnerIds } },
-               {partnerObjId: { $in: extactOptions?.[0]?.allPartnerIds } },
+               { partnerObjId: { $in: extactOptions?.[0]?.allPartnerIds } },
                { clientObjId: { $in: extactOptions?.[0]?.clientIds } },
                { _id: { $in: extactOptions?.[0]?.caseIds } },
             ]
@@ -1289,8 +1277,8 @@ export const viewAllEmployeeCase = async (req, res) => {
                   {
                      "$project": {
                         "fullName": 1, // Include only the fullName field,
-                        "profile.consultantName":1,
-                        "profile.consultantCode":1,
+                        "profile.consultantName": 1,
+                        "profile.consultantCode": 1,
                      }
                   }
                ],
@@ -1312,8 +1300,8 @@ export const viewAllEmployeeCase = async (req, res) => {
                   {
                      "$project": {
                         "fullName": 1, // Include only the fullName field
-                         "profile.consultantName":1,
-                        "profile.consultantCode":1,
+                        "profile.consultantName": 1,
+                        "profile.consultantCode": 1,
                      }
                   }
                ],
@@ -1482,11 +1470,11 @@ export const employeeViewCaseByIdBy = async (req, res) => {
                localField: "partnerObjId",
                foreignField: "_id",
                as: "partnerDetails",
-               pipeline:[
+               pipeline: [
                   {
-                     $project:{
-                        "profile.consultantName":1,
-                        "profile.consultantCode":1
+                     $project: {
+                        "profile.consultantName": 1,
+                        "profile.consultantCode": 1
                      }
                   }
                ]
@@ -1499,29 +1487,29 @@ export const employeeViewCaseByIdBy = async (req, res) => {
                localField: "empObjId",
                foreignField: "_id",
                as: "empDetails",
-               pipeline:[
+               pipeline: [
                   {
-                     $project:{
-                        fullName:1,
-                        type:1,
-                        designation:1
+                     $project: {
+                        fullName: 1,
+                        type: 1,
+                        designation: 1
                      }
                   }
                ]
             }
          },
          { $unwind: { path: "$empDetails", preserveNullAndEmptyArrays: true } },
-               {
+         {
             $lookup: {
                from: "clients",
                localField: "clientObjId",
                foreignField: "_id",
                as: "clientDetails",
-               pipeline:[
+               pipeline: [
                   {
-                     $project:{
-                         "profile.consultantName":1,
-                        "profile.consultantCode":1
+                     $project: {
+                        "profile.consultantName": 1,
+                        "profile.consultantCode": 1
                      }
                   }
                ]
@@ -1538,10 +1526,12 @@ export const employeeViewCaseByIdBy = async (req, res) => {
                         $expr: {
                            $and: [
                               { $eq: ["$isActive", true] },
-                              { $or: [
-                                 { $eq: ["$caseId", "$$id"] }, 
-                                 { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
-                              ] }
+                              {
+                                 $or: [
+                                    { $eq: ["$caseId", "$$id"] },
+                                    { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
+                                 ]
+                              }
                            ]
                         }
                      }
@@ -1561,10 +1551,12 @@ export const employeeViewCaseByIdBy = async (req, res) => {
                         $expr: {
                            $and: [
                               { $eq: ["$isActive", true] },
-                              { $or: [
-                                 { $eq: ["$caseId", "$$id"] }, 
-                                 { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
-                              ] }
+                              {
+                                 $or: [
+                                    { $eq: ["$caseId", "$$id"] },
+                                    { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
+                                 ]
+                              }
                            ]
                         }
                      }
@@ -1584,10 +1576,12 @@ export const employeeViewCaseByIdBy = async (req, res) => {
                         $expr: {
                            $and: [
                               { $eq: ["$isActive", true] },
-                              { $or: [
-                                 { $eq: ["$caseId", "$$id"] }, 
-                                 { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
-                              ] }
+                              {
+                                 $or: [
+                                    { $eq: ["$caseId", "$$id"] },
+                                    { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
+                                 ]
+                              }
                            ]
                         }
                      }
@@ -1712,12 +1706,12 @@ export const employeeViewCaseByIdBy = async (req, res) => {
 
 
 export const empAddCaseFile = async (req, res) => {
-  try {
-   await dbFunction.commonAddCaseFile(req,res)
-  } catch (error) {
-    console.log("add case file in error:", error);
-    res.status(500).json({ success: false, message: "Internal server error", error: error });
-  }
+   try {
+      await dbFunction.commonAddCaseFile(req, res)
+   } catch (error) {
+      console.log("add case file in error:", error);
+      res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
 }
 
 export const employeeFindCaseByFileNo = async (req, res) => {
@@ -1737,12 +1731,12 @@ export const employeeFindCaseByFileNo = async (req, res) => {
                'partnerObjId': 1,
                'empObjId': 1,
                'name': 1,
-               'email':1,
-               'mobileNo':1,
-               'address':1,
-               'pinCode':1,
-               'city':1,
-               'state':1,
+               'email': 1,
+               'mobileNo': 1,
+               'address': 1,
+               'pinCode': 1,
+               'city': 1,
+               'state': 1,
                'fileNo': 1,
                'policyNo': 1,
                'claimAmount': 1,
@@ -1771,7 +1765,7 @@ export const employeeFindCaseByFileNo = async (req, res) => {
                'preserveNullAndEmptyArrays': true
             }
          },
-           {
+         {
             '$lookup': {
                'from': 'employees',
                "localField": "empObjId",
@@ -1943,7 +1937,7 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
       const { employee } = req
       const { partnerId, partnerCaseId, empSaleId, empSaleCaseId, clientCaseId } = req?.query
 
-      if(employee?.type?.toLowerCase()!="operation") return res.status(400).json({ success: false, message: "Permission denied!" })
+      if (employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Permission denied!" })
       if (!validMongooseId(clientCaseId)) return res.status(400).json({ success: false, message: "Not a valid clientCaseId" })
 
       if (!partnerId && !empSaleId) return res.status(400).json({ success: false, message: "For add case refernce must provide partnerId or employeeId" })
@@ -1976,15 +1970,15 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
       let mergeParmeter = {}
       let bulkOps = []
 
-      if(isExistMergeTo?.partnerObjId){
+      if (isExistMergeTo?.partnerObjId) {
          mergeParmeter["partnerObjId"] = isExistMergeTo?.partnerObjId
          bulkOps.push({
-            insertOne:{
-               document:{
-                  mergeCaseId:isExistMergeTo?._id,
-                  caseId:getClientCase?._id,
-                  partnerId:isExistMergeTo?.partnerObjId,
-                  byEmpId:employee?._id
+            insertOne: {
+               document: {
+                  mergeCaseId: isExistMergeTo?._id,
+                  caseId: getClientCase?._id,
+                  partnerId: isExistMergeTo?.partnerObjId,
+                  byEmpId: employee?._id
                }
             }
          })
@@ -1992,13 +1986,13 @@ export const empAddReferenceCaseAndMarge = async (req, res) => {
 
       if (isExistMergeTo?.empObjId) {
          mergeParmeter["empObjId"] = isExistMergeTo?.empObjId
-            bulkOps.push({
-            insertOne:{
-               document:{
-                  mergeCaseId:isExistMergeTo?._id,
-                  caseId:getClientCase?._id,
-                  empId:isExistMergeTo?.empObjId,
-                  byEmpId:employee?._id
+         bulkOps.push({
+            insertOne: {
+               document: {
+                  mergeCaseId: isExistMergeTo?._id,
+                  caseId: getClientCase?._id,
+                  empId: isExistMergeTo?.empObjId,
+                  byEmpId: employee?._id
                }
             }
          })
@@ -2093,39 +2087,39 @@ export const empRemoveReferenceCase = async (req, res) => {
    try {
       const { employee } = req
 
-      if(employee?.type?.toLowerCase()!="operation") return res.status(400).json({ success: false, message: "Permission denied!" })
+      if (employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Permission denied!" })
 
       const { type, _id } = req?.query
       if (!type) return res.status(400).json({ success: false, message: "Please select the type of reference to remove" })
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid CaseId" })
 
-         const getClientCase = await Case.findById(_id)
-         if (!getClientCase) return res.status(404).json({ success: false, message: "Case not found" })
-         
-         let filterOptions = {isActive:true}
-         let updateMergeParameter = type?.toLowerCase() == "partner" ? { isPartnerReferenceCase: false, } : {isEmpSaleReferenceCase:false}
-         let updateClientCaseParameter = type?.toLowerCase() == "partner" ? { partnerObjId: ""} : {empObjId:""}
-         if(type?.toLowerCase() == "partner"){
-            filterOptions.partnerId = getClientCase?.partnerObjId
-         }else if(type?.toLowerCase() == "sale-emp"){
-            filterOptions.empId = getClientCase?.empObjId
-         }else {
-            return res.status(400).json({ success: false, message: "Not a valid type" })
-         }
+      const getClientCase = await Case.findById(_id)
+      if (!getClientCase) return res.status(404).json({ success: false, message: "Case not found" })
 
-         filterOptions.caseId = getClientCase?._id
-         const mergeCase = await CaseMergeDetails.findOne(filterOptions).select("mergeCaseId")
-         if(!mergeCase) return res.status(404).json({ success: false, message: "Merge case not found" })
+      let filterOptions = { isActive: true }
+      let updateMergeParameter = type?.toLowerCase() == "partner" ? { isPartnerReferenceCase: false, } : { isEmpSaleReferenceCase: false }
+      let updateClientCaseParameter = type?.toLowerCase() == "partner" ? { partnerObjId: "" } : { empObjId: "" }
+      if (type?.toLowerCase() == "partner") {
+         filterOptions.partnerId = getClientCase?.partnerObjId
+      } else if (type?.toLowerCase() == "sale-emp") {
+         filterOptions.empId = getClientCase?.empObjId
+      } else {
+         return res.status(400).json({ success: false, message: "Not a valid type" })
+      }
 
-         await Promise.all([
-            Case.findByIdAndUpdate(mergeCase?.mergeCaseId, { $set: updateMergeParameter }, { new: true }), // remove ref. from merge case of partner /emp
-            Case.findByIdAndUpdate(getClientCase?._id, { $unset: updateClientCaseParameter }, { new: true }), // remove partnerObjId / empObjId
-            CaseMergeDetails.findByIdAndDelete(mergeCase?._id), // delete merge details
-            CaseDoc.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } }),
-            CaseStatus.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } }),
-            CaseComment.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } }),
-         ])
-         return res.status(200).json({ success: true, message: "Successfully remove reference case" })
+      filterOptions.caseId = getClientCase?._id
+      const mergeCase = await CaseMergeDetails.findOne(filterOptions).select("mergeCaseId")
+      if (!mergeCase) return res.status(404).json({ success: false, message: "Merge case not found" })
+
+      await Promise.all([
+         Case.findByIdAndUpdate(mergeCase?.mergeCaseId, { $set: updateMergeParameter }, { new: true }), // remove ref. from merge case of partner /emp
+         Case.findByIdAndUpdate(getClientCase?._id, { $unset: updateClientCaseParameter }, { new: true }), // remove partnerObjId / empObjId
+         CaseMergeDetails.findByIdAndDelete(mergeCase?._id), // delete merge details
+         CaseDoc.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } }),
+         CaseStatus.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } }),
+         CaseComment.updateMany({ caseMargeId: _id }, { $set: { caseMargeId: "", isMarge: false } }),
+      ])
+      return res.status(200).json({ success: true, message: "Successfully remove reference case" })
    } catch (error) {
       console.log("adminRemoveRefenceCase in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -2304,13 +2298,13 @@ export const empRemoveReferenceCase = async (req, res) => {
 export const employeeViewAllPartner = async (req, res) => {
    try {
       const { employee } = req
-       const result = await getAllPartnerResult(req,employee)      
-      if(result?.status==200){
-         return res.status(200).json({ success: true, message: result?.message, data: result?.data, noOfPartner: result?.noOfPartner});
-      }else if(result?.message){
-      return res.status(result.status).json({ success: false, message:result?.message });
-      } else{
-      return res.status(500).json({ success: false, message: "Something went wrong" });
+      const result = await getAllPartnerResult(req, employee)
+      if (result?.status == 200) {
+         return res.status(200).json({ success: true, message: result?.message, data: result?.data, noOfPartner: result?.noOfPartner });
+      } else if (result?.message) {
+         return res.status(result.status).json({ success: false, message: result?.message });
+      } else {
+         return res.status(500).json({ success: false, message: "Something went wrong" });
       }
 
    } catch (error) {
@@ -2338,11 +2332,11 @@ export const employeeViewPartnerById = async (req, res) => {
 
 export const employeeViewAllClient = async (req, res) => {
    try {
-      const result = await getAllClientResult(req)      
-      if(result?.status==1){
-         return res.status(200).json({ success: true, message: "get client data", data: result?.data, noOfClient: result?.noOfClient});
-      }else{
-      return res.status(400).json({ success: false, message: "Something went wrong" });
+      const result = await getAllClientResult(req)
+      if (result?.status == 1) {
+         return res.status(200).json({ success: true, message: "get client data", data: result?.data, noOfClient: result?.noOfClient });
+      } else {
+         return res.status(400).json({ success: false, message: "Something went wrong" });
       }
 
    } catch (error) {
@@ -2355,16 +2349,16 @@ export const employeeViewAllClient = async (req, res) => {
 
 export const empClientDownload = async (req, res) => {
    try {
-      const result = await getAllClientResult(req)      
-      if(result?.status==1){
+      const result = await getAllClientResult(req)
+      if (result?.status == 1) {
          // Generate Excel buffer
          const excelBuffer = await getAllClientDownloadExcel(result?.data);
          res.setHeader('Content-Disposition', 'attachment; filename="clients.xlsx"')
          res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
          res.status(200)
          return res.send(excelBuffer)
-      }else{
-      return res.status(400).json({ success: false, message: "Something went wrong" });
+      } else {
+         return res.status(400).json({ success: false, message: "Something went wrong" });
       }
 
    } catch (error) {
@@ -3428,9 +3422,9 @@ export const saleEmployeeAddCase = async (req, res) => {
       }
 
       req.body.empSaleId = employee?._id,
-      req.body.empObjId = employee?._id,
-      req.body.empSaleName = `${employee?.fullName} | ${employee?.type?.toLowerCase()} | ${employee?.designation?.toLowerCase()}`,
-      req.body.caseFrom = "team"
+         req.body.empObjId = employee?._id,
+         req.body.empSaleName = `${employee?.fullName} | ${employee?.type?.toLowerCase()} | ${employee?.designation?.toLowerCase()}`,
+         req.body.caseFrom = "team"
 
       const newAddCase = new Case({ ...req.body, branchId: employee?.branchId?.toLowerCase(), caseDocs: [] })
       const noOfCase = await Case.count()
@@ -4913,9 +4907,9 @@ export const empViewAllEmployee = async (req, res) => {
       const caseAccess = ["operation", "finance", "branch"]
 
       let matchQuery = []
-      const {designation="",referEmpId="",branchId=""} = employee
+      const { designation = "", referEmpId = "", branchId = "" } = employee
       matchQuery.push({ branchId: { $regex: branchId, $options: "i" } })
-      if(!caseAccess?.includes(employee?.type?.toLowerCase())){
+      if (!caseAccess?.includes(employee?.type?.toLowerCase())) {
          if (designation?.toLowerCase() == "executive") {
             matchQuery.push(
                {
@@ -4945,7 +4939,7 @@ export const empViewAllEmployee = async (req, res) => {
          {
             "$match": {
                "isActive": true,
-               "$and":matchQuery,
+               "$and": matchQuery,
                "$or": [
                   { "fullName": { "$regex": search, "$options": "i", }, },
                   { "email": { "$regex": search, "$options": "i", }, },
@@ -5031,15 +5025,15 @@ export const empViewAllEmployee = async (req, res) => {
             "$project": {
                "fullName": 1,
                "email": 1,
-               "empId":1,
+               "empId": 1,
                "mobileNo": 1,
                "type": 1,
                "designation": 1,
                "branchId": 1,
                "referEmpId": 1,
                "createdAt": 1,
-               "managerId":1,
-               "headEmpId":1
+               "managerId": 1,
+               "headEmpId": 1
             },
          },
          {
@@ -5056,8 +5050,8 @@ export const empViewAllEmployee = async (req, res) => {
          },
       ]
       const result = await Employee.aggregate(pipeline)
-      console.log("data",result?.[0]?.data);
-      
+      console.log("data", result?.[0]?.data);
+
       return res.status(200).json({ success: true, message: "get employee data", data: result?.[0]?.data || [], noOfEmployee: result?.[0]?.totalCount?.[0]?.count || 0 });
    } catch (error) {
       console.log("empViewAllEmployee in error:", error);
@@ -5324,22 +5318,22 @@ export const empOptShareCaseToEmployee = async (req, res) => {
       // console.log("updateCase", updateCase);
       // const allUpdateCase = await Promise.all(updateCase)
 
-      const {shareCase=[],shareEmployee=[]} = req.body
+      const { shareCase = [], shareEmployee = [] } = req.body
       let bulkOps = []
       for (const toEmployeeId of shareEmployee) {
-         const exists = await ShareSection.find({toEmployeeId,caseId:{$in:shareCase}},{caseId:1})
-         let filter = shareClients?.filter(caseId=>!exists?.map(ele=>ele?.caseId?.toString())?.includes(caseId)) 
-         filter?.forEach(caseId=>{
+         const exists = await ShareSection.find({ toEmployeeId, caseId: { $in: shareCase } }, { caseId: 1 })
+         let filter = shareClients?.filter(caseId => !exists?.map(ele => ele?.caseId?.toString())?.includes(caseId))
+         filter?.forEach(caseId => {
             bulkOps.push({
-               insertOne:{
-                  document:{
+               insertOne: {
+                  document: {
                      caseId,
                      toEmployeeId
                   }
                }
             })
          })
-      }   
+      }
       await ShareSection.bulkWrite(bulkOps)
       return res.status(200).json({ success: true, message: "Successfully employee add to case" });
    } catch (error) {
@@ -5468,7 +5462,7 @@ export const getStatement = async (req, res) => {
          matchQuery.push({
             empId: new Types.ObjectId(empId)
          })
-      }    
+      }
 
       if (partnerId) {
          const partner = await Partner.findById(partnerId,).select({
@@ -5782,8 +5776,8 @@ export const getAllStatement = async (req, res) => {
          });
       }
 
-      if(employee?.type?.toLowerCase()=="sathi team"){
-         matchQuery.push({empId:employee?._id})
+      if (employee?.type?.toLowerCase() == "sathi team") {
+         matchQuery.push({ empId: employee?._id })
       }
 
       const allStatement = await Statement.aggregate([
@@ -5807,8 +5801,38 @@ export const getAllStatement = async (req, res) => {
                      $project: {
                         'profile.consultantName': 1,
                         'profile.consultantCode': 1,
+                        'bankingDetails.bankName': 1,
+                        'bankingDetails.bankAccountNo': 1,
+                        'bankingDetails.bankBranchName': 1,
+                        'bankingDetails.panNo': 1,
+                        'bankingDetails.branchId': 1,
+                        'profile.consultantName': 1,
+                        'profile.consultantCode': 1,
+                        'profile.address': 1,
+                        'branchId': 1,
                      }
-                  }
+                  },
+                  {
+                     "$lookup": {
+                        from: 'employees',
+                        localField: 'salesId',
+                        foreignField: '_id',
+                        as: 'salesId',
+                        pipeline: [
+                           {
+                              "$project": {
+                                 "fullName": 1
+                              }
+                           }
+                        ]
+                     }
+                  },
+                  {
+                     $unwind: {
+                        path: '$salesId',
+                        preserveNullAndEmptyArrays: true
+                     }
+                  },
                ]
             }
          },
@@ -5829,54 +5853,102 @@ export const getAllStatement = async (req, res) => {
                      $project: {
                         'fullName': 1,
                         'type': 1,
+                        'bankName': 1,
+                        'bankBranchName': 1,
+                        'bankAccountNo': 1,
+                        'panNo': 1,
+                        'address': 1,
+                        'branchId': 1,
+                        'empId': 1,
                      }
-                  }
+                  },
+                  {
+                     "$lookup": {
+                        from: 'employees',
+                        localField: 'referEmpId',
+                        foreignField: '_id',
+                        as: 'referEmpId',
+                        pipeline: [
+                           {
+                              "$project": {
+                                 "fullName": 1
+                              }
+                           }
+                        ]
+                     }
+                  },
+                  {
+                     $unwind: {
+                        path: '$referEmpId',
+                        preserveNullAndEmptyArrays: true
+                     }
+                  },       
                ]
             }
          },
-         {
-            $unwind: {
-               path: '$empDetails',
-               preserveNullAndEmptyArrays: true
-            }
-         },
-         {
-            $match: {
-               $and: [
-                  // Regex-based search after lookup
-                  search ? {
-                     $or: [
-                        { 'partnerDetails.profile.consultantName': { $regex: search, $options: 'i' } },
-                        { 'partnerDetails.profile.consultantCode': { $regex: search, $options: 'i' } },
-                        { 'empDetails.fullName': { $regex: search, $options: 'i' } },
-                     ]
-                  } : { isActive: true }
-               ]
-            }
-         },
-         { '$sort': { 'createdAt': -1 } },
-         {
-            $facet: {
-               statement: [
-                  { $skip: Number(page) },
-                  { $limit: Number(pageItemLimit) },
-               ],
-               total: [
-                  { $count: "count" }
-               ]
-            }
-         }
+{
+   $unwind: {
+      path: '$empDetails',
+         preserveNullAndEmptyArrays: true
+   }
+},
+{
+   $match: {
+      $and: [
+         // Regex-based search after lookup
+         search ? {
+            $or: [
+               { 'partnerDetails.profile.consultantName': { $regex: search, $options: 'i' } },
+               { 'partnerDetails.profile.consultantCode': { $regex: search, $options: 'i' } },
+               { 'empDetails.fullName': { $regex: search, $options: 'i' } },
+            ]
+         } : { isActive: true }
+      ]
+   }
+},
+{ '$sort': { 'createdAt': -1 } },
+{
+   $facet: {
+      statement: [
+         { $skip: Number(page) },
+         { $limit: Number(pageItemLimit) },
+      ],
+         total: [
+            { $count: "count" }
+         ]
+   }
+}
       ])
 
-      const data = allStatement?.[0]?.statement
-      const totalData = allStatement?.[0]?.total?.[0]?.count || 0
+const data = allStatement?.[0]?.statement
+const totalData = allStatement?.[0]?.total?.[0]?.count || 0
 
-      return res.status(200).json({ success: true, message: `Successfully fetch all statement`, data: { data: data, totalData } });
+return res.status(200).json({ success: true, message: `Successfully fetch all statement`, data: { data: data, totalData } });
 
    } catch (error) {
-      console.log("createOrUpdateStatement in error:", error);
-      res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
+   console.log("createOrUpdateStatement in error:", error);
+   res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
 
+}
+}
+
+export const empOpChangeStatementStatus = async (req, res) => {
+   try {
+      const { employee } = req
+      if (employee?.type?.toLowerCase() != "operation") return res.status(401).json({ success: false, message: "Access denied" })
+
+      const { _id } = req.body;
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+
+      const { remark = "", status } = req.body
+      if (!status) return res.status(400).json({ success: false, message: "Status is required" })
+
+      const invoice = await Statement.findByIdAndUpdate(_id, { $set: { remark: remark, isPaid: status == "paid" ? true : false, paidBy: "operation", paidDate: new Date() } })
+      if (!invoice) return res.status(404).json({ success: true, message: "Details not found" });
+      return res.status(200).json({ success: true, message: "Successfully update statement" });
+   } catch (error) {
+      console.log("emp-op-Paid-statement in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }
 
@@ -5884,12 +5956,6 @@ export const getAllStatement = async (req, res) => {
 export const getAllNotification = async (req, res) => {
    try {
       const { employee } = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "operation") {
          return res.status(400).json({ success: false, message: "Access denied" })
       }

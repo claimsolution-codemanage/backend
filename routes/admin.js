@@ -145,6 +145,7 @@ router.get("/getAllStatement",authAdmin,adminController.getStatement)
 router.get("/getStatements",authAdmin,adminController.getAllStatement)
 router.get("/download/downloadAllStatement",authAdmin,adminController.adminDownloadAllStatement)
 router.get("/adminFindCaseByFileNo",authAdmin,adminController.adminFindCaseByFileNo)
+router.put("/adminChangeStatementStatus",authAdmin,adminController.adminChangeStatementStatus)
 
 // notification
 router.get("/getAllNotification",authAdmin,adminController.getAllNotification)

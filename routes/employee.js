@@ -98,6 +98,7 @@ router.post("/emp/createOrUpdateStatement",authEmployee,employeeController.creat
 router.get("/emp/getAllStatement",authEmployee,employeeController.getStatement)
 router.get("/emp/download/empDownloadAllStatement",authEmployee,employeeController.empDownloadAllStatement)
 router.get("/emp/getStatements",authEmployee,employeeController.getAllStatement)
+router.put("/emp/empOpChangeStatementStatus",authEmployee,employeeController.empOpChangeStatementStatus)
 
 // notification section
 router.get("/emp/getAllNotification",authEmployee,employeeController.getAllNotification)
