@@ -1222,7 +1222,7 @@ export const partnerAddCaseFile = async (req, res) => {
 
 export const getpartnerDashboard = async (req, res) => {
   try {
-    const year = Number(req.query.year || new Date().getFullYear());
+    // const year = Number(req.query.year || new Date().getFullYear());
     const verify = await authPartner(req, res);
     if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
 
@@ -1236,31 +1236,40 @@ export const getpartnerDashboard = async (req, res) => {
       fullName: partner?.fullName
     }
 
-    // Define the time range for the selected year
-    const currentYear = new Date().getFullYear();
-    const currentYearStart = new Date(year, 0, 1); // Jan 1 of selected year
-    const endYearStart = new Date(year + 1, 0, 1); // Jan 1 of next year
-    const currentMonth = year === currentYear ? new Date().getMonth() + 1 : 12;
+      const year = Number(req.query.year || new Date().getFullYear());
+      const startYear = Number(year || 2024); // default April 2024
+      const endYear = Number(startYear + 1);     // default March 2035
 
-    // Generate default 0-case values for each month
-    const allMonths = [];
-    for (let i = 0; i < currentMonth; i++) {
-      allMonths.push({
-        _id: {
-          year: year,
-          month: i + 1
-        },
-        totalCases: 0
-      });
-    }
+      // Dates range
+      const financialYearStart = new Date(startYear, 3, 1); // April 1 startYear
+      const financialYearEnd = new Date(endYear, 2, 31, 23, 59, 59, 999); // March 31 endYear
+      const currentYear = new Date().getFullYear();
+
+
+      const allMonths = [];
+      const currentMonth = new Date().getMonth();
+      const totalMonths = currentYear == year && currentMonth > 2 ? currentMonth - 2 : (endYear - startYear - 1) * 12 + 12;
+
+      for (let i = 0; i < totalMonths; i++) {
+         const date = new Date(financialYearStart);
+         date.setMonth(date.getMonth() + i);
+         allMonths.push({
+            _id: {
+               year: date.getFullYear(),
+               month: date.getMonth() + 1
+            },
+            totalCases: 0
+         });
+      }
+
 
     // Get case distribution by currentStatus (for pie chart)
     const pieChartData = await Case.aggregate([
       {
         $match: {
           createdAt: {
-            $gte: currentYearStart,
-            $lt: endYearStart,
+           $gte: financialYearStart,
+          $lte: financialYearEnd,
           },
           partnerObjId: new Types.ObjectId(req?.user?._id),
           isActive: true,
@@ -1290,8 +1299,8 @@ export const getpartnerDashboard = async (req, res) => {
       {
         $match: {
           createdAt: {
-            $gte: currentYearStart,
-            $lt: endYearStart,
+            $gte: financialYearStart,
+            $lte: financialYearEnd,
           },
           partnerObjId: new Types.ObjectId(req?.user?._id),
           isActive: true,
