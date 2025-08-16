@@ -442,30 +442,19 @@ export const adminSettingDetailsUpdate = async (req, res) => {
 export const adminSetIsActiveEmployee = async (req, res) => {
    try {
       const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
 
       const { _id, status } = req.query
-      // console.log("emp",_id,status);
       if (!_id || !status) return res.status(400).json({ success: false, message: "required employee id and status" })
 
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
-      // console.log("status",status);
       const updateEmployee = await Employee.findByIdAndUpdate(_id, { $set: { isActive: status } }, { new: true })
       if (!updateEmployee) return res.status(404).json({ success: false, message: "Employee not found" })
-      // console.log("update",updateEmployee);
 
       return res.status(200).json({ success: true, message: `Now employee ${updateEmployee?.isActive ? "Active" : "Unactive"}` });
    } catch (error) {
       console.log("adminSetIsActiveEmployee in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
-
 }
 
 
@@ -705,7 +694,7 @@ export const adminViewAllEmployee = async (req, res) => {
       const pipeline = [
          {
             "$match": {
-               "isActive": true,
+               "isActive": req?.query?.type=="true" ? true :false,
                ...(empType ? { "type": { "$regex": empType, "$options": "i" } } : {}),
                "$or": [
                   { "fullName": { "$regex": search, "$options": "i", }, },
@@ -817,7 +806,6 @@ export const adminViewAllEmployee = async (req, res) => {
          },
       ]
       const result = await Employee.aggregate(pipeline)
-      console.log("data", result?.[0]?.data);
 
       return res.status(200).json({ success: true, message: "get sale employee data", data: result?.[0]?.data || [], noOfEmployee: result?.[0]?.totalCount?.[0]?.count || 0 });
    } catch (error) {
@@ -999,14 +987,6 @@ export const adminGetNormalEmployee = async (req, res) => {
 export const changeStatusAdminCase = async (req, res) => {
    try {
       const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
-
       const { error } = validateUpdateAdminCase(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
@@ -1328,7 +1308,7 @@ export const viewAllAdminCase = async (req, res) => {
       }
 
 
-      matchQuery.push({ isActive: Boolean(type == "true" ? true : false) })
+      matchQuery.push({ isActive: type == "true" ? true : false })
       matchQuery.push(isReject == "true" ? { currentStatus: { $in: ["Reject"] } } : { currentStatus: { $nin: ["Reject"] } })
 
       //  date-wise filter
@@ -1351,7 +1331,6 @@ export const viewAllAdminCase = async (req, res) => {
                   { "isPartnerReferenceCase": false },
                   { "isEmpSaleReferenceCase": false },
                   { "currentStatus": { "$regex": status, "$options": "i" } },
-                  { "isActive": true },
                   ...matchQuery,
                ]
             }
@@ -2630,30 +2609,18 @@ export const adminUpdatePartnerBankingDetails = async (req, res) => {
 export const adminSetIsActivePartner = async (req, res) => {
    try {
       const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
 
       const { _id, status } = req.query
-      // console.log("emp",id,status);
       if (!_id || !status) return res.status(400).json({ success: false, message: "required partner id and status" })
 
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
-      // console.log("status",status);
       const updatePartner = await Partner.findByIdAndUpdate(_id, { $set: { isActive: status } }, { new: true })
       if (!updatePartner) return res.status(404).json({ success: false, message: "Partner not found" })
-      // console.log("update",updatePartner);
-
       return res.status(200).json({ success: true, message: `Now partner ${updatePartner?.isActive ? "Active" : "Unactive"}` });
    } catch (error) {
-      console.log("adminSetIsActiveEmployee in error:", error);
+      console.log("adminSetIsActivePartner in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
-
 }
 
 
@@ -2864,30 +2831,18 @@ export const adminAddOrUpdatePayment = async (req, res) => {
 export const adminSetIsActiveClient = async (req, res) => {
    try {
       const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
 
       const { _id, status } = req.query
-      // console.log("emp",id,status);
       if (!_id || !status) return res.status(400).json({ success: false, message: "required client id and status" })
 
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
-      // console.log("status",status);
       const updateClient = await Client.findByIdAndUpdate(_id, { $set: { isActive: status } }, { new: true })
       if (!updateClient) return res.status(404).json({ success: false, message: "Client not found" })
-      // console.log("update",updatePartner);
-
       return res.status(200).json({ success: true, message: `Now client ${updateClient?.isActive ? "Active" : "Unactive"}` });
    } catch (error) {
       console.log("adminSetIsActiveClient in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
-
 }
 
 
@@ -3536,14 +3491,6 @@ export const adminRemoveReferenceCase = async (req, res) => {
 export const adminUnactiveCaseDoc = async (req, res) => {
    try {
       const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
-
       const { _id, status } = req?.query
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid docId" })
 
@@ -3552,7 +3499,7 @@ export const adminUnactiveCaseDoc = async (req, res) => {
 
       return res.status(200).json({ success: true, message: `Successfully ${!status ? "restore" : "remove"} case-doc` })
    } catch (error) {
-      console.log("adminRemoveRefenceCase in error:", error);
+      console.log("adminUnactiveCaseDoc in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
 }
@@ -3561,13 +3508,6 @@ export const adminUnactiveCaseDoc = async (req, res) => {
 export const adminAllUnactiveCaseDoc = async (req, res) => {
    try {
       const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
       const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = req.query.search ? req.query.search : "";
@@ -3590,30 +3530,19 @@ export const adminAllUnactiveCaseDoc = async (req, res) => {
 export const adminSetIsActiveCase = async (req, res) => {
    try {
       const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
 
       const { _id, status } = req.query
-      // console.log("emp",id,status);
       if (!_id || !status) return res.status(400).json({ success: false, message: "required case id and status" })
 
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
-      // console.log("status",status);
       const updateCase = await Case.findByIdAndUpdate(_id, { $set: { isActive: status } }, { new: true })
       if (!updateCase) return res.status(404).json({ success: false, message: "Case not found" })
-      // console.log("update",updateCase);
 
       return res.status(200).json({ success: true, message: `Now case ${updateCase?.isActive ? "Active" : "Unactive"}` });
    } catch (error) {
-      console.log("adminSetIsActiveEmployee in error:", error);
+      console.log("adminSetIsActiveCase in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
    }
-
 }
 
 

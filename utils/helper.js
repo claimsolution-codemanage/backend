@@ -205,11 +205,11 @@ export const getAllClientSearchQuery = (searchQuery, type, startDate = "", endDa
 export const getAllClientResult = async (req) => {
   try {
     const { employee, admin } = req
-    let { limit = 10, pageNo = 0, search = "", startDate = "", endDate = "" } = req.query
+    let { limit = 10, pageNo = 0, search = "", startDate = "", endDate = "",type } = req.query
     pageNo = pageNo ? (pageNo - 1) * limit : 0
 
     const matchQuery = {
-      "isActive": true,
+      "isActive": type=="true" ? true :false,
     }
     
     if(employee){

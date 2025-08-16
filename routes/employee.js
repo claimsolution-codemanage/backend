@@ -23,6 +23,7 @@ router.get("/all/dashboard",authEmployee,employeeController.allEmployeeDashboard
 // case
 router.get("/viewAllCase",authEmployee,employeeController.viewAllEmployeeCase)
 router.get("/viewCaseById",authEmployee,employeeController.employeeViewCaseByIdBy)
+router.put("/changeCaseIsActive",authEmployee,employeeController.empSetIsActiveCase)
 router.post("/empAddCaseFile",authEmployee,employeeController.empAddCaseFile)
 router.get("/employeeFindCaseByFileNo",authEmployee,employeeController.employeeFindCaseByFileNo)
 router.put("/changeCaseStatus",authEmployee,employeeController.changeStatusEmployeeCase)
@@ -33,17 +34,22 @@ router.put("/operation/removeReferenceCase",authEmployee,employeeController.empR
 router.post("/emp/empAddOrUpdatePayment",authEmployee,employeeController.empAddOrUpdatePayment)
 router.post('/opeation/empOpCreateOrUpdateCaseForm',authEmployee,employeeController.empOpCreateOrUpdateCaseForm)
 
+// case doc
+router.put("/unActiveDoc",authEmployee,employeeController.empUnactiveCaseDoc)
+router.get("/allUnactiveCaseDoc",authEmployee,employeeController.empAllUnactiveCaseDoc)
 
 
 // client
 router.get("/viewAllClient",authEmployee,employeeController.employeeViewAllClient)
 router.get("/viewClientById",authEmployee,employeeController.employeeViewClientById)
+router.put("/changeClientStatus",authEmployee,employeeController.empSetIsActiveClient)
 router.put("/updateClient",authEmployee,employeeController.employeeEditClient)
 router.get("/download/allClient",authEmployee,employeeController.empClientDownload)
 
 // partner
 router.get("/viewAllPartner",authEmployee,employeeController.employeeViewAllPartner)
 router.get("/viewPartnerById",authEmployee,employeeController.employeeViewPartnerById)
+router.put("/changePartnerStatus",authEmployee,employeeController.employeeSetIsActivePartner)
 router.put("/updatePartnerProfile",authEmployee,employeeController.employeeupdateParnterProfile)
 router.put("/updatePartnerBankingDetails",authEmployee,employeeController.employeeUpdatePartnerBankingDetails)
 router.put("/operation/addPartnerRefToEmp",authEmployee,employeeController.empAddPartnerRefToEmp)
@@ -87,6 +93,8 @@ router.get("/download/allPartner",authEmployee,employeeController.employeeDownlo
 // emphead
 router.get("/head/allEmployee",authEmployee,employeeController.empViewAllEmployee)
 router.get("/download/allEmployee",authEmployee,employeeController.empDownloadAllEmployee)
+router.put("/setIsActiveEmployee",authEmployee,employeeController.empSetIsActiveEmployee)
+
 
 
 

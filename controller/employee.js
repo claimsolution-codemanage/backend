@@ -16,7 +16,7 @@ import bcrypt from 'bcrypt'
 import Jwt from "jsonwebtoken";
 import { validateEmployeeSignIn, validateEmployeeResetPassword, validateUpdateEmployeeCase, validateAddPartner, validateAddEmpCase, validateEmployeeSignUp, validateSathiTeamSignUp, validateEmployeeUpdate } from "../utils/validateEmployee.js";
 import { authEmployee, authPartner } from "../middleware/authentication.js";
-import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel, getAllClientDownloadExcel, commonInvoiceDownloadExcel, sendNotificationAndMail, getAllStatementDownloadExcel, commonDownloadCaseExcel, getAllClientResult, getAllPartnerResult } from "../utils/helper.js";
+import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel, getAllClientDownloadExcel, commonInvoiceDownloadExcel, sendNotificationAndMail, getAllStatementDownloadExcel, commonDownloadCaseExcel, getAllClientResult, getAllPartnerResult, getAllCaseDocQuery } from "../utils/helper.js";
 import * as dbFunction from "../utils/dbFunction.js"
 import { sendAddClientRequest, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
 import { validateAddClientCase, validateClientProfileBody } from "../utils/validateClient.js";
@@ -293,6 +293,49 @@ export const empOpCreateOrUpdateCaseForm = async (req, res, next) => {
 
    }
 }
+
+export const empUnactiveCaseDoc = async (req, res) => {
+   try {
+      const { employee } = req
+      const { _id, status } = req?.query
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid docId" })
+
+      if (employee?.designation?.toLowerCase() != "manager" || employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
+      
+      const updateDoc = await CaseDoc.findByIdAndUpdate(_id, { $set: { isActive: status } })
+      if (!updateDoc) return res.status(404).json({ success: false, message: "Case-doc not found" })
+
+      return res.status(200).json({ success: true, message: `Successfully ${!status ? "restore" : "remove"} case-doc` })
+   } catch (error) {
+      console.log("empUnactiveCaseDoc in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
+
+export const empAllUnactiveCaseDoc = async (req, res) => {
+   try {
+      const { employee } = req
+      const pageItemLimit = req.query.limit ? req.query.limit : 10;
+      const pageNo = req.query.pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
+      const searchQuery = req.query.search ? req.query.search : "";
+      const startDate = req.query.startDate ? req.query.startDate : "";
+      const endDate = req.query.endDate ? req.query.endDate : "";
+
+      if (employee?.designation?.toLowerCase() != "manager" || employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
+      const query = getAllCaseDocQuery(searchQuery, startDate, endDate,)
+      if (!query.success) return res.status(400).json({ success: false, message: query.message })
+
+      const getAllCaseDoc = await CaseDoc.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).populate("caseId");
+      const noOfCaseDoc = await CaseDoc.find(query?.query).count()
+
+      return res.status(200).json({ success: true, message: `Successfully fetch case-doc`, data: getAllCaseDoc, totalDoc: noOfCaseDoc })
+   } catch (error) {
+      console.log("empAllUnactiveCaseDoc in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
 
 // old version
 // export const empOpSharePartnerToSaleEmp = async (req, res) => {
@@ -1197,9 +1240,6 @@ export const viewAllEmployeeCase = async (req, res) => {
 
          const extactOptions = await Employee.aggregate(filterPipeline)
 
-         console.log("extactOptions", extactOptions[0]);
-
-
          matchQuery.push({
             $or: [
                { empObjId: { $in: extactOptions?.[0]?.empIds } },
@@ -1237,7 +1277,7 @@ export const viewAllEmployeeCase = async (req, res) => {
                   { "isPartnerReferenceCase": false },
                   { "isEmpSaleReferenceCase": false },
                   { "currentStatus": { "$regex": status, "$options": "i" } },
-                  { "isActive": true },
+                  // { "isActive": true },
                   { "branchId": { "$regex": employee?.branchId, "$options": "i" } },
                   ...matchQuery,
                ]
@@ -1703,6 +1743,25 @@ export const employeeViewCaseByIdBy = async (req, res) => {
       return res.status(500).json({ success: false, message: "Internal server error", error });
    }
 };
+
+export const empSetIsActiveCase = async (req, res) => {
+   try {
+      const { employee } = req
+      if (employee?.designation?.toLowerCase() != "manager" || employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
+
+      const { _id, status } = req.query
+      if (!_id || !status) return res.status(400).json({ success: false, message: "required case id and status" })
+
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+      const updateCase = await Case.findByIdAndUpdate(_id, { $set: { isActive: status } }, { new: true })
+      if (!updateCase) return res.status(404).json({ success: false, message: "Case not found" })
+
+      return res.status(200).json({ success: true, message: `Now case ${updateCase?.isActive ? "Active" : "Unactive"}` });
+   } catch (error) {
+      console.log("empSetIsActiveCase in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
 
 
 export const empAddCaseFile = async (req, res) => {
@@ -2330,6 +2389,24 @@ export const employeeViewPartnerById = async (req, res) => {
    }
 }
 
+export const employeeSetIsActivePartner = async (req, res) => {
+   try {
+      const { employee } = req
+      if (employee?.designation?.toLowerCase() != "manager" || employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
+
+      const { _id, status } = req.query
+      if (!_id || !status) return res.status(400).json({ success: false, message: "required partner id and status" })
+
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+      const updatePartner = await Partner.findByIdAndUpdate(_id, { $set: { isActive: status } }, { new: true })
+      if (!updatePartner) return res.status(404).json({ success: false, message: "Partner not found" })
+      return res.status(200).json({ success: true, message: `Now partner ${updatePartner?.isActive ? "Active" : "Unactive"}` });
+   } catch (error) {
+      console.log("employeeSetIsActivePartner in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
 export const employeeViewAllClient = async (req, res) => {
    try {
       const result = await getAllClientResult(req)
@@ -2371,15 +2448,6 @@ export const empClientDownload = async (req, res) => {
 export const employeeViewClientById = async (req, res) => {
    try {
       const { employee } = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
-
-
-
       const { _id } = req.query;
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
@@ -2394,6 +2462,24 @@ export const employeeViewClientById = async (req, res) => {
    }
 }
 
+
+export const empSetIsActiveClient = async (req, res) => {
+   try {
+      const { employee } = req
+      if (employee?.designation?.toLowerCase() != "manager" || employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
+
+      const { _id, status } = req.query
+      if (!_id || !status) return res.status(400).json({ success: false, message: "required client id and status" })
+
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+      const updateClient = await Client.findByIdAndUpdate(_id, { $set: { isActive: status } }, { new: true })
+      if (!updateClient) return res.status(404).json({ success: false, message: "Client not found" })
+      return res.status(200).json({ success: true, message: `Now client ${updateClient?.isActive ? "Active" : "Unactive"}` });
+   } catch (error) {
+      console.log("empSetIsActiveClient in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
 
 
 export const employeeForgetPassword = async (req, res) => {
@@ -2449,13 +2535,6 @@ export const employeeResetForgetPassword = async (req, res) => {
 export const employeeAddCaseComment = async (req, res) => {
    try {
       const { employee } = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
-
 
       if (!req?.body?.Comment) return res.status(400).json({ success: false, message: "Case Comment required" })
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
@@ -2614,12 +2693,6 @@ export const employeeCreateInvoice = async (req, res) => {
 export const employeeViewAllInvoice = async (req, res) => {
    try {
       const { employee } = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
       if (employee?.type?.toLowerCase() != "finance" && employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
 
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
@@ -4959,7 +5032,7 @@ export const empViewAllEmployee = async (req, res) => {
       const pipeline = [
          {
             "$match": {
-               "isActive": true,
+               "isActive": req?.query?.type=="true" ? true :false,
                "$and": matchQuery,
                "$or": [
                   { "fullName": { "$regex": search, "$options": "i", }, },
@@ -5085,12 +5158,6 @@ export const empViewAllEmployee = async (req, res) => {
 export const empDownloadAllEmployee = async (req, res) => {
    try {
       const { employee } = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
 
       const searchQuery = req.query.search ? req.query.search : "";
       const pageItemLimit = req.query.limit ? req.query.limit : 10;
@@ -5140,6 +5207,27 @@ export const empDownloadAllEmployee = async (req, res) => {
 
    }
 }
+
+export const empSetIsActiveEmployee = async (req, res) => {
+   try {
+      const { employee } = req
+
+      const { _id, status } = req.query
+      if (!_id || !status) return res.status(400).json({ success: false, message: "required employee id and status" })
+
+      if (employee?.designation?.toLowerCase() != "manager" || employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
+      
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+      const updateEmployee = await Employee.findByIdAndUpdate(_id, { $set: { isActive: status } }, { new: true })
+      if (!updateEmployee) return res.status(404).json({ success: false, message: "Employee not found" })
+
+      return res.status(200).json({ success: true, message: `Now employee ${updateEmployee?.isActive ? "Active" : "Unactive"}` });
+   } catch (error) {
+      console.log("empSetIsActiveEmployee in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
 
 export const empViewSathiEmployee = async (req, res) => {
    try {
