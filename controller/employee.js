@@ -378,25 +378,10 @@ export const empOpSharePartnerToSaleEmp = async (req, res) => {
       const { error } = validateAdminSharePartner(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
       const { sharePartners = [], shareEmployee = [] } = req.body
-      // let bulkOps = []
-      // for (const toEmployeeId of shareEmployee) {
-      //    const exists = await ShareSection.find({toEmployeeId,partnerId:{$in:sharePartners}},{partnerId:1})
-      //    let filter = sharePartners?.filter(partnerId=>!exists?.map(ele=>ele?.partnerId?.toString())?.includes(partnerId)) 
-      //    filter?.forEach(partnerId=>{
-      //       bulkOps.push({
-      //          insertOne:{
-      //             document:{
-      //                partnerId,
-      //                toEmployeeId
-      //             }
-      //          }
-      //       })
-      //    })
-      // }   
-      // await ShareSection.bulkWrite(bulkOps)
 
       // show in added by
       if (!shareEmployee[0]) return res.status(400).json({ success: true, message: "Please add employee to share" });
+      await ShareSection.deleteMany({toEmployeeId:{$exists:true},partnerId:{ $in: sharePartners },clientId:{$exists:false},caseId:{$exists:false}})
       await Partner.updateMany({ _id: { $in: sharePartners } }, { $set: { salesId: shareEmployee[0] } })
       return res.status(200).json({ success: true, message: "Successfully share partner" });
 
@@ -684,13 +669,6 @@ export const employeeUpdatePartnerBankingDetails = async (req, res) => {
 export const empAddPartnerRefToEmp = async (req, res) => {
    try {
       const { employee } = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "employee account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "employee account not active" })
-
       const { partnerId, empEmail } = req?.body
       if (!partnerId) return res.status(400).json({ success: false, message: "Partner id required" })
       if (!validMongooseId(partnerId)) return res.status(400).json({ success: false, message: "Not a valid PartnerId" })
@@ -703,6 +681,7 @@ export const empAddPartnerRefToEmp = async (req, res) => {
       const findEmp = await Employee.findOne({ email: { $regex: empEmail, $options: "i" } })
       if (!findEmp) return res.status(404).json({ success: false, message: "Employee not found" })
 
+      await ShareSection.deleteMany({toEmployeeId:{$exists:true},partnerId,clientId:{$exists:false},caseId:{$exists:false}})
       const updatePartner = await Partner.findByIdAndUpdate(partnerId, { salesId: findEmp._id })
       return res.status(200).json({ success: true, message: "Successfully add employee reference" });
 
@@ -1616,6 +1595,16 @@ export const employeeViewCaseByIdBy = async (req, res) => {
                         $expr: {
                            $and: [
                               { $eq: ["$isActive", true] },
+                              ...(!isOperation
+                                 ? [
+                                    {
+                                       $or: [
+                                          { $eq: ["$isPrivate", false] },
+                                           { $eq: [{ $ifNull: ["$isPrivate", false] }, false] }
+                                       ]
+                                    }
+                                 ]
+                                 : []),
                               {
                                  $or: [
                                     { $eq: ["$caseId", "$$id"] },
@@ -2535,17 +2524,12 @@ export const employeeResetForgetPassword = async (req, res) => {
 export const employeeAddCaseComment = async (req, res) => {
    try {
       const { employee } = req
+      const {comment,isPrivate} = req.body
 
-      if (!req?.body?.Comment) return res.status(400).json({ success: false, message: "Case Comment required" })
+      if (!comment) return res.status(400).json({ success: false, message: "Case Comment required" })
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-
-      // const newCommit = {
-      //    _id:req?.user?._id,
-      //    role:req?.user?.role,
-      //    name:req?.user?.fullName,
-      //    type:req?.user?.empType,
-      //    commit:req?.body?.Comment,Date:new Date()}      
+     
       const getCase = await Case.findById(req.body._id)
       if (!getCase) return res.status(400).json({ success: false, message: "Case not found" })
 
@@ -2553,9 +2537,11 @@ export const employeeAddCaseComment = async (req, res) => {
          role: req?.user?.role,
          name: req?.user?.fullName,
          type: req?.user?.empType,
-         message: req?.body?.Comment,
+         message: comment?.trim(),
+         isPrivate:isPrivate ?? false,
          caseId: getCase?._id?.toString(),
          employeeId: req?.user?._id,
+
       })
       await newComment.save()
 

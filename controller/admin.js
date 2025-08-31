@@ -2891,13 +2891,6 @@ export const adminAddCaseFeeClient = async (req, res) => {
 export const adminUpdateClientCaseFee = async (req, res) => {
    try {
       const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
 
       const { error } = validateAdminUpdateCasePayment(req.query)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
@@ -3014,26 +3007,12 @@ export const adminSharePartnerToSaleEmp = async (req, res) => {
       const { error } = validateAdminSharePartner(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
       const { sharePartners = [], shareEmployee = [] } = req.body
-      // let bulkOps = []
-      // for (const toEmployeeId of shareEmployee) {
-      //    const exists = await ShareSection.find({toEmployeeId,partnerId:{$in:sharePartners}},{partnerId:1})
-      //    let filter = sharePartners?.filter(partnerId=>!exists?.map(ele=>ele?.partnerId?.toString())?.includes(partnerId)) 
-      //    filter?.forEach(partnerId=>{
-      //       bulkOps.push({
-      //          insertOne:{
-      //             document:{
-      //                partnerId,
-      //                toEmployeeId
-      //             }
-      //          }
-      //       })
-      //    })
-      // }   
-      // await ShareSection.bulkWrite(bulkOps)
-      // return res.status(200).json({ success: true, message: "Successfully share partner" });
 
       if (!shareEmployee[0]) return res.status(400).json({ success: true, message: "Please add employee to share" });
+
+      await ShareSection.deleteMany({toEmployeeId:{$exists:true},partnerId:{ $in: sharePartners },clientId:{$exists:false},caseId:{$exists:false}})
       await Partner.updateMany({ _id: { $in: sharePartners } }, { $set: { salesId: shareEmployee[0] } })
+      
       return res.status(200).json({ success: true, message: "Successfully share partner" });
 
    } catch (error) {
@@ -3100,7 +3079,8 @@ export const adminShareClientToSaleEmp = async (req, res) => {
 export const adminAddCaseComment = async (req, res) => {
    try {
       const { admin } = req
-      if (!req?.body?.Comment) return res.status(400).json({ success: false, message: "Case Comment required" })
+      const {comment,isPrivate} = req.body
+      if (!comment?.trim()) return res.status(400).json({ success: false, message: "Case Comment required" })
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
       const getCase = await Case.findById(req.body._id,)
@@ -3110,7 +3090,8 @@ export const adminAddCaseComment = async (req, res) => {
          role: req?.user?.role,
          name: req?.user?.fullName,
          type: req?.user?.empType,
-         message: req?.body?.Comment,
+         message: comment?.trim(),
+         isPrivate: isPrivate ?? false,
          caseId: getCase?._id?.toString(),
          adminId: req?.user?._id,
       })
@@ -3672,12 +3653,6 @@ export const adminDeletePartnerById = async (req, res) => {
 export const adminAddPartnerRefToEmp = async (req, res) => {
    try {
       const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       const { partnerId, empEmail } = req?.body
       if (!partnerId) return res.status(400).json({ success: false, message: "Partner id required" })
@@ -3692,7 +3667,9 @@ export const adminAddPartnerRefToEmp = async (req, res) => {
       const findEmp = await Employee.findOne({ email: { $regex: empEmail, $options: "i" } })
       if (!findEmp) return res.status(404).json({ success: false, message: "Employee not found" })
 
+      await ShareSection.deleteMany({toEmployeeId:{$exists:true},partnerId,clientId:{$exists:false},caseId:{$exists:false}})
       const updatePartner = await Partner.findByIdAndUpdate(partnerId, { salesId: findEmp?._id })
+
       return res.status(200).json({ success: true, message: "Successfully add employee reference" });
 
    } catch (error) {

@@ -82,11 +82,8 @@ export const createOrUpdateCaseStatusForm = async (req, res, next) => {
             })
         }
 
-        console.log("approved",approved,approved==true,isSettelment,isSettelment==true,"settelment");
-        
         if (isSettelment && isExist) {
             let isExistPaymentDetails = await CasePaymentDetails.findOne({ _id: isExist?.paymentDetailsId, isActive: true })
-            console.log("isExistPaymentDetails",isExistPaymentDetails);
             
             if (!isExistPaymentDetails) {
                 isExistPaymentDetails = new CasePaymentDetails({ caseId:findCase?._id, isActive: true, branchId: findCase?.branchId || "" })
@@ -102,9 +99,7 @@ export const createOrUpdateCaseStatusForm = async (req, res, next) => {
             })
             await isExistPaymentDetails.save()
             isExist.paymentDetailsId = isExistPaymentDetails?._id
-
-            console.log("partnerId",findCase?.branchId);
-            
+  
             if (findCase?.partnerId && partnerFee) {
                 let isExistStatement = await Statement.findOne({_id:isExist.statementId, isActive: true })
                 if (!isExistStatement) {
