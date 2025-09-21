@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt'
 import { sendOTPMail } from "../utils/sendMail.js";
 import { authClient } from "../middleware/authentication.js";
 import { otp6Digit, sendNotificationAndMail } from '../utils/helper.js'
-import Case from "../models/case.js";
+import Case from "../models/case/case.js";
 import { getAllCaseQuery } from "../utils/helper.js";
 import { validMongooseId } from "../utils/helper.js";
 import jwt from 'jsonwebtoken'
@@ -22,7 +22,7 @@ import Notification from "../models/notification.js";
 import CasePaymentDetails from "../models/casePaymentDetails.js";
 import CasegroStatus from "../models/groStatus.js";
 import CaseOmbudsmanStatus from "../models/ombudsmanStatus.js";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 
 export const clientUploadImage = async (req, res) => {
   try {
@@ -640,6 +640,7 @@ export const clientUpdateCaseById = async (req, res) => {
 
 export const viewClientCaseById = async (req, res) => {
   try {
+    const {_id} = req.query
     const verify = await authClient(req, res)
     if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -648,71 +649,116 @@ export const viewClientCaseById = async (req, res) => {
     if (!client?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
 
     //  console.log("query",query?.query);
-    const { _id } = req.query;
-    if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
-    const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails")
-    if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
-
-    const [getCaseDoc, getCaseStatus, getCasePaymentDetails, getCaseGroDetails,getCaseOmbudsmanDetails] = await Promise.all([
-      CaseDoc.find({ 
-        $and: [
-          {
-            $or: [
-              { caseId: getCase?._id },
-              { caseMargeId: getCase?._id }
-            ]
-          },
-          {
-            $or: [
-              { isPrivate: false },
-              { isPrivate: { $exists: false } }
-            ]
-          }
-        ], isActive: true }).select("-adminId"),
-      CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
-      CasePaymentDetails.find({ caseId: getCase?._id, isActive: true }),
-      CasegroStatus.findOne({ caseId: getCase?._id, isActive: true }).select("-groStatusUpdates -queryHandling -queryReply").populate("paymentDetailsId"),
-      CaseOmbudsmanStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
-      
-    ]);
-    
-    // Convert `getCaseGroDetails` to a plain object if it exists
-      const caseGroDetailsObj = getCaseGroDetails ? getCaseGroDetails.toObject() : null;
-      const caseOmbudsmanDetailsObj = getCaseOmbudsmanDetails ? getCaseOmbudsmanDetails.toObject() : null;
-
-    const getCaseJson = getCase.toObject();
-    getCaseJson.caseDocs = getCaseDoc;
-    getCaseJson.processSteps = getCaseStatus;
-    getCaseJson.casePayment = getCasePaymentDetails;
-    console.log("getCaseGroDetails",getCaseGroDetails);
-    
-    if(caseGroDetailsObj){
-       getCaseJson.caseGroDetails = {
-         ...caseGroDetailsObj,
-         groStatusUpdates: [],
-         queryHandling: [],
-         queryReply: [],
-         approvalLetter: caseGroDetailsObj?.approvalLetterPrivate ? "" : caseGroDetailsObj?.approvalLetter,
-       };          
-    }else{
-      getCaseJson.caseGroDetails = caseGroDetailsObj
+if (!validMongooseId(_id)) {
+      return res.status(400).json({ success: false, message: "Not a valid id" });
     }
 
-        //  ombudsman status
-        if (caseOmbudsmanDetailsObj) {
-          getCaseJson.caseOmbudsmanDetails = {
-            ...caseOmbudsmanDetailsObj,
-            statusUpdates: caseOmbudsmanDetailsObj?.statusUpdates?.filter(ele => ele?.isPrivate) || [],
-            queryHandling: caseOmbudsmanDetailsObj?.queryHandling?.filter(ele => ele?.isPrivate) || [],
-            queryReply: caseOmbudsmanDetailsObj?.queryReply?.filter(ele => ele?.isPrivate) || [],
-            hearingSchedule: caseOmbudsmanDetailsObj?.hearingSchedule?.filter(ele => ele?.isPrivate) || [],
-            awardPart: caseOmbudsmanDetailsObj?.awardPart?.filter(ele => ele?.isPrivate) || [],
-            approvalLetter: caseOmbudsmanDetailsObj?.approvalLetterPrivate ? "" : caseOmbudsmanDetailsObj?.approvalLetter,
-          };
-        } else {
-          getCaseJson.caseOmbudsmanDetails = caseOmbudsmanDetailsObj
+    const [caseData] = await Case.aggregate([
+      { $match: { _id: new mongoose.Types.ObjectId(_id) } },
+      {
+        $lookup: {
+          from: "casedocs",
+          let: { caseId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$isActive", true] },
+                    {
+                      $or: [
+                        { $eq: ["$caseId", "$$caseId"] },
+                        { $eq: ["$caseMargeId", { $toString: "$$caseId" }] }
+                      ]
+                    },
+                    {
+                      $or: [
+                        { $eq: ["$isPrivate", false] },
+                        { $not: { $ifNull: ["$isPrivate", false] } }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            { $project: { adminId: 0 } }
+          ],
+          as: "caseDocs"
         }
-    return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
+      },
+      {
+        $lookup: {
+          from: "casestatuses",
+          let: { caseId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$isActive", true] },
+                    {
+                      $or: [
+                        { $eq: ["$caseId", "$$caseId"] },
+                        { $eq: ["$caseMargeId", { $toString: "$$caseId" }] }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            { $project: { adminId: 0 } }
+          ],
+          as: "processSteps"
+        }
+      },
+      {
+        $lookup: {
+          from: "casepaymentdetails",
+          let: { caseId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$isActive", true] },
+                    { $eq: ["$caseId", "$$caseId"] }
+                  ]
+                }
+              }
+            }
+          ],
+          as: "casePayment"
+        }
+      },
+      {
+        $project: {
+          addEmployee: 0,
+          partnerReferenceCaseDetails: 0,
+          caseCommit: 0
+        }
+      },  {
+            $lookup: {
+               from: "case_forms",
+               localField: "_id",
+               foreignField: "caseId",
+               pipeline: [
+                  { $match: { isActive: true } },
+                  { $project: { formType: 1,caseId:1 } },
+               ],
+               as: "case_forms"
+            }
+         },
+    ]);
+
+    if (!caseData) {
+      return res.status(404).json({ success: false, message: "Case not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Case data fetched successfully",
+      data: caseData
+    });
 
   } catch (error) {
     console.log("get all client case in error:", error);

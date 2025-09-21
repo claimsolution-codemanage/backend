@@ -1,6 +1,6 @@
 import axios from "axios";
 import jwtDecode from "jwt-decode";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import ExcelJS from 'exceljs';
 import bcrypt from 'bcrypt';
 import { Readable } from 'stream';
@@ -32,7 +32,7 @@ import { validateInvoice } from "../utils/validateEmployee.js";
 
 // model
 import Employee from "../models/employee.js";
-import Case from "../models/case.js";
+import Case from "../models/case/case.js";
 import Partner from "../models/partner.js";
 import Client from '../models/client.js'
 import Admin from "../models/admin.js";
@@ -331,9 +331,9 @@ export const adminDashboard = async (req, res) => {
       const pieChartData = await Case.aggregate([
          {
             '$match': {
-               'createdAt': { 
-               $gte: financialYearStart,
-               $lte: financialYearEnd,
+               'createdAt': {
+                  $gte: financialYearStart,
+                  $lte: financialYearEnd,
                },
                'isActive': true,
                'isPartnerReferenceCase': false,
@@ -371,10 +371,10 @@ export const adminDashboard = async (req, res) => {
       const graphData = await Case.aggregate([
          {
             $match: {
-               'createdAt': { 
+               'createdAt': {
                   $gte: financialYearStart,
                   $lte: financialYearEnd,
-                },
+               },
                'isActive': true,
                'isPartnerReferenceCase': false,
                'isEmpSaleReferenceCase': false,
@@ -694,7 +694,7 @@ export const adminViewAllEmployee = async (req, res) => {
       const pipeline = [
          {
             "$match": {
-               "isActive": req?.query?.type=="true" ? true :false,
+               "isActive": req?.query?.type == "true" ? true : false,
                ...(empType ? { "type": { "$regex": empType, "$options": "i" } } : {}),
                "$or": [
                   { "fullName": { "$regex": search, "$options": "i", }, },
@@ -850,48 +850,48 @@ export const adminGetSaleEmployee = async (req, res) => {
    try {
       const { admin } = req
 
-     let {limit,search,pageNo} = req.query
+      let { limit, search, pageNo } = req.query
       const pageItemLimit = limit || 50;
       pageNo = pageNo ? (req.query.pageNo - 1) * pageItemLimit : 0;
       const searchQuery = search || "";
 
-      const pipeline =[
+      const pipeline = [
          {
-           $match: {
-             isActive: true,
-             type: { $regex: "sales", $options: "i", },
-             $or: [
-               {fullName: {$regex: searchQuery, $options: "i", },  },
-               {email: {$regex: searchQuery, $options: "i", },  },
-               {mobileNo: {$regex: searchQuery, $options: "i", },  },
-               {type: {$regex: searchQuery, $options: "i", },  },
-               {designation: {$regex: searchQuery, $options: "i", },  },
-             ],
-           },
+            $match: {
+               isActive: true,
+               type: { $regex: "sales", $options: "i", },
+               $or: [
+                  { fullName: { $regex: searchQuery, $options: "i", }, },
+                  { email: { $regex: searchQuery, $options: "i", }, },
+                  { mobileNo: { $regex: searchQuery, $options: "i", }, },
+                  { type: { $regex: searchQuery, $options: "i", }, },
+                  { designation: { $regex: searchQuery, $options: "i", }, },
+               ],
+            },
          },
          {
-           $project: {
-             fullName: 1,
-             email: 1,
-             mobileNo: 1,
-             type: 1,
-             designation: 1,
-             branchId: 1,
-           },
+            $project: {
+               fullName: 1,
+               email: 1,
+               mobileNo: 1,
+               type: 1,
+               designation: 1,
+               branchId: 1,
+            },
          },
          {
-           $facet: {
-             data: [
-               {$sort: { createdAt: -1, }, },
-               { $skip: 0, },
-               { $limit: 10, },
-             ],
-             totalCount: [
-               {$count: "count",  },
-             ],
-           },
+            $facet: {
+               data: [
+                  { $sort: { createdAt: -1, }, },
+                  { $skip: 0, },
+                  { $limit: 10, },
+               ],
+               totalCount: [
+                  { $count: "count", },
+               ],
+            },
          },
-       ]
+      ]
       const result = await Employee.aggregate(pipeline)
       return res.status(200).json({ success: true, message: "get sale employee data", data: result?.[0]?.data || [], noOfEmployee: result?.[0]?.totalCount?.[0]?.count || 0 });
 
@@ -2389,37 +2389,174 @@ export const adminViewEmpSalePartnerReport = async (req, res) => {
 
 export const viewCaseByIdByAdmin = async (req, res) => {
    try {
-      const { admin } = req
       const { _id } = req.query;
-      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-      const getCase = await Case.findById(_id).select("-caseDocs -processSteps -addEmployee -caseCommit")
-      if (!getCase) return res.status(404).json({ success: false, message: "Case not found" })
-      const [getCaseDoc, getCaseStatus, getCaseComment, getCasePaymentDetails, getCaseGroDetails, caseOmbudsmanDetails] = await Promise.all([
-         CaseDoc.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
-         CaseStatus.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }).select("-adminId"),
-         CaseComment.find({ $or: [{ caseId: getCase?._id }, { caseMargeId: getCase?._id }], isActive: true }),
-         CasePaymentDetails.find({ caseId: getCase?._id, isActive: true }),
-         CasegroStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
-         CaseOmbudsmanStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
+      if (!validMongooseId(_id)) {
+         return res.status(400).json({ success: false, message: "Invalid case id" });
+      }
 
+      const [caseData] = await Case.aggregate([
+         { $match: { _id: new mongoose.Types.ObjectId(_id) } },
+         {
+            $lookup: {
+               from: "clients",
+               localField: "clientObjId",
+               foreignField: "_id",
+               as: "clientDetails",
+               pipeline: [
+                  { $project: { "profile.consultantCode": 1, "profile.consultantName": 1 } }
+               ]
+            }
+         },
+         {
+            $unwind: {
+               path: "$clientDetails",
+               preserveNullAndEmptyArrays: true
+            }
+         },
+         {
+            $lookup: {
+               from: "partners",
+               localField: "partnerObjId",
+               foreignField: "_id",
+               as: "partnerDetails",
+               pipeline: [
+                  { $project: { "profile.consultantCode": 1, "profile.consultantName": 1 } }
+               ]
+            }
+         },
+         {
+            $unwind: {
+               path: "$partnerDetails",
+               preserveNullAndEmptyArrays: true
+            }
+         },
+         {
+            $lookup: {
+               from: "employees",
+               localField: "empObjId",
+               foreignField: "_id",
+               as: "empDetails",
+               pipeline: [
+                  {
+                     $project: {
+                        fullName: 1,
+                        type: 1,
+                        designation: 1
+                     }
+                  }
+               ]
+            }
+         },
+         { $unwind: { path: "$empDetails", preserveNullAndEmptyArrays: true } },
+         {
+            $lookup: {
+               from: "casedocs",
+               let: { caseId: "$_id" },
+               pipeline: [
+                  {
+                     $match: {
+                        $expr: {
+                           $and: [
+                              { $eq: ["$isActive", true] },
+                              { $or: [{ $eq: ["$caseId", "$$caseId"] }, { $eq: ["$caseMargeId", { $toString: "$$caseId" }] }] }
+                           ]
+                        }
+                     }
+                  },
+                  { $project: { adminId: 0 } }
+               ],
+               as: "caseDocs"
+            }
+         },
+         {
+            $lookup: {
+               from: "casestatuses",
+               let: { caseId: "$_id" },
+               pipeline: [
+                  {
+                     $match: {
+                        $expr: {
+                           $and: [
+                              { $eq: ["$isActive", true] },
+                              { $or: [{ $eq: ["$caseId", "$$caseId"] }, { $eq: ["$caseMargeId", { $toString: "$$caseId" }] }] }
+                           ]
+                        }
+                     }
+                  },
+                  { $project: { adminId: 0 } }
+               ],
+               as: "processSteps"
+            }
+         },
+         {
+            $lookup: {
+               from: "casecomments",
+               let: { caseId: "$_id" },
+               pipeline: [
+                  {
+                     $match: {
+                        $expr: {
+                           $and: [
+                              { $eq: ["$isActive", true] },
+                              { $or: [{ $eq: ["$caseId", "$$caseId"] }, { $eq: ["$caseMargeId", { $toString: "$$caseId" }] }] }
+                           ]
+                        }
+                     }
+                  }
+               ],
+               as: "caseCommit"
+            }
+         },
+         {
+            $lookup: {
+               from: "casepaymentdetails",
+               let: { caseId: "$_id" },
+               pipeline: [
+                  { $match: { $expr: { $and: [{ $eq: ["$isActive", true] }, { $eq: ["$caseId", "$$caseId"] }] } } }
+               ],
+               as: "casePayment"
+            }
+         },
+         {
+            $project: {
+               addEmployee: 0
+            }
+         },
+         {
+            $lookup: {
+               from: "case_forms",
+               localField: "_id",
+               foreignField: "caseId",
+               pipeline: [
+                  { $match: { isActive: true } },
+                  { $project: { formType: 1,caseId:1 } },
+               ],
+               as: "case_forms"
+            }
+         },
       ]);
 
-      const getCaseJson = getCase.toObject();
-      getCaseJson.caseDocs = getCaseDoc;
-      getCaseJson.processSteps = getCaseStatus;
-      getCaseJson.caseCommit = getCaseComment;
-      getCaseJson.casePayment = getCasePaymentDetails;
-      getCaseJson.caseGroDetails = getCaseGroDetails
-      getCaseJson.caseOmbudsmanDetails = caseOmbudsmanDetails
-      return res.status(200).json({ success: true, message: "get case data", data: getCaseJson });
+      if (!caseData) {
+         return res.status(404).json({ success: false, message: "Case not found" });
+      }
+
+      return res.status(200).json({
+         success: true,
+         message: "Case data fetched successfully",
+         data: caseData
+      });
 
    } catch (error) {
-      console.log("updateAdminCase in error:", error);
-      res.status(500).json({ success: false, message: "Internal server error", error: error });
-
+      console.error("viewCaseByIdByAdmin error:", error);
+      return res.status(500).json({
+         success: false,
+         message: "Internal server error",
+         error: error.message
+      });
    }
-}
+};
+
 
 export const adminAddCaseFile = async (req, res) => {
    try {
@@ -3010,9 +3147,9 @@ export const adminSharePartnerToSaleEmp = async (req, res) => {
 
       if (!shareEmployee[0]) return res.status(400).json({ success: true, message: "Please add employee to share" });
 
-      await ShareSection.deleteMany({toEmployeeId:{$exists:true},partnerId:{ $in: sharePartners },clientId:{$exists:false},caseId:{$exists:false}})
+      await ShareSection.deleteMany({ toEmployeeId: { $exists: true }, partnerId: { $in: sharePartners }, clientId: { $exists: false }, caseId: { $exists: false } })
       await Partner.updateMany({ _id: { $in: sharePartners } }, { $set: { salesId: shareEmployee[0] } })
-      
+
       return res.status(200).json({ success: true, message: "Successfully share partner" });
 
    } catch (error) {
@@ -3079,7 +3216,7 @@ export const adminShareClientToSaleEmp = async (req, res) => {
 export const adminAddCaseComment = async (req, res) => {
    try {
       const { admin } = req
-      const {comment,isPrivate} = req.body
+      const { comment, isPrivate } = req.body
       if (!comment?.trim()) return res.status(400).json({ success: false, message: "Case Comment required" })
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
@@ -3667,7 +3804,7 @@ export const adminAddPartnerRefToEmp = async (req, res) => {
       const findEmp = await Employee.findOne({ email: { $regex: empEmail, $options: "i" } })
       if (!findEmp) return res.status(404).json({ success: false, message: "Employee not found" })
 
-      await ShareSection.deleteMany({toEmployeeId:{$exists:true},partnerId,clientId:{$exists:false},caseId:{$exists:false}})
+      await ShareSection.deleteMany({ toEmployeeId: { $exists: true }, partnerId, clientId: { $exists: false }, caseId: { $exists: false } })
       const updatePartner = await Partner.findByIdAndUpdate(partnerId, { salesId: findEmp?._id })
 
       return res.status(200).json({ success: true, message: "Successfully add employee reference" });
@@ -3841,31 +3978,10 @@ export const adminResetForgetPassword = async (req, res) => {
 }
 
 
-export const adminUpdateModalSchema = async (req, res) => {
-   try {
-      const updateSchema = await Case.updateMany({ $or: [{ isEmpSaleReferenceCase: { $exists: false } }, { isPartnerReferenceCase: { $exists: false } }] },
-         { $set: { isEmpSaleReferenceCase: false, isPartnerReferenceCase: false } },)
-
-      res.status(200).json({ success: true, message: "Schema modal updated", });
-   } catch (error) {
-      console.log("adminUpdateModalSchema in error:", error);
-      res.status(500).json({ success: false, message: "Internal server error", error: error });
-   }
-}
-
 //  for download data in excel
 export const adminDownloadAllCase = async (req, res) => {
    try {
       const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
-
-      // query = ?statusType=&search=&limit=&pageNo
       const searchQuery = req.query.search ? req.query.search : "";
       const statusType = req.query.status ? req.query.status : "";
       const startDate = req.query.startDate ? req.query.startDate : "";
@@ -4104,14 +4220,6 @@ export const adminDownloadAllCase = async (req, res) => {
 export const adminDownloadAllPartner = async (req, res) => {
    try {
       const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
-      // query = ?statusType=&search=&limit=&pageNo
       const searchQuery = req.query.search ? req.query.search : "";
       const type = req?.query?.type ? req.query.type : true;
       const startDate = req.query.startDate ? req.query.startDate : "";
@@ -6054,7 +6162,7 @@ export const getAllStatement = async (req, res) => {
                         "path": '$referEmpId',
                         "preserveNullAndEmptyArrays": true
                      }
-                  },       
+                  },
                ]
             }
          },
@@ -6276,13 +6384,6 @@ export const admingetEmpJoiningForm = async (req, res) => {
    try {
       const { admin } = req
       const { empId } = req.query
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
       let isExist = await EmployeeJoiningForm.findOne({ empId })
       return res.status(200).json({ success: true, message: `Success`, data: isExist });
 
@@ -6292,205 +6393,168 @@ export const admingetEmpJoiningForm = async (req, res) => {
    }
 }
 
-// export const updatePartnerSchema = async (req, res) => {
-//    try {
-//       const allSharepartner = await Partner.find({shareEmployee:{$exists:true}},{shareEmployee:1}).sort({createdAt:-1})
-//       let bulkOps = []
-//       for (const partner of allSharepartner) {
-//          for (const ele of partner?.shareEmployee) {
-//             const isExist = await ShareSection.findOne({partnerId:partner?._id,toEmployeeId:ele})
-//               console.log("isExist",isExist);
-//               if(!isExist){
-//                  bulkOps?.push({insertOne:{document:{partnerId:partner?._id,toEmployeeId:ele}}})
-//               }
 
-//          }
-//       }
+import GROStatus from "../models/groStatus.js"; // old model
+import OmbudsmanStatus from "../models/ombudsmanStatus.js"; // old model
+import CaseFormModal from "../models/caseForm/caseForm.js";
+import CaseFormSectionModal from "../models/caseForm/caseFormSection.js";
+import CaseFormAttachmentModal from "../models/caseForm/caseFormAttachment.js";
 
-//       await ShareSection.bulkWrite(bulkOps)
-//       return res.status(200).json({ success: true, message: `Successfully fetch all notification`, data: bulkOps });
-
-//    } catch (error) {
-//       console.log("getAllNotification in error:", error);
-//       res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
-
-//    }
-// }
-
-export const updatePartnerSchema = async (req, res) => {
+export const migrateGROForms = async (req, res) => {
    try {
-      const allSharepartner = await Partner.find(
-         { shareEmployee: { $exists: true, $ne: [] } },
-         { shareEmployee: 1 }
-      ).sort({ createdAt: -1 });
+      const oldForms = await GROStatus.find({ isActive: true });
 
-      const bulkOps = [];
+      for (const old of oldForms) {
+         // 1️⃣ Create new CaseForm
+         const caseForm = new CaseFormModal({
+            caseId: old.caseId,
+            clientId: old.clientId,
+            branchId: old.branchId || "",
+            formType: "gro",
+            partnerFee: old.partnerFee || "",
+            consultantFee: old.consultantFee || "",
+            filingDate: old.groFilingDate || "",
+            isSettelment: old.isSettelment,
+            approved: old.approved,
+            approvedAmount: old.approvedAmount || "",
+            approvalDate: old.approvalDate,
+            approvalLetter: old.approvalLetter,
+            approvalLetterPrivate: old.approvalLetterPrivate,
+            specialCase: old.specialCase,
+            ...(old?.paymentDetailsId ? { paymentDetailsId: old?.paymentDetailsId } : {}),
+            ...(old?.statementId ? { statementId: old?.statementId } : {}),
+            ...(old?.billId ? { billId: old?.billId } : {}),
+         });
 
-      // Step 1: Flatten all combinations of partnerId and toEmployeeId
-      const pairsToInsert = [];
-      for (const partner of allSharepartner) {
-         for (const ele of partner?.shareEmployee) {
-            pairsToInsert.push({ partnerId: partner._id.toString(), toEmployeeId: ele.toString() });
-         }
-      }
+         await caseForm.save();
 
-      // Step 2: Get existing ones
-      const existing = await ShareSection.find({
-         $or: pairsToInsert.map(p => ({ partnerId: p.partnerId, toEmployeeId: p.toEmployeeId })),
-      }, { partnerId: 1, toEmployeeId: 1 });
+         // 2️⃣ Map old sections to new sections
+         const sectionMappings = [
+            { oldKey: "groStatusUpdates", type: "status" },
+            { oldKey: "queryHandling", type: "query" },
+            { oldKey: "queryReply", type: "query_reply" },
+         ];
 
-      const existingSet = new Set(
-         existing.map(e => `${e.partnerId}_${e.toEmployeeId}`)
-      );
+         for (const mapping of sectionMappings) {
+            const oldSection = old[mapping.oldKey] || [];
 
-      // Step 3: Prepare bulk inserts
-      for (const pair of pairsToInsert) {
-         const key = `${pair.partnerId}_${pair.toEmployeeId}`;
-         if (!existingSet.has(key)) {
-            bulkOps.push({
-               insertOne: {
-                  document: {
-                     partnerId: pair.partnerId,
-                     toEmployeeId: pair.toEmployeeId
-                  }
+            for (const sec of oldSection) {
+               // create new section doc
+               const sectionDoc = new CaseFormSectionModal({
+                  caseFormId: caseForm._id,
+                  type: mapping.type,
+                  status: sec.status || "",
+                  remarks: sec.remarks || "",
+                  date: sec.date || new Date(),
+                  isPrivate: sec.isPrivate || false,
+                  deliveredBy: sec.byCourier ? "courier" : (sec.byMail ? "mail" : ""),
+               });
+
+               await sectionDoc.save();
+
+               // handle old attachments
+               if (sec.attachment) {
+                  const att = new CaseFormAttachmentModal({
+                     caseFormId: caseForm._id,
+                     caseFormSectionId: sectionDoc._id,
+                     url: sec.attachment,
+                     fileName: sec.attachment.split("/").pop(),
+                     fileType: sec.attachment.split(".").pop(),
+                  });
+                  await att.save();
                }
-            });
+            }
          }
+
+         console.log(`Migrated GRO Form: ${old._id} → CaseForm: ${caseForm._id}`);
       }
 
-      // Step 4: Execute only if there are operations
-      if (bulkOps.length > 0) {
-         await ShareSection.bulkWrite(bulkOps);
-      }
-
-      return res.status(200).json({
-         success: true,
-         message: `Inserted ${bulkOps.length} new records into ShareSection.`,
-         data: bulkOps
-      });
-
-   } catch (error) {
-      console.error("updatePartnerSchema error:", error);
-      return res.status(500).json({
-         success: false,
-         message: "Oops! something went wrong",
-         error: error.message || error
-      });
+      res.status(200).json({ message: "Migration completed successfully!" })
+   } catch (err) {
+      console.error("Migration error:", err);
+      res.status(500).json({ message: "Something went wrong", err })
    }
 };
 
-
-export const updateCaseSchema = async (req, res) => {
+export const migrateOmbusmanForms = async (req, res) => {
    try {
-      const allCases = await Case.find({})
-      let bulkOps = []
-      let bulkShareCase = []
-      allCases.forEach(ele => {
+      const oldForms = await OmbudsmanStatus.find({ isActive: true });
 
-         let updateValue = {}
+      for (const old of oldForms) {
+         // 1️⃣ Create new CaseForm
+         const caseForm = new CaseFormModal({
+            caseId: old.caseId,
+            clientId: old.clientId,
+            branchId: old.branchId || "",
+            formType: "ombudsman",
+            partnerFee: old.partnerFee || "",
+            consultantFee: old.consultantFee || "",
+            filingDate: old.filingDate || "",
+            isSettelment: old.isSettelment,
+            approved: old.approved,
+            approvedAmount: old.approvedAmount || "",
+            approvalDate: old.approvalDate,
+            approvalLetter: old.approvalLetter,
+            approvalLetterPrivate: old.approvalLetterPrivate,
+            specialCase: old.specialCase,
+            method: old?.method || 'online',
+            complaintNumber: old?.complaintNumber || '',
+            ...(old?.paymentDetailsId ? { paymentDetailsId: old?.paymentDetailsId } : {}),
+            ...(old?.statementId ? { statementId: old?.statementId } : {}),
+            ...(old?.billId ? { billId: old?.billId } : {}),
+         });
 
-         if (ele?.clientId) updateValue.clientObjId = ele?.clientId
-         if (ele?.partnerId) updateValue.partnerObjId = ele?.partnerId
-         if (ele?.empSaleId) updateValue.empObjId = ele?.empSaleId
+         await caseForm.save();
 
-         bulkOps.push({
-            updateOne: {
-               filter: { _id: ele?._id },
-               update: {
-                  $set: updateValue
+         // 2️⃣ Map old sections to new sections
+         const sectionMappings = [
+            { oldKey: "statusUpdates", type: "status" },
+            { oldKey: "queryHandling", type: "query" },
+            { oldKey: "queryReply", type: "query_reply" },
+            { oldKey: "hearingSchedule", type: "hearing_schedule" },
+            { oldKey: "awardPart", type: "award_part" },
+            { oldKey: "attachmentPart", type: "attachment_part" },
+
+         ];
+
+         for (const mapping of sectionMappings) {
+            const oldSection = old[mapping.oldKey] || [];
+
+            for (const sec of oldSection) {
+               // create new section doc
+               const sectionDoc = new CaseFormSectionModal({
+                  caseFormId: caseForm._id,
+                  type: mapping.type,
+                  status: sec.status || "",
+                  remarks: sec.remarks || "",
+                  ...(sec.date ? { date: sec.date } : {}),
+                  ...(sec.type ? { awardType: sec.type } : {}),
+                  isPrivate: sec.isPrivate || false,
+                  deliveredBy: sec.byCourier ? "courier" : (sec.byMail ? "mail" : ""),
+               });
+
+               await sectionDoc.save();
+
+               // handle old attachments
+               if (sec.attachment) {
+                  const att = new CaseFormAttachmentModal({
+                     caseFormId: caseForm._id,
+                     caseFormSectionId: sectionDoc._id,
+                     url: sec.attachment,
+                     fileName: sec.attachment.split("/").pop(),
+                     fileType: sec.attachment.split(".").pop(),
+                  });
+                  await att.save();
                }
             }
-         })
-         if (ele?.addEmployee?.length) {
-            ele?.addEmployee?.map(async (item) => {
-               const isExist = await ShareSection.find({ caseId: ele?._id, toEmployeeId: item })
-               console.log("isExist", isExist);
-
-               if (isExist?.length == 0) {
-                  bulkShareCase.push({
-                     insertOne: {
-                        document: {
-                           caseId: ele?._id,
-                           toEmployeeId: item,
-                           branchId: ele?.branchId
-                        }
-                     }
-                  })
-               }
-            })
          }
-      })
-      await Case.bulkWrite(bulkOps)
-      await ShareSection.bulkWrite(bulkShareCase)
-      return res.status(200).json({ success: true, message: `Successfully update`, data: bulkShareCase });
-   } catch (error) {
-      console.log(error);
-      res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
 
+         console.log(`Migrated GRO Form: ${old._id} → CaseForm: ${caseForm._id}`);
+      }
+
+      res.status(200).json({ message: "Migration completed successfully!" })
+   } catch (err) {
+      console.error("Migration error:", err);
+      res.status(500).json({ message: "Something went wrong", err })
    }
-}
-
-export const updateCaseAndMargeSchema = async (req, res) => {
-   try {
-      const { admin } = req
-
-      const allCases = await Case.find({})
-      let bulkOps = []
-      allCases.forEach(ele => {
-         //  partner reference
-         if (ele?.partnerReferenceCaseDetails?.referenceId && ele?.partnerObjId) {
-            bulkOps.push({
-               insertOne: {
-                  document: {
-                     caseId: ele?._id,
-                     mergeCaseId: ele?.partnerReferenceCaseDetails?.referenceId,
-                     partnerId: ele?.partnerObjId
-                  }
-               }
-            })
-            if (ele?.empObjId) {
-               bulkOps.push({
-                  insertOne: {
-                     document: {
-                        caseId: ele?._id,
-                        mergeCaseId: ele?.partnerReferenceCaseDetails?.referenceId,
-                        empId: ele?.empObjId
-                     }
-                  }
-               })
-            }
-         }
-
-         //  emp reference
-         if (ele?.empSaleReferenceCaseDetails?.referenceId && ele?.empObjId) {
-            bulkOps.push({
-               insertOne: {
-                  document: {
-                     caseId: ele?._id,
-                     mergeCaseId: ele?.empSaleReferenceCaseDetails?.referenceId,
-                     empId: ele?.empObjId
-                  }
-               }
-            })
-
-            if (ele?.partnerObjId) {
-               bulkOps.push({
-                  insertOne: {
-                     document: {
-                        caseId: ele?._id,
-                        mergeCaseId: ele?.partnerReferenceCaseDetails?.referenceId,
-                        partnerId: ele?.partnerObjId
-                     }
-                  }
-               })
-            }
-         }
-      })
-      await CaseMergeDetails.bulkWrite(bulkOps)
-
-      return res.status(400).json({ success: true, message: "Success" });
-   } catch (error) {
-      console.log("adminAddRefenceCaseAndMarge in error:", error);
-      return res.status(500).json({ success: false, message: "Internal server error", error: error });
-   }
-}
+};

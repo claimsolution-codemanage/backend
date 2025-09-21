@@ -1,6 +1,7 @@
 import express from 'express';
 const router = express.Router();
 import * as employeeController from '../controller/employee.js'
+import caseFormRoutes from "../routes/caseForm/empCaseFormRoutes.js"
 import { authEmployee } from '../middleware/authentication.js';
 
 
@@ -32,7 +33,8 @@ router.put("/updateCaseById",authEmployee,employeeController.employeeUpdateCaseB
 router.put("/operation/addReferenceCaseAndMarge",authEmployee,employeeController.empAddReferenceCaseAndMarge)
 router.put("/operation/removeReferenceCase",authEmployee,employeeController.empRemoveReferenceCase)
 router.post("/emp/empAddOrUpdatePayment",authEmployee,employeeController.empAddOrUpdatePayment)
-router.post('/opeation/empOpCreateOrUpdateCaseForm',authEmployee,employeeController.empOpCreateOrUpdateCaseForm)
+// router.post('/opeation/empOpCreateOrUpdateCaseForm',authEmployee,employeeCaseFormController.empOpCreateOrUpdateCaseForm)
+// router.get('/opeation/empOpGetCaseFormById/:formId/:caseId',authEmployee,employeeCaseFormController.empOpGetCaseFormById)
 
 // case doc
 router.put("/unActiveDoc",authEmployee,employeeController.empUnactiveCaseDoc)
@@ -113,6 +115,6 @@ router.get("/emp/getAllNotification",authEmployee,employeeController.getAllNotif
 router.put("/emp/updateNotification",authEmployee,employeeController.updateNotification)
 
 
-
+router.use("/caseForm",caseFormRoutes)
 
 export default router

@@ -1,7 +1,7 @@
 import Employee from "../models/employee.js";
 import Partner from "../models/partner.js";
 import Client from "../models/client.js";
-import Case from "../models/case.js";
+import Case from "../models/case/case.js";
 import CaseDoc from "../models/caseDoc.js";
 import CaseStatus from "../models/caseStatus.js";
 import CaseComment from "../models/caseComment.js";
@@ -1630,63 +1630,16 @@ export const employeeViewCaseByIdBy = async (req, res) => {
          },
          {
             $lookup: {
-               from: "casegrostatuses",
-               let: { id: "$_id" },
+               from: "case_forms",
+               localField: "_id",
+               foreignField: "caseId",
                pipeline: [
-                  {
-                     $match: {
-                        $expr: {
-                           $and: [
-                              { $eq: ["$isActive", true] },
-                              { $eq: ["$caseId", "$$id"] }
-                           ]
-                        }
-                     }
-                  },
-                  {
-                     $lookup: {
-                        from: "casepaymentdetails",
-                        localField: "paymentDetailsId",
-                        foreignField: "_id",
-                        as: "paymentDetailsId"
-                     }
-                  },
-                  { $unwind: { path: "$paymentDetailsId", preserveNullAndEmptyArrays: true } }
+                  { $match: { isActive: true } },
+                  { $project: { formType: 1,caseId:1 } },
                ],
-               as: "caseGroDetails"
+               as: "case_forms"
             }
          },
-         { $unwind: { path: "$caseGroDetails", preserveNullAndEmptyArrays: true } },
-
-         {
-            $lookup: {
-               from: "caseombudsmanstatuses",
-               let: { id: "$_id" },
-               pipeline: [
-                  {
-                     $match: {
-                        $expr: {
-                           $and: [
-                              { $eq: ["$isActive", true] },
-                              { $eq: ["$caseId", "$$id"] }
-                           ]
-                        }
-                     }
-                  },
-                  {
-                     $lookup: {
-                        from: "casepaymentdetails",
-                        localField: "paymentDetailsId",
-                        foreignField: "_id",
-                        as: "paymentDetailsId"
-                     }
-                  },
-                  { $unwind: { path: "$paymentDetailsId", preserveNullAndEmptyArrays: true } }
-               ],
-               as: "caseOmbudsmanDetails"
-            }
-         },
-         { $unwind: { path: "$caseOmbudsmanDetails", preserveNullAndEmptyArrays: true } },
       ]);
 
       if (!caseData.length) {
@@ -1694,36 +1647,6 @@ export const employeeViewCaseByIdBy = async (req, res) => {
       }
 
       const result = caseData[0];
-
-      // Filter private fields based on employee type
-      const filterPrivate = (arr) =>
-         arr?.filter((ele) => isOperation || ele?.isPrivate) || [];
-
-      if (result.caseGroDetails) {
-         result.caseGroDetails = {
-            ...result.caseGroDetails,
-            groStatusUpdates: filterPrivate(result.caseGroDetails?.groStatusUpdates),
-            queryHandling: filterPrivate(result.caseGroDetails?.queryHandling),
-            queryReply: filterPrivate(result.caseGroDetails?.queryReply),
-            approvalLetter: result.caseGroDetails?.approvalLetterPrivate
-               ? isOperation && result.caseGroDetails?.approvalLetter
-               : result.caseGroDetails?.approvalLetter
-         };
-      }
-
-      if (result.caseOmbudsmanDetails) {
-         result.caseOmbudsmanDetails = {
-            ...result.caseOmbudsmanDetails,
-            statusUpdates: filterPrivate(result.caseOmbudsmanDetails?.statusUpdates),
-            queryHandling: filterPrivate(result.caseOmbudsmanDetails?.queryHandling),
-            queryReply: filterPrivate(result.caseOmbudsmanDetails?.queryReply),
-            hearingSchedule: filterPrivate(result.caseOmbudsmanDetails?.hearingSchedule),
-            awardPart: filterPrivate(result.caseOmbudsmanDetails?.awardPart),
-            approvalLetter: result.caseOmbudsmanDetails?.approvalLetterPrivate
-               ? isOperation && result.caseOmbudsmanDetails?.approvalLetter
-               : result.caseOmbudsmanDetails?.approvalLetter
-         };
-      }
 
       return res.status(200).json({ success: true, message: "get case data", data: result });
 

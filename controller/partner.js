@@ -8,7 +8,7 @@ import { otp6Digit, getAllCaseQuery, getDownloadCaseExcel, partnerGetDownloadCas
 import { sendOTPMail, sendForgetPasswordMail } from '../utils/sendMail.js'
 import { authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
-import Case from "../models/case.js";
+import Case from "../models/case/case.js";
 import { validMongooseId, validateResetPassword, validateAddCaseFile } from "../utils/helper.js";
 import jwt from "jsonwebtoken";
 import jwtDecode from "jwt-decode";
@@ -1041,65 +1041,18 @@ export const partnerViewCaseById = async (req, res) => {
                as: "casePayment"
             }
          },
-         {
-            $lookup: {
-               from: "casegrostatuses",
-               let: { id: "$_id" },
-               pipeline: [
-                  {
-                     $match: {
-                        $expr: {
-                           $and: [
-                              { $eq: ["$isActive", true] },
-                              { $eq: ["$caseId", "$$id"] }
-                           ]
-                        }
-                     }
-                  },
-                  {
-                     $lookup: {
-                        from: "casepaymentdetails",
-                        localField: "paymentDetailsId",
-                        foreignField: "_id",
-                        as: "paymentDetailsId"
-                     }
-                  },
-                  { $unwind: { path: "$paymentDetailsId", preserveNullAndEmptyArrays: true } }
-               ],
-               as: "caseGroDetails"
-            }
-         },
-         { $unwind: { path: "$caseGroDetails", preserveNullAndEmptyArrays: true } },
-
-         {
-            $lookup: {
-               from: "caseombudsmanstatuses",
-               let: { id: "$_id" },
-               pipeline: [
-                  {
-                     $match: {
-                        $expr: {
-                           $and: [
-                              { $eq: ["$isActive", true] },
-                              { $eq: ["$caseId", "$$id"] }
-                           ]
-                        }
-                     }
-                  },
-                  {
-                     $lookup: {
-                        from: "casepaymentdetails",
-                        localField: "paymentDetailsId",
-                        foreignField: "_id",
-                        as: "paymentDetailsId"
-                     }
-                  },
-                  { $unwind: { path: "$paymentDetailsId", preserveNullAndEmptyArrays: true } }
-               ],
-               as: "caseOmbudsmanDetails"
-            }
-         },
-         { $unwind: { path: "$caseOmbudsmanDetails", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "case_forms",
+            localField: "_id",
+            foreignField: "caseId",
+            pipeline: [
+              { $match: { isActive: true } },
+              { $project: { formType: 1, caseId: 1 } },
+            ],
+            as: "case_forms"
+          }
+        },
       ]);
 
       if (!caseData.length) {

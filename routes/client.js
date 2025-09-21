@@ -7,6 +7,8 @@ import {clientSignUp,clientsignIn,verifyClientEmailOtp,updateClientProfile,getCl
     clientPayInvoiceById,clientUploadImage,clientUploadAttachment,signUpWithRequest
 } from '../controller/client.js';
 
+import caseFormRoutes from "../routes/caseForm/clientCaseFormRoutes.js"
+
 
 router.post("/signin", clientsignIn)
 router.post("/signup", clientSignUp)
@@ -33,6 +35,8 @@ router.get("/getClientViewInvoiceById",clientViewInvoiceById)
 router.post("/clientPayInvoiceById",clientPayInvoiceById)
 router.post("/upload/image",clientUploadImage)
 router.post("/upload/attachment",clientUploadAttachment)
+
+router.use("/caseForm",caseFormRoutes)
 
 
 

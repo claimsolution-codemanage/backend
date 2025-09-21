@@ -9,6 +9,7 @@ import { signUp,verifyEmailOtp,signIn,partnerForgetPassword,partnerResetPassword
 
 } from '../controller/partner.js';
 
+import caseFormRoutes from "../routes/caseForm/partnerCaseFormRoutes.js"
 
 
 router.post("/signUp",signUp)
@@ -51,6 +52,8 @@ router.get("/downloadReport",partnerDownloadReport)
 
 // for statement
 router.get("/getStatement",getStatement)
+
+router.use("/caseForm",caseFormRoutes)
 
 
 

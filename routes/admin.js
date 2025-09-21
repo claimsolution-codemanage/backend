@@ -5,6 +5,10 @@ import { viewAllAdminComplaint,adminRemoveComplaintById } from '../controller/co
 import { authAdmin } from '../middleware/authentication.js';
 import * as adminController from '../controller/admin.js'
 
+
+// sub routes
+import adminCaseFormRoutes from "../routes/caseForm/adminCaseFormRoutes.js"
+
 //  for admin 
 router.get("/dashboard",authAdmin,adminController.adminDashboard)
 router.post("/signin", adminController.adminSignin)
@@ -152,10 +156,11 @@ router.get("/getAllNotification",authAdmin,adminController.getAllNotification)
 router.put("/updateNotification",authAdmin,adminController.updateNotification)
 
 
-// router.get("/updateModalSchema",adminController.adminUpdateModalSchema)
-// router.get("/updatePartnerSchema",adminController.updatePartnerSchema)
-// router.get("/updateCaseSchema",adminController.updateCaseSchema)
-// router.get("/updateCaseAndMargeSchema",adminController.updateCaseAndMargeSchema)
+// use sub-routes 
+router.use("/caseForm",adminCaseFormRoutes)
+
+router.get("/migrateGROForms",adminController.migrateGROForms)
+router.get("/migrateOmbusmanForms",adminController.migrateOmbusmanForms)
 
 
 
