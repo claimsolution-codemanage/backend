@@ -159,8 +159,8 @@ router.put("/updateNotification",authAdmin,adminController.updateNotification)
 // use sub-routes 
 router.use("/caseForm",adminCaseFormRoutes)
 
-router.get("/migrateGROForms",adminController.migrateGROForms)
-router.get("/migrateOmbusmanForms",adminController.migrateOmbusmanForms)
+// router.get("/migrateGROForms",adminController.migrateGROForms)
+// router.get("/migrateOmbusmanForms",adminController.migrateOmbusmanForms)
 
 
 
