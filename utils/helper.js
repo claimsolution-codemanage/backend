@@ -11,13 +11,13 @@ import multer from "multer";
 import {exec} from 'child_process'
 import fs from 'fs'
 import path from 'path'
-import { commonSendMail, generateNotificationTemplate } from "./sendMail.js";
+import { commonSendMail, sendMail } from "./sendMail.js";
 import Employee from "../models/employee.js";
 import Notification from "../models/notification.js";
 import Admin from "../models/admin.js";
 import Client from "../models/client.js";
 import Partner from "../models/partner.js";
-
+import { notificationTemplate } from "./emailTemplates/notificationTemplate.js";
 const upload = multer({
   storage: multer.memoryStorage(),
 });
@@ -1358,15 +1358,20 @@ export const sendNotificationAndMail = async (caseId, message, branchId="", user
     const empUrl = process.env.PANEL_FRONTEND_URL + notificationUrl
     const adminUrl = process.env.PANEL_FRONTEND_URL + notificationAdminUrl
 
-    await commonSendMail(
-      generateNotificationTemplate(message, empUrl, adminUrl),
-      "Claimsolution latest notification",
-      mailTo,
-      [],
-      mailList?.filter(ele=>ele && ele!=mailTo)
-    )
-    console.log("successfully sendNotificationAndMail");
-    
+    // await commonSendMail(
+    //   generateNotificationTemplate(message, empUrl, adminUrl),
+    //   "Claimsolution latest notification",
+    //   mailTo,
+    //   [],
+    //   mailList?.filter(ele=>ele && ele!=mailTo)
+    // )
+    await sendMail({
+      subject:"Claimsolution latest notification",
+      to:mailTo,
+      bcc:[],
+      cc:mailList?.filter(ele=>ele && ele!=mailTo),
+      html:notificationTemplate(message, empUrl, adminUrl),
+    })
   } catch (error) {
     console.log("sendNotificationAndMail", error);
 

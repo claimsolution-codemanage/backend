@@ -9,19 +9,21 @@ import { signUp,verifyEmailOtp,signIn,partnerForgetPassword,partnerResetPassword
 
 } from '../controller/partner.js';
 
+import * as partnerController from "../controller/partner.js"
+
 import caseFormRoutes from "../routes/caseForm/partnerCaseFormRoutes.js"
 
 
-router.post("/signUp",signUp)
-router.post("/verifyEmail",verifyEmailOtp)
+router.post("/signUp",partnerController.signUp)
+router.post("/verifyEmail",partnerController.verifyEmailOtp)
 router.post("/authenticate",partnerAuthenticate)
-router.post("/signIn",signIn)
-router.put("/forgetPassword",partnerForgetPassword)
-router.put("/resetPassword",partnerResetPassword)
+router.post("/signIn",partnerController.signIn)
+router.put("/forgetPassword",partnerController.partnerForgetPassword)
+router.put("/resetPassword",partnerController.partnerResetPassword)
 router.post("/sendMobileOtpCode",partnerSendMobileOtpCode)
 router.post("/mobileNoVerify",partnerMobileNoVerify)
-router.post("/resendOtp",partnerResendOtp)
-router.post("/acceptRequest",signUpWithRequest)
+router.post("/resendOtp",partnerController.partnerResendOtp)
+router.post("/acceptRequest",partnerController.signUpWithRequest)
 
 
 // router.post("/setForgetPassword",setForgetPassword)

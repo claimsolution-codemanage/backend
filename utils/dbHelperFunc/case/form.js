@@ -234,7 +234,7 @@ export const createOrUpdateCaseForm = async (req, res, next) => {
             }
 
             // Update section fields
-            const sectionFields = ["status", "remarks", "date", "isPrivate", "deliveredBy"];
+            const sectionFields = ["status", "remarks", "date", "isPrivate", "deliveredBy","awardType"];
             sectionFields.forEach(field => {
                 if (sec[field] !== undefined) sectionDoc[field] = sec[field];
             });

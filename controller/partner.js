@@ -1,11 +1,11 @@
 import Partner from "../models/partner.js";
 import {
-  validateSignUp, validateUpdateBody, validateBankingDetailsBody, validateProfileBody, validateNewPassword, validateSignIn,
+  validateSignUp, validateBankingDetailsBody, validateProfileBody, validateSignIn,
   validateAddCase
 
 } from "../utils/validatePatner.js";
-import { otp6Digit, getAllCaseQuery, getDownloadCaseExcel, partnerGetDownloadCaseExcel, getValidateDate, sendNotificationAndMail } from "../utils/helper.js";
-import { sendOTPMail, sendForgetPasswordMail } from '../utils/sendMail.js'
+import { otp6Digit, getAllCaseQuery,  partnerGetDownloadCaseExcel, getValidateDate, sendNotificationAndMail } from "../utils/helper.js";
+import { sendMail } from '../utils/sendMail.js'
 import { authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
 import Case from "../models/case/case.js";
@@ -13,17 +13,15 @@ import { validMongooseId, validateResetPassword, validateAddCaseFile } from "../
 import jwt from "jsonwebtoken";
 import jwtDecode from "jwt-decode";
 import Admin from "../models/admin.js";
-import { sendAccountTerm_ConditonsMail } from "../utils/sendMail.js";
 import { editServiceAgreement } from "../utils/helper.js";
 import { firebaseUpload } from "../utils/helper.js";
 import CaseDoc from "../models/caseDoc.js";
 import CaseStatus from "../models/caseStatus.js";
 import Statement from "../models/statement.js";
-import Notification from "../models/notification.js";
-import CasePaymentDetails from "../models/casePaymentDetails.js";
-import CasegroStatus from "../models/groStatus.js";
-import CaseOmbudsmanStatus from "../models/ombudsmanStatus.js";
 import { Types } from "mongoose";
+import { accountVerificationTemplate } from "../utils/emailTemplates/accountVerificationTemplate.js";
+import { accountTermConditionTemplate } from "../utils/emailTemplates/accountTermConditionTemplate.js";
+import { forgetPasswordTemplate } from "../utils/emailTemplates/forgotPasswordTemplate.js";
 
 
 
@@ -67,231 +65,244 @@ export const partnerUploadAttachment = async (req, res) => {
 
 
 //  for create new account
-export const signUp = async function (req, res) {
+export const signUp = async (req, res) => {
   try {
     const { error } = validateSignUp(req.body);
-    if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+    if (error) {
+      return res.status(400).json({ success: false, message: error.details[0].message });
+    }
 
-    const otp = otp6Digit();
-    const partner = await Partner.find({ email: req?.body?.email?.trim()?.toLowerCase() });
-    //  const partnerWithEmail = await Partner.find({email:req.body.email})
-    const { agreement } = req.body
+    const { fullName, email, mobileNo, workAssociation, areaOfOperation, partnerType, agreement, password } = req.body;
     if (!agreement) {
-      return res.status(400).json({ success: false, message: "Must agree with our service agreement" })
+      return res.status(400).json({ success: false, message: "Must agree with our service agreement" });
     }
 
-    if (partner[0]?.emailVerify || partner[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Email already register with us" })
-    //  if (partnerWithEmail[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Email already register with us" });
-    const bcrypePassword = await bcrypt.hash(req.body.password, 10)
-    if (partner.length == 0) {
-      const newPartner = new Partner({
-        fullName: req.body.fullName,
-        email: req?.body?.email?.trim()?.toLowerCase(),
-        mobileNo: req.body.mobileNo,
-        workAssociation: req.body.workAssociation,
-        areaOfOperation: req.body.areaOfOperation,
-        password: bcrypePassword,
-        emailOTP: { otp: otp, createAt: Date.now() },
-        //  acceptPartnerTls:agreement,
-        acceptTnc: agreement
-      })
-      await newPartner.save();
-      const token = await newPartner.getAuth()
-      try {
-        await sendOTPMail(req.body.email, otp, "partner");
-        return res.status(201).header("x-auth-token", token)
-          .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully send OTP" });
-      } catch (err) {
-        console.log("send otp error", err);
-        return res.status(400).json({ success: false, message: "Failed to send OTP" });
-      }
+    const normalizedEmail = email?.trim()?.toLowerCase();
+    const otp = otp6Digit();
+    const hashedPassword = await bcrypt.hash(password, 10);
 
+    let partner = await Partner.findOne({ email: normalizedEmail });
+
+    // ✅ If partner exists and already verified
+    if (partner?.emailVerify || partner?.mobileVerify) {
+      return res.status(400).json({ success: false, message: "Email already registered with us" });
+    }
+
+    const partnerData = {
+      fullName,
+      email: normalizedEmail,
+      mobileNo,
+      workAssociation,
+      areaOfOperation,
+      partnerType,
+      password: hashedPassword,
+      emailOTP: { otp, createAt: Date.now() },
+      acceptTnc: agreement,
+    };
+
+    let partnerDoc;
+    if (!partner) {
+      // Create new partner
+      partnerDoc = new Partner(partnerData);
+      await partnerDoc.save();
     } else {
-      //  else block for already filled details
-      console.log("else block");
-      if (partner?.length > 0) {
-        const updatePatner = await Partner.findByIdAndUpdate(partner[0]?._id, {
-          $set: {
-            fullName: req.body.fullName,
-            email: req?.body?.email?.trim()?.toLowerCase(),
-            mobileNo: req.body.mobileNo,
-            workAssociation: req.body.workAssociation,
-            areaOfOperation: req.body.areaOfOperation,
-            partnerType: req.body.partnerType,
-            password: bcrypePassword,
-            emailOTP: { otp: otp, createAt: Date.now() },
-            // acceptPartnerTls:agreement,
-            acceptTnc: agreement
-          }
-        })
-        const token = await updatePatner.getAuth()
-        try {
-          await sendOTPMail(req.body.email, otp, "partner");
-          res.status(201).header("x-auth-token", token)
-            .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully send OTP" });
-        } catch (err) {
-          console.log("send otp error", err);
-          return res.status(400).json({ success: false, message: "Failed to send OTP" });
-        }
-      }
-      return res.status(400).json({ success: false, message: "Failed to send OTP" });
-      // if(partnerWithEmail.length>0){
-      //   const updatePatner = await Partner.findByIdAndUpdate(partnerWithEmail[0]?._id,{
-      //     $set:{
-      //       fullName: req.body.fullName,
-      //       email: req.body.email,
-      //       mobileNo: req.body.mobileNo,
-      //       workAssociation: req.body.workAssociation,
-      //       areaOfOperation: req.body.areaOfOperation,
-      //       partnerType:req.body.partnerType,
-      //       password:bcrypePassword,
-      //       emailOTP: {otp:otp,createAt:Date.now()},
-      //       acceptPartnerTls:agreement
-      //     }})
-      //   const token = await updatePatner.getAuth()
-      //   try {
-      //     await sendOTPMail(req.body.email, otp,"partner");
-      //     res.status(201).header("x-auth-token", token)
-      //     .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully send OTP"});
-      //  } catch (err) {
-      //   console.log("send otp error",err);
-      //     return res.status(400).json({ success: false, message: "Failed to send OTP" });
-      //  }
-      // }
-
+      // Update existing partner
+      partnerDoc = await Partner.findByIdAndUpdate(partner._id, { $set: partnerData }, { new: true });
     }
 
+    // ✅ Generate auth token
+    const token = await partnerDoc.getAuth();
+
+    // ✅ Send OTP
+    try {
+      await sendMail({
+        subject: "Account Verification",
+        to: normalizedEmail,
+        html: accountVerificationTemplate({ name: fullName, otp, type: "partner" }),
+      });
+      return res
+        .status(201)
+        .header("x-auth-token", token)
+        .header("Access-Control-Expose-Headers", "x-auth-token")
+        .json({ success: true, message: "Successfully sent OTP" });
+    } catch (mailErr) {
+      console.error("send OTP error:", mailErr);
+      return res.status(400).json({ success: false, message: "Failed to send OTP" });
+    }
   } catch (error) {
-    console.log("signup error: ", error);
-    res.status(500).json({ success: false, message: "Internal server error", error: error });
+    console.error("signup error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error });
   }
-}
+};
+
 
 //  at time of signup
 export const partnerResendOtp = async (req, res) => {
   try {
-    const verify = await authPartner(req, res)
-    if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+    const verify = await authPartner(req, res);
+    if (!verify.success) {
+      return res.status(401).json({ success: false, message: verify.message });
+    }
 
-    const partner = await Partner.findById(req?.user?._id);
-    if (!partner) return res.status(401).json({ success: false, message: "Not SignUp with us" })
+    const partner = await Partner.findById(req.user._id);
+    if (!partner) {
+      return res.status(401).json({ success: false, message: "Not signed up with us" });
+    }
 
-    if (partner?.mobileVerify || partner?.isActive || partner?.emailVerify) return res.status(400).json({ success: false, message: "Already register with us" })
+    if (partner.mobileVerify || partner.isActive || partner.emailVerify) {
+      return res.status(400).json({ success: false, message: "Account is already registered" });
+    }
 
     const otp = otp6Digit();
-    const updatepartner = await Partner.findByIdAndUpdate(req?.user?._id, { $set: { emailOTP: { otp: otp, createAt: Date.now() } } })
-    if (!updatepartner) return res.status(401).json({ success: false, message: "Not SignUp with us" })
+    const updatedPartner = await Partner.findByIdAndUpdate(
+      partner._id,
+      { $set: { emailOTP: { otp, createAt: Date.now() } } },
+      { new: true }
+    );
+
+    if (!updatedPartner) {
+      return res.status(401).json({ success: false, message: "Not signed up with us" });
+    }
 
     try {
-      await sendOTPMail(partner?.email, otp, "partner");
-      res.status(200).json({ success: true, message: "Successfully resend OTP" });
+      await sendMail({
+        subject: "Account Verification - Resend OTP",
+        to: partner.email,
+        html: accountVerificationTemplate({ name: partner.fullName, otp, type: "partner" }),
+      });
+      return res.status(200).json({ success: true, message: "OTP resent successfully" });
     } catch (err) {
-      console.log("send otp error", err);
-      return res.status(400).json({ success: false, message: "Failed to send OTP" });
+      console.error("Error sending OTP:", err);
+      return res.status(400).json({ success: false, message: "Failed to resend OTP" });
     }
   } catch (error) {
-    console.log("resend otp error: ", error);
-    res.status(500).json({ success: false, message: "Internal server error", error: error });
+    console.error("partnerResendOtp error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error });
   }
-}
+};
 
-// const testPdfMail = async()=>{
-//   try {
-//     const today = new Date()
-//     const modifiedPdfBytes = await editServiceAgreement("agreement/partner.pdf",today)
-//     await sendAccountTerm_ConditonsMail("anil-emp@yopmail.com", "partner", modifiedPdfBytes);
-//     console.log("send testPdf");
-//   } catch (error) {
-//     console.log("testpdfMail error:",error);
-//   }
-// }
-
-// testPdfMail()
 
 //  for email verification check
-export const verifyEmailOtp = async (req, res, next) => {
+export const verifyEmailOtp = async (req, res) => {
   try {
-    const verify = await authPartner(req, res, next)
-    if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+    const verify = await authPartner(req, res);
+    if (!verify.success) {
+      return res.status(401).json({ success: false, message: verify.message });
+    }
 
-    const partner = await Partner.findById(req?.user?._id);
-    if (!partner) return res.status(401).json({ success: false, message: "Not register with us" })
-    if (partner?.mobileVerify || partner?.emailVerify) return res.status(400).json({ success: false, message: "Account is already verify" })
-    if (!req.body.otp) return res.status(404).json({ success: false, message: "Otp is required" })
-    const validFiveMinutes = new Date().getTime() - 5 * 60 * 1000;
+    const partner = await Partner.findById(req.user?._id);
+    if (!partner) {
+      return res.status(401).json({ success: false, message: "Not registered with us" });
+    }
 
-    if (new Date(partner.emailOTP?.createAt).getTime() >= validFiveMinutes && partner.emailOTP?.otp == req?.body?.otp) {
-      console.log(new Date(partner.emailOTP?.createAt).getTime(), validFiveMinutes);
-      try {
-        const today = new Date()
-        const modifiedPdfBytes =await editServiceAgreement("agreement/partner.pdf", today)
-        await sendAccountTerm_ConditonsMail(partner?.email, "partner", modifiedPdfBytes);
-        const noOfPartners = await Partner.count()
-        const updatePartner = await Partner.findByIdAndUpdate(req?.user?._id, {
+    if (partner.mobileVerify || partner.emailVerify) {
+      return res.status(400).json({ success: false, message: "Account is already verified" });
+    }
+
+    const { otp } = req.body;
+    if (!otp) {
+      return res.status(400).json({ success: false, message: "OTP is required" });
+    }
+
+    const otpValidFrom = Date.now() - 5 * 60 * 1000; // 5 minutes
+    const otpCreatedAt = new Date(partner.emailOTP?.createAt).getTime();
+    const isOtpValid = otpCreatedAt >= otpValidFrom && partner.emailOTP?.otp === otp;
+
+    if (!isOtpValid) {
+      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+    }
+
+    try {
+      const today = new Date();
+      const modifiedPdfBytes = await editServiceAgreement("agreement/partner.pdf", today);
+
+      await sendMail({
+        subject: "Service Agreement",
+        to: partner.email,
+        html: accountTermConditionTemplate({ as: "partner", name: partner?.fullName }),
+        attachments: [{
+          filename: 'service_agreement.pdf',
+          content: modifiedPdfBytes,
+          encoding: 'base64'
+        }]
+      });
+
+      const noOfPartners = await Partner.countDocuments();
+      const consultantCode = `${today.getFullYear()}${today.getMonth() + 1 < 10 ? `0${today.getMonth() + 1}` : today.getMonth() + 1
+        }${today.getDate()}${noOfPartners + 1}`;
+
+      const profileData = {
+        profilePhoto: "",
+        consultantName: partner.fullName,
+        consultantCode,
+        associateWithUs: today,
+        primaryEmail: partner.email,
+        alternateEmail: "",
+        primaryMobileNo: partner.mobileNo,
+        alternateMobileNo: "",
+        whatsupNo: "",
+        panNo: "",
+        aadhaarNo: "",
+        dob: null,
+        gender: "",
+        businessName: "",
+        companyName: "",
+        natureOfBusiness: "",
+        designation: "",
+        areaOfOperation: partner.areaOfOperation,
+        workAssociation: partner.workAssociation,
+        state: "",
+        district: "",
+        city: "",
+        pinCode: "",
+        about: "",
+        kycPhoto: "",
+        kycAadhaar: "",
+        kycAadhaarBack: "",
+        kycPan: "",
+      };
+
+      const bankingData = {
+        bankName: "",
+        bankAccountNo: "",
+        bankBranchName: "",
+        gstNo: "",
+        panNo: "",
+        cancelledChequeImg: "",
+        gstCopyImg: "",
+      };
+
+      const updatedPartner = await Partner.findByIdAndUpdate(
+        partner._id,
+        {
           $set: {
             emailVerify: true,
             mobileVerify: true,
-            // acceptPartnerTls:true,
             isActive: true,
-            tlsUrl: `${process?.env?.FRONTEND_URL}/agreement/partner.pdf`,
-            profile: {
-              profilePhoto: "",
-              consultantName: partner?.fullName,
-              consultantCode: `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfPartners+1}`,
-              associateWithUs: today,
-              primaryEmail: partner?.email,
-              alternateEmail: "",
-              primaryMobileNo: partner?.mobileNo,
-              alternateMobileNo: "",
-              whatsupNo: "",
-              panNo: "",
-              aadhaarNo: "",
-              dob: null,
-              gender: "",
-              businessName: "",
-              companyName: "",
-              natureOfBusiness: "",
-              designation: "",
-              areaOfOperation: partner?.areaOfOperation,
-              workAssociation: partner?.workAssociation,
-              state: "",
-              district: "",
-              city: "",
-              pinCode: "",
-              about: "",
-              kycPhoto:"",
-              kycAadhaar:"",
-              kycAadhaarBack:"",
-              kycPan:"",
-            },
-            bankingDetails: {
-              bankName: "",
-              bankAccountNo: "",
-              bankBranchName: "",
-              gstNo: "",
-              panNo: "",
-              cancelledChequeImg: "",
-              gstCopyImg: "",
-            },
-          }
-        }, { new: true })
+            tlsUrl: `${process.env.FRONTEND_URL}/agreement/partner.pdf`,
+            profile: profileData,
+            bankingDetails: bankingData,
+          },
+        },
+        { new: true }
+      );
 
-        const token = updatePartner?.getAuth(true)
-        return res.status(200).header("x-auth-token", token)
-          .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully Signup" })
-      } catch (err) {
-        console.log("send forget password mail error", err);
-        return res.status(400).json({ success: false, message: "Invaild/expired OTP" });
-      }
-    } else {
-      return res.status(400).json({ success: false, message: "Invaild/expired OTP" })
+      const token = await updatedPartner.getAuth(true);
+      return res
+        .status(200)
+        .header("x-auth-token", token)
+        .header("Access-Control-Expose-Headers", "x-auth-token")
+        .json({ success: true, message: "Successfully signed up" });
+    } catch (err) {
+      console.error("OTP verification error:", err);
+      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
     }
-    // res.status(400).json({success: true, message: "valid otp"})
   } catch (error) {
-    console.log("verifyEmailOtp: ", error);
-    return res.status(500).json({ success: false, message: "Internal server error", error: error });
+    console.error("verifyEmailOtp error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error });
   }
-}
+};
+
 
 
 export const partnerSendMobileOtpCode = async (req, res) => {
@@ -327,8 +338,6 @@ export const partnerMobileNoVerify = async (req, res) => {
       const updatePartner = await Partner.findByIdAndUpdate(req?.user?._id, { $set: { mobileVerify: true } })
       const admin = await Admin.find({}).select("-password")
       const jwtToken = await jwt.sign({ _id: partner?._id, email: partner?.email }, process.env.PARTNER_SECRET_KEY, { expiresIn: '6h' })
-      await sendAccountTerm_ConditonsMail(partner?.email, `${process.env.FRONTEND_URL}/partner/acceptTermsAndConditions/${jwtToken}`, "partner", admin[0]?.partnerTlsUrl);
-      console.log("sendAccountTerm_ConditonsMail partner");
       res.status(200).json({ success: true, message: "Please check your mail" });
     } catch (err) {
       console.log("send forget password mail error", err);
@@ -424,235 +433,248 @@ export const partnerTls = async (req, res) => {
 export const signIn = async (req, res) => {
   try {
     const { error } = validateSignIn(req.body);
-    if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-    const partner = await Partner.find({ email: req?.body?.email?.toLowerCase() });
-    if (partner.length == 0) return res.status(404).json({ success: false, message: "Not register with us" })
-    if (!partner[0]?.isActive || !partner[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Account is not active" })
-    const validPassword = await bcrypt.compare(req.body.password, partner[0].password,)
-    if (!validPassword) return res.status(401).json({ success: false, message: "invaild email/password" })
-    const updateLoginHistory = await Partner.findByIdAndUpdate(partner[0]?._id, { $set: { recentLogin: new Date(), lastLogin: partner[0]?.recentLogin ? partner[0]?.recentLogin : new Date() } })
-    const token = partner[0]?.getAuth(true)
+    if (error) {
+      return res.status(400).json({ success: false, message: error.details[0].message });
+    }
 
-    return res.status(200).header("x-auth-token", token)
-      .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully signIn" })
+    const { email, password } = req.body;
+    const partner = await Partner.findOne({ email: email?.trim().toLowerCase() });
+
+    if (!partner) {
+      return res.status(404).json({ success: false, message: "Not registered with us" });
+    }
+
+    if (!partner.isActive || !partner.mobileVerify) {
+      return res.status(400).json({ success: false, message: "Account is not active" });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, partner.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ success: false, message: "Invalid email/password" });
+    }
+
+    // Update login history
+    await Partner.findByIdAndUpdate(partner._id, {
+      $set: {
+        lastLogin: partner.recentLogin || new Date(),
+        recentLogin: new Date(),
+      },
+    });
+
+    const token = await partner.getAuth(true);
+
+    return res
+      .status(200)
+      .header("x-auth-token", token)
+      .header("Access-Control-Expose-Headers", "x-auth-token")
+      .json({ success: true, message: "Successfully signed in" });
   } catch (error) {
-    console.log("setPassword: ", error);
-    return res.status(500).json({ success: false, message: "Internal server error", error: error });
+    console.error("signIn error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error });
   }
-}
+};
 
 export const signUpWithRequest = async (req, res) => {
   try {
-    const { password, agreement, tokenId } = req.body
-    if (!password) return res.status(400).json({ success: true, message: "Password is required" })
-    if (!agreement) return res.status(400).json({ success: true, message: "Must accept our service agreement" })
-    if (!tokenId) return res.status(400).json({ success: true, message: "Invalid/expired link" })
-    console.log(process.env.EMPLOYEE_SECRET_KEY, process.env.EMPLOYEE_SECRET_KEY);
+    const { password, agreement, tokenId } = req.body;
+
+    if (!password) return res.status(400).json({ success: false, message: "Password is required" });
+    if (!agreement) return res.status(400).json({ success: false, message: "Must accept the service agreement" });
+    if (!tokenId) return res.status(400).json({ success: false, message: "Invalid or expired link" });
+
+    let decoded;
     try {
-      await jwt.verify(tokenId, process.env.EMPLOYEE_SECRET_KEY)
-      const decode = await jwtDecode(tokenId)
-      console.log("decode", decode);
-      const bcryptPassword = await bcrypt.hash(password, 10)
-      const { fullName, email, mobileNo, workAssociation, areaOfOperation, empId,empBranchId } = decode
-      if (!email || !mobileNo || !fullName || !workAssociation || !areaOfOperation || !empId ||!empBranchId) return res.status(400).json({ success: false, message: "Invalid/expired link" })
-      const partner = await Partner.find({ email: email })
-      if (partner[0]?.isActive || partner[[0]]?.mobileVerify || partner[0]?.emailVerify) return res.status(400).json({ success: false, message: "Account is already exist" })
-      const noOfPartners = await Partner.count()
-      const today = new Date()
-      const modifiedPdfBytes = await editServiceAgreement("agreement/partner.pdf", today)
-      await sendAccountTerm_ConditonsMail(email, "partner", modifiedPdfBytes);
-      const newPartner = new Partner({
-        fullName: fullName,
-        email: email?.trim()?.toLowerCase(),
-        mobileNo: mobileNo,
-        workAssociation: workAssociation,
-        areaOfOperation: areaOfOperation,
-        password: bcryptPassword,
-        acceptTnc: agreement,
-        emailVerify: true,
-        mobileVerify: true,
-        isActive: true,
-        tlsUrl: `${process?.env?.FRONTEND_URL}/agreement/partner.pdf`,
-        profile: {
-          profilePhoto: "",
-          consultantName: fullName,
-          consultantCode: `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfPartners+1}`,
-          associateWithUs: today,
-          primaryEmail: email,
-          alternateEmail: "",
-          primaryMobileNo: mobileNo,
-          alternateMobileNo: "",
-          whatsupNo: "",
-          panNo: "",
-          aadhaarNo: "",
-          dob: null,
-          gender: "",
-          businessName: "",
-          companyName: "",
-          natureOfBusiness: "",
-          designation: "",
-          areaOfOperation: areaOfOperation,
-          workAssociation: workAssociation,
-          state: "",
-          district: "",
-          city: "",
-          pinCode: "",
-          about: "",
-        },
-        bankingDetails: {
-          bankName: "",
-          bankAccountNo: "",
-          bankBranchName: "",
-          gstNo: "",
-          panNo: "",
-          cancelledChequeImg: "",
-          gstCopyImg: "",
-          upiId: "",
-        },
-        salesId: empId,
-        shareEmployee: [empId],
-        branchId:empBranchId?.trim()
-      })
-      await newPartner.save()
-      const token = newPartner?.getAuth(true)
-      return res.status(200).header("x-auth-token", token)
-        .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully Signup" })
-    } catch (error) {
-      console.log("error", error);
-      return res.status(401).json({ success: false, message: "Invalid/expired link" })
+      await jwt.verify(tokenId, process.env.EMPLOYEE_SECRET_KEY);
+      decoded = jwtDecode(tokenId);
+    } catch (err) {
+      console.error("JWT verification error:", err);
+      return res.status(401).json({ success: false, message: "Invalid or expired link" });
     }
+
+    const { fullName, email, mobileNo, workAssociation, areaOfOperation, empId, empBranchId } = decoded;
+
+    if (!email || !mobileNo || !fullName || !workAssociation || !areaOfOperation || !empId || !empBranchId) {
+      return res.status(400).json({ success: false, message: "Invalid or expired link" });
+    }
+
+    const existingPartner = await Partner.findOne({ email: email.trim().toLowerCase() });
+    if (existingPartner?.isActive || existingPartner?.mobileVerify || existingPartner?.emailVerify) {
+      return res.status(400).json({ success: false, message: "Account already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const noOfPartners = await Partner.countDocuments();
+    const today = new Date();
+    const modifiedPdfBytes = await editServiceAgreement("agreement/partner.pdf", today);
+
+    await sendMail({
+      subject: "Service Agreement",
+      to: email,
+      html: accountTermConditionTemplate({ as: "partner", name: existingPartner?.fullName }),
+      attachments: [{
+        filename: 'service_agreement.pdf',
+        content: modifiedPdfBytes,
+        encoding: 'base64'
+      }]
+    });
+
+    const newPartner = new Partner({
+      fullName,
+      email: email.trim().toLowerCase(),
+      mobileNo,
+      workAssociation,
+      areaOfOperation,
+      password: hashedPassword,
+      acceptTnc: agreement,
+      emailVerify: true,
+      mobileVerify: true,
+      isActive: true,
+      tlsUrl: `${process.env.FRONTEND_URL}/agreement/partner.pdf`,
+      profile: {
+        profilePhoto: "",
+        consultantName: fullName,
+        consultantCode: `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}${noOfPartners + 1}`,
+        associateWithUs: today,
+        primaryEmail: email,
+        alternateEmail: "",
+        primaryMobileNo: mobileNo,
+        alternateMobileNo: "",
+        whatsupNo: "",
+        panNo: "",
+        aadhaarNo: "",
+        dob: null,
+        gender: "",
+        businessName: "",
+        companyName: "",
+        natureOfBusiness: "",
+        designation: "",
+        areaOfOperation,
+        workAssociation,
+        state: "",
+        district: "",
+        city: "",
+        pinCode: "",
+        about: "",
+      },
+      bankingDetails: {
+        bankName: "",
+        bankAccountNo: "",
+        bankBranchName: "",
+        gstNo: "",
+        panNo: "",
+        cancelledChequeImg: "",
+        gstCopyImg: "",
+        upiId: "",
+      },
+      salesId: empId,
+      shareEmployee: [empId],
+      branchId: empBranchId.trim(),
+    });
+
+    await newPartner.save();
+    const token = newPartner.getAuth(true);
+
+    return res
+      .status(200)
+      .header("x-auth-token", token)
+      .header("Access-Control-Expose-Headers", "x-auth-token")
+      .json({ success: true, message: "Successfully signed up" });
+
   } catch (error) {
-    console.log("signUpWithRequest: ", error);
-    return res.status(500).json({ success: false, message: "Oops, something went wrong", error: error });
+    console.error("signUpWithRequest error:", error);
+    return res.status(500).json({ success: false, message: "Something went wrong", error });
   }
-}
-
-//   //  for partner forget password
-// export const forgetPassword =async (req,res)=>{
-//   try {
-//     if(!req.body.email) return res.status(404).json({success:false,message: "email is required"})
-//     const partner = await Partner.find({email:req?.body?.email});
-//     if(partner.length == 0) return res.status(404).json({success:false,message: "Not register with us"})
-//     if(!partner[0]?.isActive) return res.status(400).json({success:false,message:"Account is not active"})
-//     const otp = otp6Digit();
-//     const setForgotPassword = await Partner.findByIdAndUpdate(partner[0]?._id,{$set:{forgotPasswordOTP: {otp:otp,createAt:Date.now()}}},{new:true})
-//     try {
-//       await sendOTPMail(req.body.email, otp,"partner");
-//       res.status(200).json({ success: true, message: "Successfully send OTP", otp: otp});
-//    } catch (err) {
-//     console.log("send otp error",err);
-//       return res.status(400).json({ success: false, message: "Failed to send OTP" });
-//    }
-//   } catch (error) {
-//     console.log("setPassword: ",error);
-//     return res.status(500).json({success: false,message:"Internal server error",error: error});
-//   }
-//   }
-
-//  forget password verification check
-// export const verifyForgetPassword = async (req,res,next)=>{
-//   try {
-//     if(!req.body.email) return res.status(400).json({success:false,message: "email is required"})
-//     if(!req.body.otp) return res.status(400).json({success:false,message: "Otp is required"})
-//      const partner = await Partner.find({email:req?.body?.email});
-//      if(partner.length == 0) return res.status(404).json({success:false,message: "Not register with us"})
-//      if(!partner[0]?.isActive) return res.status(400).json({success:false,message:"Account is not active"})
-//      const validFiveMinutes =new Date().getTime() - 5 * 60 * 1000;
-
-//      if( new Date(partner[0].forgotPasswordOTP?.createAt).getTime()>=validFiveMinutes && partner[0].forgotPasswordOTP?.otp==req?.body?.otp){
-//        console.log(new Date(partner[0].forgotPasswordOTP?.createAt).getTime(),validFiveMinutes);
-//        const updatePatner = await Partner.findByIdAndUpdate(partner[0]?._id,{$set:{"forgotPasswordOTP.verify":true}},{new:true})
-//      const token = await partner[0].getAuth()
-//       return res.status(201).header("x-auth-token", token)
-//         .header("Access-Control-Expose-Headers", "x-auth-token").json({success: true, message: "Forget password otp verify"})
-//      }else{
-//        return res.status(400).json({success: false, message: "Invaild/expired OTP"})
-//      }
-//      // res.status(400).json({success: true, message: "valid otp"})
-//   } catch (error) {
-//    console.log("verifyEmailOtp: ",error);
-//     return res.status(500).json({success: false,message:"Internal server error",error: error});
-//   } 
-//  }
-
-//  set new forget password
-// export const setForgetPassword =async (req,res)=>{
-//   try {
-//     const verify =  await authPartner(req,res)
-//     if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
-
-//     const {error} = validateNewPassword(req.body);
-//     if(error) return res.status(400).json({success:false,message:error.details[0].message})
-
-//     if(req.body.password!=req.body.confirmPassword) return res.status(400).json({success:false,message:"Confirm password must be same"})
-
-//     const partner = await Partner.find({email:req?.user?.email});
-//     if(partner.length == 0) return res.status(404).json({success:false,message: "Not register with us"})
-
-//     if(!partner[0]?.forgotPasswordOTP?.verify) return res.status(400).json({success:false,message:"forget password not active"})
-
-//     const bcryptPassword = await bcrypt.hash(req.body.password,10)
-//     const updatePatner = await Partner.findByIdAndUpdate(partner[0]?._id,{$set:{password:bcryptPassword}},{new:true})
-
-//     const token = await updatePatner.getAuth(true)
-//     return  res.status(200).header("x-auth-token", token)
-//     .header("Access-Control-Expose-Headers", "x-auth-token").json({success: true, message: "Successfully set New password"})
-//   } catch (error) {
-//     console.log("setPassword: ",error);
-//     return res.status(500).json({success: false,message:"Internal server error",error: error});
-//   }
-//   }
-
+};
 
 export const partnerForgetPassword = async (req, res) => {
   try {
-    if (!req.body.email) return res.status(400).json({ success: false, message: "Account email required" })
-    const partner = await Partner.find({ email: req.body.email })
-    if (partner.length == 0) return res.status(404).json({ success: false, message: "Account not exist" })
-    if (!partner[0]?.isActive || !partner[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Account is not active" })
-
-    const jwtToken = await jwt.sign({ _id: partner[0]?._id, email: partner[0]?.email }, process.env.PARTNER_SECRET_KEY, { expiresIn: '5m' })
-    try {
-      await sendForgetPasswordMail(req.body.email, `/partner/resetPassword/${jwtToken}`);
-      console.log("send forget password partner");
-      res.status(201).json({ success: true, message: "Successfully send mail" });
-    } catch (err) {
-      console.log("send forget password mail error", err);
-      return res.status(400).json({ success: false, message: "Failed to send forget password mail" });
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Account email is required" });
     }
 
+    const partner = await Partner.findOne({ email: email.trim().toLowerCase() });
+    if (!partner) {
+      return res.status(404).json({ success: false, message: "Account does not exist" });
+    }
+
+    if (!partner.isActive || !partner.mobileVerify) {
+      return res.status(400).json({ success: false, message: "Account is not active" });
+    }
+
+    // ✅ Generate JWT token valid for 5 minutes
+    const jwtToken = jwt.sign(
+      { _id: partner._id, email: partner.email },
+      process.env.PARTNER_SECRET_KEY,
+      { expiresIn: "5m" }
+    );
+
+    try {
+      await sendMail({
+        subject: "Password Reset",
+        to: partner.email,
+        html: forgetPasswordTemplate({
+          email: partner.email,
+          name: partner.fullName,
+          link: `/partner/resetPassword/${jwtToken}`,
+        }),
+      });
+      console.log("Forget password email sent to partner:", partner.email);
+      return res.status(201).json({ success: true, message: "Password reset email sent successfully" });
+    } catch (mailErr) {
+      console.error("Error sending forget password mail:", mailErr);
+      return res.status(400).json({ success: false, message: "Failed to send password reset email" });
+    }
   } catch (error) {
-    console.log("get all partner case in error:", error);
-    res.status(500).json({ success: false, message: "Internal server error", error: error });
+    console.error("partnerForgetPassword error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error });
   }
-}
+};
 
 export const partnerResetPassword = async (req, res) => {
   try {
     const { error } = validateResetPassword(req.body);
-    if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-    const { password, confirmPassword } = req.body
-    if (password != confirmPassword) return res.status(400).json({ success: false, message: "Confirm password must be same" })
-    const { verifyId } = req.query
-    console.log("verifyId", verifyId);
-    try {
-      await jwt.verify(verifyId, process.env.PARTNER_SECRET_KEY)
-      const decode = await jwtDecode(verifyId)
-      const bcryptPassword = await bcrypt.hash(req.body.password, 10)
-      const partner = await Partner.findById(decode?._id)
-      if (!partner?.isActive || !partner?.mobileVerify) return res.status(400).json({ success: false, message: "Account is not active" })
-      const forgetPasswordPartner = await Partner.findByIdAndUpdate(decode?._id, { $set: { password: bcryptPassword } })
-      if (!forgetPasswordPartner) return res.status(404).json({ success: false, message: "Account not exist" })
-      return res.status(200).json({ success: true, message: "Successfully reset password" })
-    } catch (error) {
-      return res.status(401).json({ success: false, message: "Invalid/expired link" })
+    if (error) {
+      return res.status(400).json({ success: false, message: error.details[0].message });
     }
 
+    const { password, confirmPassword } = req.body;
+    if (password !== confirmPassword) {
+      return res.status(400).json({ success: false, message: "Confirm password must match" });
+    }
+
+    const { verifyId } = req.query;
+    if (!verifyId) {
+      return res.status(400).json({ success: false, message: "Reset link is required" });
+    }
+
+    let decoded;
+    try {
+      await jwt.verify(verifyId, process.env.PARTNER_SECRET_KEY);
+      decoded = jwtDecode(verifyId);
+    } catch (err) {
+      return res.status(401).json({ success: false, message: "Invalid or expired link" });
+    }
+
+    const partner = await Partner.findById(decoded._id);
+    if (!partner) {
+      return res.status(404).json({ success: false, message: "Account does not exist" });
+    }
+
+    if (!partner.isActive || !partner.mobileVerify) {
+      return res.status(400).json({ success: false, message: "Account is not active" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await Partner.findByIdAndUpdate(partner._id, { $set: { password: hashedPassword } });
+
+    return res.status(200).json({ success: true, message: "Password reset successfully" });
   } catch (error) {
-    console.log("get all client case in error:", error);
-    res.status(500).json({ success: false, message: "Internal server error", error: error });
+    console.error("partnerResetPassword error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error });
   }
-}
+};
+
 
 
 // //  get only profile information
@@ -683,14 +705,14 @@ export const updateProfileDetails = async (req, res) => {
     const { error } = validateProfileBody(req.body);
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
     const updateKeys = ["profilePhoto", "consultantName", "alternateEmail", "alternateMobileNo", "primaryMobileNo", "whatsupNo", "panNo", "aadhaarNo",
-       "dob", "designation", "areaOfOperation", "workAssociation", "state", "gender", "district", "city", "address", "pinCode", "about", "kycPhoto",
-       "kycAadhaar", "kycPan", "kycAadhaarBack", "companyName", "companyAddress", "officalContactNo", "officalEmailId"
+      "dob", "designation", "areaOfOperation", "workAssociation", "state", "gender", "district", "city", "address", "pinCode", "about", "kycPhoto",
+      "kycAadhaar", "kycPan", "kycAadhaarBack", "companyName", "companyAddress", "officalContactNo", "officalEmailId"
     ]
 
     updateKeys?.forEach(key => {
-       if (req.body[key]) {
-          isExist.profile[key] = req.body[key]
-       }
+      if (req.body[key]) {
+        isExist.profile[key] = req.body[key]
+      }
     })
     await isExist.save()
     return res.status(200).json({ success: true, message: "Successfully update profile details" })
@@ -727,12 +749,12 @@ export const updateBankingDetails = async (req, res) => {
     if (!isExist?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
     const { error } = validateBankingDetailsBody(req.body);
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-    const updateKeys = ["bankName", "bankAccountNo", "bankBranchName", "gstNo", "panNo","cancelledChequeImg","gstCopyImg","ifscCode","upiId"]
+    const updateKeys = ["bankName", "bankAccountNo", "bankBranchName", "gstNo", "panNo", "cancelledChequeImg", "gstCopyImg", "ifscCode", "upiId"]
 
     updateKeys?.forEach(key => {
-       if (req.body[key]) {
-          isExist.bankingDetails[key] = req.body[key]
-       }
+      if (req.body[key]) {
+        isExist.bankingDetails[key] = req.body[key]
+      }
     })
     await isExist.save()
     return res.status(200).json({ success: true, message: "Successfully update banking details" })
@@ -762,7 +784,7 @@ export const addNewCase = async (req, res) => {
     req.body.caseFrom = "partner"
     req.body.processSteps = []
 
-    const newAddCase = new Case({...req.body,caseDocs:[],branchId:partner?.branchId})
+    const newAddCase = new Case({ ...req.body, caseDocs: [], branchId: partner?.branchId })
     const noOfCase = await Case.count()
     newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
     await newAddCase.save()
@@ -801,7 +823,7 @@ export const addNewCase = async (req, res) => {
       notificationEmpUrl,
       notificationAdminUrl
     )
-   
+
     return res.status(201).json({ success: true, message: "Successfully add new case", data: newAddCase })
   } catch (error) {
     console.log("addNewCase: ", error);
@@ -846,15 +868,15 @@ export const viewAllPartnerCase = async (req, res) => {
     const aggregationPipeline = [
       { $match: query?.query }, // Match the documents based on the query
       {
-         $group: {
-            _id: null,
-            totalAmtSum: { $sum: "$claimAmount" }, // Calculate the sum of totalAmt
-            totalResolvedAmt: {
-               $sum: { $cond: [{ $eq: ["$currentStatus", "Resolve"] }, "$claimAmount", 0] } // Calculate the sum of claimAmount for resolved cases
-            }
-         }
+        $group: {
+          _id: null,
+          totalAmtSum: { $sum: "$claimAmount" }, // Calculate the sum of totalAmt
+          totalResolvedAmt: {
+            $sum: { $cond: [{ $eq: ["$currentStatus", "Resolve"] }, "$claimAmount", 0] } // Calculate the sum of claimAmount for resolved cases
+          }
+        }
       }
-   ];
+    ];
 
     //  console.log("query",query?.query);
     const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 }).select("-caseDocs -processSteps -addEmployee -caseCommit -partnerReferenceCaseDetails");
@@ -909,7 +931,7 @@ export const viewAllPartnerCase = async (req, res) => {
 //       CasegroStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
 //       CaseOmbudsmanStatus.findOne({ caseId: getCase?._id, isActive: true }).populate("paymentDetailsId"),
 //     ]);
-    
+
 //     // Convert `getCaseGroDetails` to a plain object if it exists
 //       const caseGroDetailsObj = getCaseGroDetails ? getCaseGroDetails.toObject() : null;
 //       const caseOmbudsmanDetailsObj = getCaseOmbudsmanDetails ? getCaseOmbudsmanDetails.toObject() : null;
@@ -955,7 +977,7 @@ export const viewAllPartnerCase = async (req, res) => {
 
 // new version
 export const partnerViewCaseById = async (req, res) => {
-   try {
+  try {
     const verify = await authPartner(req, res)
     if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -963,116 +985,116 @@ export const partnerViewCaseById = async (req, res) => {
     if (!partner) return res.status(401).json({ success: false, message: "Partner account not found" })
     if (!partner?.isActive) return res.status(400).json({ success: false, message: "Account is not active" })
 
-      const { _id } = req.query;
+    const { _id } = req.query;
 
-      if (!validMongooseId(_id)) {
-         return res.status(400).json({ success: false, message: "Not a valid id" });
-      }
+    if (!validMongooseId(_id)) {
+      return res.status(400).json({ success: false, message: "Not a valid id" });
+    }
 
-      const caseId = new Types.ObjectId(_id);
+    const caseId = new Types.ObjectId(_id);
 
-      const caseData = await Case.aggregate([
-         { $match: { _id: caseId } },
-         {
-            $lookup: {
-               from: "casedocs",
-               let: { id: "$_id" },
-               pipeline: [
-                  {
-                     $match: {
-                        $expr: {
-                           $and: [
-                              { $eq: ["$isActive", true] },
-                              { $or: [{ $eq: ["$caseId", "$$id"] }, { $eq: ["$caseMargeId", "$$id"] }] }
-                           ]
-                        }
-                     }
-                  },
-                  { $project: { adminId: 0 } }
-               ],
-               as: "caseDocs"
+    const caseData = await Case.aggregate([
+      { $match: { _id: caseId } },
+      {
+        $lookup: {
+          from: "casedocs",
+          let: { id: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$isActive", true] },
+                    { $or: [{ $eq: ["$caseId", "$$id"] }, { $eq: ["$caseMargeId", "$$id"] }] }
+                  ]
+                }
+              }
+            },
+            { $project: { adminId: 0 } }
+          ],
+          as: "caseDocs"
+        }
+      },
+      {
+        $lookup: {
+          from: "casestatuses",
+          let: { id: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$isActive", true] },
+                    { $or: [{ $eq: ["$caseId", "$$id"] }, { $eq: ["$caseMargeId", "$$id"] }] }
+                  ]
+                }
+              }
+            },
+            { $project: { adminId: 0 } }
+          ],
+          as: "processSteps"
+        }
+      },
+      {
+        $lookup: {
+          from: "casecomments",
+          let: { id: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$isActive", true] },
+                    { $or: [{ $eq: ["$caseId", "$$id"] }, { $eq: ["$caseMargeId", "$$id"] }] }
+                  ]
+                }
+              }
             }
-         },
-         {
-            $lookup: {
-               from: "casestatuses",
-               let: { id: "$_id" },
-               pipeline: [
-                  {
-                     $match: {
-                        $expr: {
-                           $and: [
-                              { $eq: ["$isActive", true] },
-                              { $or: [{ $eq: ["$caseId", "$$id"] }, { $eq: ["$caseMargeId", "$$id"] }] }
-                           ]
-                        }
-                     }
-                  },
-                  { $project: { adminId: 0 } }
-               ],
-               as: "processSteps"
-            }
-         },
-         {
-            $lookup: {
-               from: "casecomments",
-               let: { id: "$_id" },
-               pipeline: [
-                  {
-                     $match: {
-                        $expr: {
-                           $and: [
-                              { $eq: ["$isActive", true] },
-                              { $or: [{ $eq: ["$caseId", "$$id"] }, { $eq: ["$caseMargeId", "$$id"] }] }
-                           ]
-                        }
-                     }
-                  }
-               ],
-               as: "caseCommit"
-            }
-         },
-         {
-            $lookup: {
-               from: "casepaymentdetails",
-               localField: "_id",
-               foreignField: "caseId",
-               pipeline: [{ $match: { isActive: true } }],
-               as: "casePayment"
-            }
-         },
-        {
-          $lookup: {
-            from: "case_forms",
-            localField: "_id",
-            foreignField: "caseId",
-            pipeline: [
-              { $match: { isActive: true } },
-              { $project: { formType: 1, caseId: 1 } },
-            ],
-            as: "case_forms"
-          }
-        },
-      ]);
+          ],
+          as: "caseCommit"
+        }
+      },
+      {
+        $lookup: {
+          from: "casepaymentdetails",
+          localField: "_id",
+          foreignField: "caseId",
+          pipeline: [{ $match: { isActive: true } }],
+          as: "casePayment"
+        }
+      },
+      {
+        $lookup: {
+          from: "case_forms",
+          localField: "_id",
+          foreignField: "caseId",
+          pipeline: [
+            { $match: { isActive: true } },
+            { $project: { formType: 1, caseId: 1 } },
+          ],
+          as: "case_forms"
+        }
+      },
+    ]);
 
-      if (!caseData.length) {
-         return res.status(404).json({ success: false, message: "Case not found" });
-      }
+    if (!caseData.length) {
+      return res.status(404).json({ success: false, message: "Case not found" });
+    }
 
-      const result = caseData[0];
+    const result = caseData[0];
 
-      if (result.caseGroDetails) {
-         result.caseGroDetails = {
-         ...result.caseGroDetails,
-         groStatusUpdates: result.caseGroDetails?.groStatusUpdates?.filter(ele => ele?.isPrivate) || [],
-         queryHandling: result.caseGroDetails?.queryHandling?.filter(ele => ele?.isPrivate) || [],
-         queryReply: result.caseGroDetails?.queryReply?.filter(ele => ele?.isPrivate) || [],
-         approvalLetter: result.caseGroDetails?.approvalLetterPrivate ? "" : result.caseGroDetails?.approvalLetter,
-         };
-      }
+    if (result.caseGroDetails) {
+      result.caseGroDetails = {
+        ...result.caseGroDetails,
+        groStatusUpdates: result.caseGroDetails?.groStatusUpdates?.filter(ele => ele?.isPrivate) || [],
+        queryHandling: result.caseGroDetails?.queryHandling?.filter(ele => ele?.isPrivate) || [],
+        queryReply: result.caseGroDetails?.queryReply?.filter(ele => ele?.isPrivate) || [],
+        approvalLetter: result.caseGroDetails?.approvalLetterPrivate ? "" : result.caseGroDetails?.approvalLetter,
+      };
+    }
 
-      if (result.caseOmbudsmanDetails) {
-         result.caseOmbudsmanDetails = {
+    if (result.caseOmbudsmanDetails) {
+      result.caseOmbudsmanDetails = {
         ...result.caseOmbudsmanDetails,
         statusUpdates: result.caseOmbudsmanDetails?.statusUpdates?.filter(ele => ele?.isPrivate) || [],
         queryHandling: result.caseOmbudsmanDetails?.queryHandling?.filter(ele => ele?.isPrivate) || [],
@@ -1080,15 +1102,15 @@ export const partnerViewCaseById = async (req, res) => {
         hearingSchedule: result.caseOmbudsmanDetails?.hearingSchedule?.filter(ele => ele?.isPrivate) || [],
         awardPart: result.caseOmbudsmanDetails?.awardPart?.filter(ele => ele?.isPrivate) || [],
         approvalLetter: result.caseOmbudsmanDetails?.approvalLetterPrivate ? "" : result.caseOmbudsmanDetails?.approvalLetter,
-         };
-      }
+      };
+    }
 
-      return res.status(200).json({ success: true, message: "get case data", data: result });
+    return res.status(200).json({ success: true, message: "get case data", data: result });
 
-   } catch (error) {
-      console.error("employeeViewCaseByIdBy error:", error);
-      return res.status(500).json({ success: false, message: "Internal server error", error });
-   }
+  } catch (error) {
+    console.error("employeeViewCaseByIdBy error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error });
+  }
 };
 
 
@@ -1124,7 +1146,7 @@ export const partnerUpdateCaseById = async (req, res) => {
 
     // console.log("case_id", _id, req.body);
 
-    const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body,caseDocs:[] } }, { new: true })
+    const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body, caseDocs: [] } }, { new: true })
     return res.status(200).json({ success: true, message: "Successfully update case", data: updateCase });
 
   } catch (error) {
@@ -1189,31 +1211,31 @@ export const getpartnerDashboard = async (req, res) => {
       fullName: partner?.fullName
     }
 
-      const year = Number(req.query.year || new Date().getFullYear());
-      const startYear = Number(year || 2024); // default April 2024
-      const endYear = Number(startYear + 1);     // default March 2035
+    const year = Number(req.query.year || new Date().getFullYear());
+    const startYear = Number(year || 2024); // default April 2024
+    const endYear = Number(startYear + 1);     // default March 2035
 
-      // Dates range
-      const financialYearStart = new Date(startYear, 3, 1); // April 1 startYear
-      const financialYearEnd = new Date(endYear, 2, 31, 23, 59, 59, 999); // March 31 endYear
-      const currentYear = new Date().getFullYear();
+    // Dates range
+    const financialYearStart = new Date(startYear, 3, 1); // April 1 startYear
+    const financialYearEnd = new Date(endYear, 2, 31, 23, 59, 59, 999); // March 31 endYear
+    const currentYear = new Date().getFullYear();
 
 
-      const allMonths = [];
-      const currentMonth = new Date().getMonth();
-      const totalMonths = currentYear == year && currentMonth > 2 ? currentMonth - 2 : (endYear - startYear - 1) * 12 + 12;
+    const allMonths = [];
+    const currentMonth = new Date().getMonth();
+    const totalMonths = currentYear == year && currentMonth > 2 ? currentMonth - 2 : (endYear - startYear - 1) * 12 + 12;
 
-      for (let i = 0; i < totalMonths; i++) {
-         const date = new Date(financialYearStart);
-         date.setMonth(date.getMonth() + i);
-         allMonths.push({
-            _id: {
-               year: date.getFullYear(),
-               month: date.getMonth() + 1
-            },
-            totalCases: 0
-         });
-      }
+    for (let i = 0; i < totalMonths; i++) {
+      const date = new Date(financialYearStart);
+      date.setMonth(date.getMonth() + i);
+      allMonths.push({
+        _id: {
+          year: date.getFullYear(),
+          month: date.getMonth() + 1
+        },
+        totalCases: 0
+      });
+    }
 
 
     // Get case distribution by currentStatus (for pie chart)
@@ -1221,8 +1243,8 @@ export const getpartnerDashboard = async (req, res) => {
       {
         $match: {
           createdAt: {
-           $gte: financialYearStart,
-          $lte: financialYearEnd,
+            $gte: financialYearStart,
+            $lte: financialYearEnd,
           },
           partnerObjId: new Types.ObjectId(req?.user?._id),
           isActive: true,
@@ -1307,163 +1329,163 @@ export const partnerDownloadReport = async (req, res) => {
     if (!partner) return res.status(401).json({ success: false, message: "User account not found" });
     if (!partner?.isActive) return res.status(400).json({ success: false, message: "Account is not active" })
 
-      // query = ?statusType=&search=&limit=&pageNo
-      const searchQuery = req.query.search ? req.query.search : "";
-      const statusType = req.query.status ? req.query.status : "";
-      const startDate = req.query.startDate ? req.query.startDate : "";
-      const endDate = req.query.endDate ? req.query.endDate : "";
-      const type = req?.query?.type ? req.query.type : true
+    // query = ?statusType=&search=&limit=&pageNo
+    const searchQuery = req.query.search ? req.query.search : "";
+    const statusType = req.query.status ? req.query.status : "";
+    const startDate = req.query.startDate ? req.query.startDate : "";
+    const endDate = req.query.endDate ? req.query.endDate : "";
+    const type = req?.query?.type ? req.query.type : true
 
-      const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, partner?._id, false, false, type)
-      if (!query.success) return res.status(400).json({ success: false, message: query.message })
-      const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
+    const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, partner?._id, false, false, type)
+    if (!query.success) return res.status(400).json({ success: false, message: query.message })
+    const getAllCase = await Case.find(query?.query).sort({ createdAt: -1 });
 
-      const excelBuffer = await partnerGetDownloadCaseExcel(getAllCase)
-      res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.status(200)
-      res.send(excelBuffer)
+    const excelBuffer = await partnerGetDownloadCaseExcel(getAllCase)
+    res.setHeader('Content-Disposition', 'attachment; filename="cases.xlsx"')
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.status(200)
+    res.send(excelBuffer)
 
   } catch (error) {
-     console.log("updateAdminCase in error:", error);
-     res.status(500).json({ success: false, message: "Internal server error", error: error });
+    console.log("updateAdminCase in error:", error);
+    res.status(500).json({ success: false, message: "Internal server error", error: error });
 
   }
 }
 
 export const getStatement = async (req, res) => {
   try {
-     const verify = await authPartner(req, res)
-     if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+    const verify = await authPartner(req, res)
+    if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-     const partner = await Partner.findById(req?.user?._id).select({
-      'bankingDetails.bankName':1,
-      'bankingDetails.bankAccountNo':1,
-      'bankingDetails.bankBranchName':1,
-      'bankingDetails.panNo':1,
-      'bankingDetails.branchId':1,
-      'profile.consultantName':1,
-      'profile.consultantCode':1,
-      'profile.address':1,
-      'branchId':1,
-      'isActive':1,
-   }).populate("salesId","fullName")
-     if (!partner) return res.status(401).json({ success: false, message: "Partner account not found" })
-     
-     if (!partner?.isActive) return res.status(401).json({ success: false, message: "Partner account not active" })
+    const partner = await Partner.findById(req?.user?._id).select({
+      'bankingDetails.bankName': 1,
+      'bankingDetails.bankAccountNo': 1,
+      'bankingDetails.bankBranchName': 1,
+      'bankingDetails.panNo': 1,
+      'bankingDetails.branchId': 1,
+      'profile.consultantName': 1,
+      'profile.consultantCode': 1,
+      'profile.address': 1,
+      'branchId': 1,
+      'isActive': 1,
+    }).populate("salesId", "fullName")
+    if (!partner) return res.status(401).json({ success: false, message: "Partner account not found" })
 
-
-
-     const {startDate, endDate, limit, pageNo,isPdf } = req.query
-     const pageItemLimit = limit ? limit : 10;
-     const page = pageNo ? (pageNo - 1) * pageItemLimit : 0;
+    if (!partner?.isActive) return res.status(401).json({ success: false, message: "Partner account not active" })
 
 
-     if (startDate && endDate) {
-        const validStartDate = getValidateDate(startDate)
-        if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
-        const validEndDate = getValidateDate(endDate)
-        if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
-     }
 
-     let matchQuery = []
+    const { startDate, endDate, limit, pageNo, isPdf } = req.query
+    const pageItemLimit = limit ? limit : 10;
+    const page = pageNo ? (pageNo - 1) * pageItemLimit : 0;
 
-     if (startDate && endDate) {
-        const start = new Date(startDate).setHours(0, 0, 0, 0);
-        const end = new Date(endDate).setHours(23, 59, 59, 999);
 
-        matchQuery.push({
-           createdAt: {
-              $gte: new Date(start),
-              $lte: new Date(end)
-           }
-        });
-     }
+    if (startDate && endDate) {
+      const validStartDate = getValidateDate(startDate)
+      if (!validStartDate) return res.status(400).json({ success: false, message: "start date not formated" })
+      const validEndDate = getValidateDate(endDate)
+      if (!validEndDate) return res.status(400).json({ success: false, message: "end date not formated" })
+    }
 
-     let statementOf = {}
-     statementOf.partner = partner
-     matchQuery.push({
-        partnerId: partner?._id
-     })
-     const allStatement = await Statement.aggregate([
-        {
-           $match: {
-              $and:[
-                 ...matchQuery,
-                 {isActive:true}
+    let matchQuery = []
 
-              ]
-           }
-        },
-        {
-           $lookup: {
-              from: 'partners',
-              localField: 'partnerId',
-              foreignField: '_id',
-              as: 'partnerDetails',
-              pipeline: [
-                 {
-                    $project: {
-                       'profile.consultantName': 1,
-                       'profile.consultantCode': 1,
+    if (startDate && endDate) {
+      const start = new Date(startDate).setHours(0, 0, 0, 0);
+      const end = new Date(endDate).setHours(23, 59, 59, 999);
 
-                    }
-                 }
-              ]
-           }
-        },
-        {
-           $unwind:{
-              path:'$partnerDetails',
-              preserveNullAndEmptyArrays:true
-           }
-        },
-        {
-           $lookup: {
-              from: 'employees',
-              localField: 'empId',
-              foreignField: '_id',
-              as: 'empDetails',
-              pipeline: [
-                 {
-                    $project: {
-                       'fullName': 1,
-                       'type': 1,
-                    }
-                 }
-              ]
-           }
-        },
-        {
-           $unwind:{
-              path:'$empDetails',
-              preserveNullAndEmptyArrays:true
-           }
-        },
-        { '$sort': { 'createdAt': -1 } },
-        {
-           $facet: {
-            statement: [
-              ...(isPdf=="true" ? [] : [
-                 { $skip: Number(page) },
-                 { $limit: Number(pageItemLimit) }
-              ])
-           ],
-              total: [
-                 { $count: "count" }
-              ]
-           }
+      matchQuery.push({
+        createdAt: {
+          $gte: new Date(start),
+          $lte: new Date(end)
         }
-     ])
+      });
+    }
 
-     const data = allStatement?.[0]?.statement
-     const totalData = allStatement?.[0]?.total?.[0]?.count || 0
+    let statementOf = {}
+    statementOf.partner = partner
+    matchQuery.push({
+      partnerId: partner?._id
+    })
+    const allStatement = await Statement.aggregate([
+      {
+        $match: {
+          $and: [
+            ...matchQuery,
+            { isActive: true }
 
-     return res.status(200).json({ success: true, message: `Successfully fetch all statement`, data: { data: data,totalData, statementOf } });
+          ]
+        }
+      },
+      {
+        $lookup: {
+          from: 'partners',
+          localField: 'partnerId',
+          foreignField: '_id',
+          as: 'partnerDetails',
+          pipeline: [
+            {
+              $project: {
+                'profile.consultantName': 1,
+                'profile.consultantCode': 1,
+
+              }
+            }
+          ]
+        }
+      },
+      {
+        $unwind: {
+          path: '$partnerDetails',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'empId',
+          foreignField: '_id',
+          as: 'empDetails',
+          pipeline: [
+            {
+              $project: {
+                'fullName': 1,
+                'type': 1,
+              }
+            }
+          ]
+        }
+      },
+      {
+        $unwind: {
+          path: '$empDetails',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      { '$sort': { 'createdAt': -1 } },
+      {
+        $facet: {
+          statement: [
+            ...(isPdf == "true" ? [] : [
+              { $skip: Number(page) },
+              { $limit: Number(pageItemLimit) }
+            ])
+          ],
+          total: [
+            { $count: "count" }
+          ]
+        }
+      }
+    ])
+
+    const data = allStatement?.[0]?.statement
+    const totalData = allStatement?.[0]?.total?.[0]?.count || 0
+
+    return res.status(200).json({ success: true, message: `Successfully fetch all statement`, data: { data: data, totalData, statementOf } });
 
   } catch (error) {
-     console.log("createOrUpdateStatement in error:", error);
-     res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
+    console.log("createOrUpdateStatement in error:", error);
+    res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
 
   }
 }

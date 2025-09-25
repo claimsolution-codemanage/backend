@@ -1,15 +1,14 @@
 import Client from "../models/client.js";
 import { validateClientSignUp, validateClientSignIn, validateClientProfileBody, validateAddClientCase } from "../utils/validateClient.js";
 import bcrypt from 'bcrypt'
-import { sendOTPMail } from "../utils/sendMail.js";
+import { sendMail, } from "../utils/sendMail.js";
 import { authClient } from "../middleware/authentication.js";
 import { otp6Digit, sendNotificationAndMail } from '../utils/helper.js'
 import Case from "../models/case/case.js";
 import { getAllCaseQuery } from "../utils/helper.js";
 import { validMongooseId } from "../utils/helper.js";
 import jwt from 'jsonwebtoken'
-import { sendForgetPasswordMail, sendAccountTerm_ConditonsMail } from "../utils/sendMail.js";
-import { validateResetPassword, validateAddCaseFile, getAllInvoiceQuery, editServiceAgreement } from "../utils/helper.js";
+import { validateResetPassword, getAllInvoiceQuery, editServiceAgreement } from "../utils/helper.js";
 import jwtDecode from 'jwt-decode'
 import Admin from "../models/admin.js";
 import Bill from "../models/bill.js"
@@ -18,11 +17,10 @@ import { encrypt } from "./payment.js";
 import { firebaseUpload } from "../utils/helper.js";
 import CaseDoc from "../models/caseDoc.js";
 import CaseStatus from "../models/caseStatus.js";
-import Notification from "../models/notification.js";
-import CasePaymentDetails from "../models/casePaymentDetails.js";
-import CasegroStatus from "../models/groStatus.js";
-import CaseOmbudsmanStatus from "../models/ombudsmanStatus.js";
 import mongoose, { Types } from "mongoose";
+import { accountVerificationTemplate } from "../utils/emailTemplates/accountVerificationTemplate.js";
+import { accountTermConditionTemplate } from "../utils/emailTemplates/accountTermConditionTemplate.js";
+import { forgetPasswordTemplate } from "../utils/emailTemplates/forgotPasswordTemplate.js";
 
 export const clientUploadImage = async (req, res) => {
   try {
@@ -62,229 +60,317 @@ export const clientAuthenticate = async (req, res) => {
 export const clientSignUp = async (req, res) => {
   try {
     const { error } = validateClientSignUp(req.body);
-    if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+    if (error) {
+      return res.status(400).json({ success: false, message: error.details[0].message });
+    }
 
-    const otp = otp6Digit();
-    const client = await Client.find({ mobileNo: req.body.mobileNo });
-    const clientWithEmail = await Client.find({ email: req?.body?.email?.trim()?.toLowerCase() })
-    const { agreement } = req.body
+    const { fullName, email, mobileNo, password, agreement } = req.body;
     if (!agreement) {
-      return res.status(400).json({ success: false, message: "Must agree with our service agreement" })
+      return res.status(400).json({ success: false, message: "Must agree with our service agreement" });
     }
 
-    if (client[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Mobile No. already register with us" })
-    if (clientWithEmail[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Email already register with us" });
+    const normalizedEmail = email?.trim()?.toLowerCase();
+    const otp = otp6Digit();
 
-    // req.body.emailOTP = {otp:otp,createAt:Date.now()}
-    const bcrypePassword = await bcrypt.hash(req.body.password, 10)
-    if (client.length == 0 && clientWithEmail.length == 0) {
-      const newClient = new Client({
-        fullName: req.body.fullName,
-        email: req?.body?.email?.trim()?.toLowerCase(),
-        mobileNo: req.body.mobileNo,
-        password: bcrypePassword,
-        emailOTP: { otp: otp, createAt: Date.now() },
-        acceptClientTls: agreement
-      })
-      const token = await newClient.getAuth()
-      await newClient.save();
-      try {
-        await sendOTPMail(req.body.email, otp, "client");
-        res.status(201).header("x-auth-token", token)
-          .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully send OTP" });
-      } catch (err) {
-        console.log("send otp error", err);
-        return res.status(400).json({ success: false, message: "Failed to send OTP" });
-      }
+    // Check existing clients
+    const existingClientByMobile = await Client.findOne({ mobileNo });
+    const existingClientByEmail = await Client.findOne({ email: normalizedEmail });
 
+    if (existingClientByMobile?.mobileVerify) {
+      return res.status(400).json({ success: false, message: "Mobile No. already registered with us" });
+    }
+    if (existingClientByEmail?.mobileVerify) {
+      return res.status(400).json({ success: false, message: "Email already registered with us" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    let clientDoc;
+    if (!existingClientByMobile && !existingClientByEmail) {
+      // Create new client
+      clientDoc = new Client({
+        fullName,
+        email: normalizedEmail,
+        mobileNo,
+        password: hashedPassword,
+        emailOTP: { otp, createAt: Date.now() },
+        acceptClientTls: agreement,
+      });
+      await clientDoc.save();
     } else {
-      if (client?.length > 0) {
-        const updateClient = await Client.findByIdAndUpdate(client[0]?._id, {
+      // Update existing client (by mobile or email)
+      const targetClient = existingClientByMobile || existingClientByEmail;
+      clientDoc = await Client.findByIdAndUpdate(
+        targetClient._id,
+        {
           $set: {
-            fullName: req.body.fullName,
-            email: req?.body?.email?.trim()?.toLowerCase(),
-            mobileNo: req.body.mobileNo,
-            password: bcrypePassword,
-            emailOTP: { otp: otp, createAt: Date.now() },
-            acceptClientTls: agreement
-          }
-        })
-        const token = await updateClient.getAuth()
-        try {
-          await sendOTPMail(req.body.email, otp, "client");
-          res.status(201).header("x-auth-token", token)
-            .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully send OTP" });
-        } catch (err) {
-          console.log("send otp error", err);
-          return res.status(400).json({ success: false, message: "Failed to send OTP" });
-        }
-      } else if (clientWithEmail.length > 0) {
-        const updateClient = await Client.findByIdAndUpdate(clientWithEmail[0]?._id, {
-          $set: {
-            fullName: req.body.fullName,
-            email: req.body.email?.trim()?.toLowerCase(),
-            mobileNo: req.body.mobileNo,
-            password: bcrypePassword,
-            emailOTP: { otp: otp, createAt: Date.now() },
-            acceptClientTls: agreement
-          }
-        })
-        const token = await updateClient.getAuth()
-        try {
-          await sendOTPMail(req.body.email, otp, "client");
-          res.status(201).header("x-auth-token", token)
-            .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully send OTP" });
-        } catch (err) {
-          console.log("send otp error", err);
-          return res.status(400).json({ success: false, message: "Failed to send OTP" });
-        }
-      } else {
-        return res.status(400).json({ success: false, message: "Account already Exist" });
-      }
+            fullName,
+            email: normalizedEmail,
+            mobileNo,
+            password: hashedPassword,
+            emailOTP: { otp, createAt: Date.now() },
+            acceptClientTls: agreement,
+          },
+        },
+        { new: true }
+      );
     }
 
+    // Generate token
+    const token = await clientDoc.getAuth();
+
+    // Send email with OTP
+    try {
+      await sendMail({
+        subject: "Account Verification",
+        to: normalizedEmail,
+        html: accountVerificationTemplate({ name: fullName, otp, type: "client" }),
+      });
+
+      return res
+        .status(201)
+        .header("x-auth-token", token)
+        .header("Access-Control-Expose-Headers", "x-auth-token")
+        .json({ success: true, message: "Successfully sent OTP" });
+    } catch (mailErr) {
+      console.error("send otp error:", mailErr);
+      return res.status(400).json({ success: false, message: "Failed to send OTP" });
+    }
   } catch (error) {
-    console.log("signup error: ", error);
-    res.status(500).json({ success: false, message: "Internal server error", error: error });
+    console.error("signup error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error });
   }
-}
+};
+
 
 export const signUpWithRequest = async (req, res) => {
   try {
-    const { password, agreement, tokenId } = req.body
-    if (!password) return res.status(400).json({ success: true, message: "Password is required" })
-    if (!agreement) return res.status(400).json({ success: true, message: "Must accept our service agreement" })
-    if (!tokenId) return res.status(400).json({ success: true, message: "Invalid/expired link" })
+    const { password, agreement, tokenId } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ success: false, message: "Password is required" });
+    }
+    if (!agreement) {
+      return res.status(400).json({ success: false, message: "Must accept our service agreement" });
+    }
+    if (!tokenId) {
+      return res.status(400).json({ success: false, message: "Invalid/expired link" });
+    }
+
     try {
-      await jwt.verify(tokenId, process.env.EMPLOYEE_SECRET_KEY)
-      const decode = await jwtDecode(tokenId)
-      console.log("decode", decode);
-      const bcryptPassword = await bcrypt.hash(password, 10)
-      const { clientName, clientEmail, clientMobileNo, empId,empBranchId,caseId } = decode
-      if (!clientName || !clientEmail || !clientMobileNo || !empId ||!empBranchId) return res.status(400).json({ success: false, message: "Invalid/expired link" })
-      const client = await Client.find({ email: clientEmail })
-      if (client[0]?.isActive || client[[0]]?.mobileVerify || client[0]?.emailVerify) return res.status(400).json({ success: false, message: "Account is already exist" })
-      const noOfClients = await Client.count()
-      const today = new Date()
-      const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", today)
-      await sendAccountTerm_ConditonsMail(clientEmail, "client", modifiedPdfBytes);
-      const consultantCode = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfClients+1}`
+      // ✅ Verify and decode token
+      jwt.verify(tokenId, process.env.EMPLOYEE_SECRET_KEY);
+      const decode = jwtDecode(tokenId);
+
+      const { clientName, clientEmail, clientMobileNo, empId, empBranchId, caseId } = decode;
+      if (!clientName || !clientEmail || !clientMobileNo || !empId || !empBranchId) {
+        return res.status(400).json({ success: false, message: "Invalid/expired link" });
+      }
+
+      // ✅ Check if client already exists
+      const existingClient = await Client.findOne({ email: clientEmail });
+      if (existingClient?.isActive || existingClient?.mobileVerify || existingClient?.emailVerify) {
+        return res.status(400).json({ success: false, message: "Account already exists" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const today = new Date();
+
+      // ✅ Generate agreement with timestamp
+      const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", today);
+        await sendMail({
+        subject: "Service Agreement",
+        to: clientEmail,
+        html: accountTermConditionTemplate({as:"client",name:existingClient?.fullName }),
+        attachments:[{
+            filename: 'service_agreement.pdf',
+            content: modifiedPdfBytes,
+            encoding: 'base64'
+        }]
+      });
+
+      // ✅ Consultant code
+      const noOfClients = await Client.countDocuments();
+      const consultantCode = `${today.getFullYear()}${
+        today.getMonth() + 1 < 10 ? `0${today.getMonth() + 1}` : today.getMonth() + 1
+      }${today.getDate()}${noOfClients + 1}`;
+
+      // ✅ Create client
       const newClient = new Client({
         fullName: clientName,
-        email: clientEmail?.trim()?.toLowerCase(),
+        email: clientEmail.trim().toLowerCase(),
         mobileNo: `91${clientMobileNo}`,
-        password: bcryptPassword,
-        emailOTP: { otp: "123456", createAt: Date.now() },
+        password: hashedPassword,
+        emailOTP: { otp: "123456", createAt: Date.now() }, // static OTP placeholder
         acceptClientTls: agreement,
         emailVerify: true,
         mobileVerify: true,
         isActive: true,
-        tlsUrl: `${process?.env?.FRONTEND_URL}/agreement/client.pdf`,
-        "profile.profilePhoto": "",
-        "profile.consultantName": clientName,
-        "profile.consultantCode": consultantCode,
-        "profile.associateWithUs": today,
-        "profile.fatherName": "",
-        "profile.primaryEmail": clientEmail,
-        "profile.alternateEmail": "",
-        "profile.primaryMobileNo": clientMobileNo,
-        "profile.whatsupNo": "",
-        "profile.alternateMobileNo": "",
-        "profile.panNo": "",
-        "profile.aadhaarNo": "",
-        "profile.dob": "",
-        "profile.gender": "",
-        "profile.address": "",
-        "profile.state": "",
-        "profile.district": "",
-        "profile.city": "",
-        "profile.pinCode": "",
-        "profile.about": "",
-        "profile.kycPhoto": "",
-        "profile.kycAadhar": "",
-        "profile.kycAadhaarBack": "",
-        "profile.kycPan": "",
+        tlsUrl: `${process.env.FRONTEND_URL}/agreement/client.pdf`,
+        profile: {
+          profilePhoto: "",
+          consultantName: clientName,
+          consultantCode,
+          associateWithUs: today,
+          fatherName: "",
+          primaryEmail: clientEmail,
+          alternateEmail: "",
+          primaryMobileNo: clientMobileNo,
+          whatsupNo: "",
+          alternateMobileNo: "",
+          panNo: "",
+          aadhaarNo: "",
+          dob: "",
+          gender: "",
+          address: "",
+          state: "",
+          district: "",
+          city: "",
+          pinCode: "",
+          about: "",
+          kycPhoto: "",
+          kycAadhar: "",
+          kycAadhaarBack: "",
+          kycPan: "",
+        },
         salesId: empId,
-        branchId:empBranchId?.trim()
-      })
-      await newClient.save()
+        branchId: empBranchId.trim(),
+      });
 
-      if(caseId){
-        if(validMongooseId(caseId)){
-          const getCase = await Case.findByIdAndUpdate(caseId,{$set:{
-            clientId:newClient?._id?.toString(),
-            clientObjId:newClient?._id,
-            caseFrom:"client",
-            consultantCode:consultantCode
-          }})
-        }
+      await newClient.save();
+
+      // ✅ If linked to a case, update it
+      if (caseId && validMongooseId(caseId)) {
+        await Case.findByIdAndUpdate(caseId, {
+          $set: {
+            clientId: newClient._id.toString(),
+            clientObjId: newClient._id,
+            caseFrom: "client",
+            consultantCode,
+          },
+        });
       }
 
-      const token = newClient?.getAuth(true)
-      return res.status(200).header("x-auth-token", token)
-        .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully Signup" })
-    } catch (error) {
-      console.log("error", error);
-      return res.status(401).json({ success: false, message: "Invalid/expired link" })
+      // ✅ Issue token
+      const token = await newClient.getAuth(true);
+      return res
+        .status(200)
+        .header("x-auth-token", token)
+        .header("Access-Control-Expose-Headers", "x-auth-token")
+        .json({ success: true, message: "Successfully signed up" });
+    } catch (err) {
+      console.error("signupWithRequest error:", err);
+      return res.status(401).json({ success: false, message: "Invalid/expired link" });
     }
   } catch (error) {
-    console.log("signUpWithRequest: ", error);
-    return res.status(500).json({ success: false, message: "Oops, something went wrong", error: error });
+    console.error("signUpWithRequest:", error);
+    return res.status(500).json({ success: false, message: "Oops, something went wrong", error });
   }
-}
+};
 
 export const clientResendOtp = async (req, res) => {
   try {
-    const verify = await authClient(req, res)
-    if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+    const verify = await authClient(req, res);
+    if (!verify.success) {
+      return res.status(401).json({ success: false, message: verify.message });
+    }
 
     const client = await Client.findById(req?.user?._id);
-    if (!client) return res.status(401).json({ success: false, message: "Not SignUp with us" })
+    if (!client) {
+      return res.status(401).json({ success: false, message: "Not signed up with us" });
+    }
 
-    if (client?.mobileVerify || client?.isActive || client?.emailVerify) return res.status(400).json({ success: false, message: "Already register with us" })
+    if (client.mobileVerify || client.isActive || client.emailVerify) {
+      return res.status(400).json({ success: false, message: "Already registered with us" });
+    }
 
     const otp = otp6Digit();
-    const updateClient = await Client.findByIdAndUpdate(req?.user?._id, { $set: { emailOTP: { otp: otp, createAt: Date.now() } } })
-    if (!updateClient) return res.status(401).json({ success: false, message: "Not SignUp with us" })
+    const updatedClient = await Client.findByIdAndUpdate(
+      req.user._id,
+      { $set: { emailOTP: { otp, createAt: Date.now() } } },
+      { new: true }
+    );
+
+    if (!updatedClient) {
+      return res.status(401).json({ success: false, message: "Not signed up with us" });
+    }
 
     try {
-      await sendOTPMail(client?.email, otp, "client");
-      res.status(200).json({ success: true, message: "Successfully resend OTP" });
+      await sendMail({
+        subject: "Account Verification - Resend OTP",
+        to: client.email,
+        html: accountVerificationTemplate({ name: client.fullName, otp, type: "client" }),
+      });
+
+      return res.status(200).json({ success: true, message: "Successfully resent OTP" });
     } catch (err) {
-      console.log("send otp error", err);
+      console.error("send otp error:", err);
       return res.status(400).json({ success: false, message: "Failed to send OTP" });
     }
   } catch (error) {
-    console.log("resend otp error: ", error);
-    res.status(500).json({ success: false, message: "Internal server error", error: error });
+    console.error("resend otp error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error });
   }
-}
+};
 
 //  for email verification check
 export const verifyClientEmailOtp = async (req, res) => {
   try {
-    const verify = await authClient(req, res)
-    if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+    // ✅ Authenticate client
+    const verify = await authClient(req, res);
+    if (!verify.success) {
+      return res.status(401).json({ success: false, message: verify.message });
+    }
 
     const client = await Client.findById(req?.user?._id);
-    if (!client) return res.status(401).json({ success: false, message: "Not register with us" })
-    if (client?.mobileVerify) return res.status(400).json({ success: false, message: "Account is already verify" })
-    if (!req.body.otp) return res.status(404).json({ success: false, message: "Otp is required" })
-    const validFiveMinutes = new Date().getTime() - 5 * 60 * 1000;
+    if (!client) {
+      return res.status(401).json({ success: false, message: "Not registered with us" });
+    }
 
-    if (new Date(client.emailOTP?.createAt).getTime() >= validFiveMinutes && client.emailOTP?.otp == req?.body?.otp) {
-      // const updateClient = await Client.findByIdAndUpdate(client?._id,{$set:{emailVerify:true}})
-      //   const token = updateClient?.getAuth()
-      //   return  res.status(200).header("x-auth-token", token)
-      //   .header("Access-Control-Expose-Headers", "x-auth-token").json({success: true, message: "Account Verified with email"})
-      try {
-        // const admin = await Admin.find({}).select("-password")
-        const today = new Date()
-        const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", today)
-        await sendAccountTerm_ConditonsMail(client?.email, "client", modifiedPdfBytes);
-        // await sendAccountTerm_ConditonsMail(client?.email, "client", `${process?.env?.FRONTEND_URL}/agreement/client.pdf`);
-        const noOfClients = await Client.count()
-        const updateClient = await Client.findByIdAndUpdate(req?.user?._id, {
+    if (client.mobileVerify) {
+      return res.status(400).json({ success: false, message: "Account is already verified" });
+    }
+
+    const { otp } = req.body;
+    if (!otp) {
+      return res.status(400).json({ success: false, message: "OTP is required" });
+    }
+
+    // ✅ OTP validity: 5 minutes
+    const otpValidFrom = Date.now() - 5 * 60 * 1000;
+    const otpCreatedAt = new Date(client.emailOTP?.createAt).getTime();
+    const isOtpValid = otpCreatedAt >= otpValidFrom && client.emailOTP?.otp == otp;
+
+    if (!isOtpValid) {
+      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+    }
+
+    try {
+      const today = new Date();
+
+      // ✅ Generate agreement with timestamp
+      const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", today);
+        await sendMail({
+        subject: "Service Agreement",
+        to: client.email,
+        html: accountTermConditionTemplate({as:"client",name:client?.fullName }),
+        attachments:[{
+            filename: 'service_agreement.pdf',
+            content: modifiedPdfBytes,
+            encoding: 'base64'
+        }]
+      });
+
+      // ✅ Generate consultant code
+      const noOfClients = await Client.countDocuments();
+      const consultantCode = `${today.getFullYear()}${
+        today.getMonth() + 1 < 10 ? `0${today.getMonth() + 1}` : today.getMonth() + 1
+      }${today.getDate()}${noOfClients + 1}`;
+
+      // ✅ Update client profile
+      const updatedClient = await Client.findByIdAndUpdate(
+        client._id,
+        {
           $set: {
             emailVerify: false,
             mobileVerify: true,
@@ -294,7 +380,7 @@ export const verifyClientEmailOtp = async (req, res) => {
             tlsUrl: "",
             "profile.profilePhoto": "",
             "profile.consultantName": client.fullName,
-            "profile.consultantCode": `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfClients+1}`,
+            "profile.consultantCode": consultantCode,
             "profile.associateWithUs": today,
             "profile.fatherName": "",
             "profile.primaryEmail": client.email,
@@ -316,25 +402,29 @@ export const verifyClientEmailOtp = async (req, res) => {
             "profile.kycAadhar": "",
             "profile.kycAadhaarBack": "",
             "profile.kycPan": "",
+          },
+        },
+        { new: true }
+      );
 
-          }
-        }, { new: true })
+      // ✅ Generate token
+      const token = await updatedClient.getAuth(true);
 
-        const token = updateClient?.getAuth(true)
-        return res.status(200).header("x-auth-token", token)
-          .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully Signup" })
-      } catch (err) {
-        console.log("email verify error", err);
-        return res.status(400).json({ success: false, message: "Invaild/expired OTP" });
-      }
-    } else {
-      return res.status(400).json({ success: false, message: "Invaild/expired OTP" })
+      return res
+        .status(200)
+        .header("x-auth-token", token)
+        .header("Access-Control-Expose-Headers", "x-auth-token")
+        .json({ success: true, message: "Successfully signed up" });
+    } catch (err) {
+      console.error("email verify error:", err);
+      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
     }
   } catch (error) {
-    console.log("verifyEmailOtp: ", error);
-    return res.status(500).json({ success: false, message: "Internal server error", error: error });
+    console.error("verifyEmailOtp error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error });
   }
-}
+};
+
 
 export const clientSendMobileOtpCode = async (req, res) => {
   try {
@@ -369,8 +459,6 @@ export const clientMobileNoVerify = async (req, res) => {
       const updateClient = await Client.findByIdAndUpdate(req?.user?._id, { $set: { mobileVerify: true } })
       const admin = await Admin.find({}).select("-password")
       const jwtToken = await jwt.sign({ _id: client?._id, email: client?.email }, process.env.CLIENT_SECRET_KEY, { expiresIn: '6h' })
-      await sendAccountTerm_ConditonsMail(client?.email, `${process.env.FRONTEND_URL}/client/acceptTermsAndConditions/${jwtToken}`, "client", admin[0]?.clientTlsUrl);
-      console.log("sendAccountTerm_ConditonsMail client");
       res.status(200).json({ success: true, message: "Please check your mail" });
     } catch (err) {
       console.log("send forget password mail error", err);
@@ -450,27 +538,54 @@ export const clientTls = async (req, res) => {
   }
 }
 
-
-export const clientsignIn = async (req, res) => {
+export const clientSignIn = async (req, res) => {
   try {
+    // ✅ Validate input
     const { error } = validateClientSignIn(req.body);
-    if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-    const client = await Client.find({ email: req?.body?.email?.trim()?.toLowerCase() });
-    if (client.length == 0) return res.status(404).json({ success: false, message: "invaild email/password" })
-    if (!client[0]?.isActive || !client[0]?.mobileVerify) return res.status(400).json({ success: false, message: "Account is not active" })
-    // if(!client[0]?.acceptClientTls) return res.status(400).json({success:false,message:"Please accept our TLS first"})
-    const validPassword = await bcrypt.compare(req.body.password, client[0].password,)
-    if (!validPassword) return res.status(401).json({ success: false, message: "invaild email/password" })
-    const updateLoginHistory = await Client.findByIdAndUpdate(client[0]?._id, { $set: { recentLogin: new Date(), lastLogin: client[0]?.recentLogin ? client[0]?.recentLogin : new Date() } })
-    const token = client[0]?.getAuth(true)
+    if (error) {
+      return res.status(400).json({ success: false, message: error.details[0].message });
+    }
 
-    return res.status(200).header("x-auth-token", token)
-      .header("Access-Control-Expose-Headers", "x-auth-token").json({ success: true, message: "Successfully signIn" })
+    const email = req.body?.email?.trim()?.toLowerCase();
+    const client = await Client.findOne({ email });
+    if (!client) {
+      return res.status(404).json({ success: false, message: "Invalid email or password" });
+    }
+
+    if (!client.isActive || !client.mobileVerify) {
+      return res.status(400).json({ success: false, message: "Account is not active" });
+    }
+
+    const validPassword = await bcrypt.compare(req.body.password, client.password);
+    if (!validPassword) {
+      return res.status(401).json({ success: false, message: "Invalid email or password" });
+    }
+
+    // ✅ Update login history
+    await Client.findByIdAndUpdate(
+      client._id,
+      {
+        $set: {
+          recentLogin: new Date(),
+          lastLogin: client.recentLogin || new Date(),
+        },
+      }
+    );
+
+    // ✅ Generate token
+    const token = await client.getAuth(true);
+
+    return res
+      .status(200)
+      .header("x-auth-token", token)
+      .header("Access-Control-Expose-Headers", "x-auth-token")
+      .json({ success: true, message: "Successfully signed in" });
   } catch (error) {
-    console.log("setPassword: ", error);
-    return res.status(500).json({ success: false, message: "Internal server error", error: error });
+    console.error("signIn error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error });
   }
-}
+};
+
 
 export const getClientProfile = async (req, res, next) => {
   try {
@@ -809,27 +924,45 @@ export const viewClientAllCase = async (req, res) => {
 
 export const clientForgetPassword = async (req, res) => {
   try {
-    if (!req.body.email) return res.status(400).json({ success: false, message: "Account email required" })
-    const client = await Client.find({ email: req.body.email })
-    if (!client[0]?.isActive || !client[0]?.mobileVerify) return res.status(404).json({ success: false, message: "Account not exist" })
-    if (client.length == 0) return res.status(404).json({ success: false, message: "Account not exist" })
-
-
-    const jwtToken = await jwt.sign({ _id: client[0]?._id, email: client[0]?.email }, process.env.CLIENT_SECRET_KEY, { expiresIn: '5m' })
-    try {
-      await sendForgetPasswordMail(req.body.email, `/client/resetPassword/${jwtToken}`);
-      console.log("send forget password client");
-      res.status(201).json({ success: true, message: "Successfully send forget password mail" });
-    } catch (err) {
-      console.log("send forget password mail error", err);
-      return res.status(400).json({ success: false, message: "Failed to send forget password mail" });
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Account email required" });
     }
 
+    const client = await Client.findOne({ email: email.trim().toLowerCase() });
+    if (!client || !client.isActive || !client.mobileVerify) {
+      return res.status(404).json({ success: false, message: "Account does not exist" });
+    }
+
+    // ✅ Generate JWT token valid for 5 minutes
+    const jwtToken = jwt.sign(
+      { _id: client._id, email: client.email },
+      process.env.CLIENT_SECRET_KEY,
+      { expiresIn: "5m" }
+    );
+
+    try {
+      await sendMail({
+        subject: "Password Reset",
+        to: client.email,
+        html: forgetPasswordTemplate({
+          email: client.email,
+          name: client.fullName,
+          link: `/client/resetPassword/${jwtToken}`,
+        }),
+      });
+
+      console.log("Forget password email sent to client:", client.email);
+      return res.status(201).json({ success: true, message: "Forget password email sent successfully" });
+    } catch (mailErr) {
+      console.error("Error sending forget password mail:", mailErr);
+      return res.status(400).json({ success: false, message: "Failed to send forget password mail" });
+    }
   } catch (error) {
-    console.log("get all client case in error:", error);
-    res.status(500).json({ success: false, message: "Internal server error", error: error });
+    console.error("clientForgetPassword error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error });
   }
-}
+};
 
 export const clientResetPassword = async (req, res) => {
   try {
@@ -838,7 +971,6 @@ export const clientResetPassword = async (req, res) => {
     const { password, confirmPassword } = req.body
     if (password != confirmPassword) return res.status(400).json({ success: false, message: "Confirm password must be same" })
     const { verifyId } = req.query
-    console.log("verifyId", verifyId);
     try {
       await jwt.verify(verifyId, process.env.CLIENT_SECRET_KEY)
       const decode = await jwtDecode(verifyId)
