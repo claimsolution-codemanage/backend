@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 import validateDate from "validate-date";
 import Joi from "joi";
 import ExcelJS from 'exceljs';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import fsAsync from 'fs/promises'
 import { getStorage, getDownloadURL } from 'firebase-admin/storage';
 // import { bucket } from "../index.js";
@@ -1143,7 +1142,7 @@ export const getAllClientDownloadExcel = async (getAllClient = []) => {
   return await workbook.xlsx.writeBuffer();
 }
 
-const dateOptions = {
+export const dateOptions = {
   weekday: 'short',
   year: 'numeric',
   month: 'short',
@@ -1155,15 +1154,16 @@ const dateOptions = {
 };
 
 
-export const editServiceAgreement = async (path, date) => {
-  const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
-  const existingPdfBytes = await fsAsync.readFile(path);
-  const pdfBytes = await PDFDocument.load(existingPdfBytes);
-  const page = pdfBytes.getPages()[pdfBytes.getPages()?.length ? pdfBytes.getPages()?.length - 1 : 0]; // Assuming you're working with the first page
-  page.drawText(today, { x: 50, y: 50 });
-  const modifiedPdfBytes = await pdfBytes.save();
-  return modifiedPdfBytes;
-}
+// export const editServiceAgreement = async (path, date) => {
+//   const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
+//   const existingPdfBytes = await fsAsync.readFile(path);
+//   const pdfBytes = await PDFDocument.load(existingPdfBytes);
+//   const page = pdfBytes.getPages()[pdfBytes.getPages()?.length ? pdfBytes.getPages()?.length - 1 : 0]; // Assuming you're working with the first page
+//   page.drawText(today, { x: 50, y: 50 });
+//   const modifiedPdfBytes = await pdfBytes.save();
+//   return modifiedPdfBytes;
+// }
+
 
 export const firebaseUpload = async (req, res, folderPath) => {
   upload.single('file')(req, res, async (err) => {

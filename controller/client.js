@@ -3,12 +3,12 @@ import { validateClientSignUp, validateClientSignIn, validateClientProfileBody, 
 import bcrypt from 'bcrypt'
 import { sendMail, } from "../utils/sendMail.js";
 import { authClient } from "../middleware/authentication.js";
-import { otp6Digit, sendNotificationAndMail } from '../utils/helper.js'
+import { dateOptions, otp6Digit, sendNotificationAndMail } from '../utils/helper.js'
 import Case from "../models/case/case.js";
 import { getAllCaseQuery } from "../utils/helper.js";
 import { validMongooseId } from "../utils/helper.js";
 import jwt from 'jsonwebtoken'
-import { validateResetPassword, getAllInvoiceQuery, editServiceAgreement } from "../utils/helper.js";
+import { validateResetPassword, getAllInvoiceQuery } from "../utils/helper.js";
 import jwtDecode from 'jwt-decode'
 import Admin from "../models/admin.js";
 import Bill from "../models/bill.js"
@@ -21,6 +21,7 @@ import mongoose, { Types } from "mongoose";
 import { accountVerificationTemplate } from "../utils/emailTemplates/accountVerificationTemplate.js";
 import { accountTermConditionTemplate } from "../utils/emailTemplates/accountTermConditionTemplate.js";
 import { forgetPasswordTemplate } from "../utils/emailTemplates/forgotPasswordTemplate.js";
+import { editServiceAgreement } from "../utils/createPdf/serviceAgreement.js";
 
 export const clientUploadImage = async (req, res) => {
   try {
@@ -174,14 +175,16 @@ export const signUpWithRequest = async (req, res) => {
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
-      const today = new Date();
-
+      const date = new Date()
+      const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
+      const replacements= { commission: `20%`, signed_on: today }
+      
       // ✅ Generate agreement with timestamp
-      const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", today);
+      const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", replacements);
         await sendMail({
-        subject: "Service Agreement",
+        subject: "Client Service Agreement",
         to: clientEmail,
-        html: accountTermConditionTemplate({as:"client",name:existingClient?.fullName }),
+        html: accountTermConditionTemplate({as:"Client",name:existingClient?.fullName }),
         attachments:[{
             filename: 'service_agreement.pdf',
             content: modifiedPdfBytes,
@@ -191,9 +194,9 @@ export const signUpWithRequest = async (req, res) => {
 
       // ✅ Consultant code
       const noOfClients = await Client.countDocuments();
-      const consultantCode = `${today.getFullYear()}${
-        today.getMonth() + 1 < 10 ? `0${today.getMonth() + 1}` : today.getMonth() + 1
-      }${today.getDate()}${noOfClients + 1}`;
+      const consultantCode = `${date?.getFullYear()}${
+        date?.getMonth() + 1 < 10 ? `0${date?.getMonth() + 1}` : date?.getMonth() + 1
+      }${date?.getDate()}${noOfClients + 1}`;
 
       // ✅ Create client
       const newClient = new Client({
@@ -211,7 +214,7 @@ export const signUpWithRequest = async (req, res) => {
           profilePhoto: "",
           consultantName: clientName,
           consultantCode,
-          associateWithUs: today,
+          associateWithUs: date,
           fatherName: "",
           primaryEmail: clientEmail,
           alternateEmail: "",
@@ -346,14 +349,16 @@ export const verifyClientEmailOtp = async (req, res) => {
     }
 
     try {
-      const today = new Date();
+      const date = new Date()
+      const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
+      const replacements= { commission: `20%`, signed_on: today }
 
       // ✅ Generate agreement with timestamp
-      const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", today);
+      const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", replacements);
         await sendMail({
-        subject: "Service Agreement",
+        subject: "Client Service Agreement",
         to: client.email,
-        html: accountTermConditionTemplate({as:"client",name:client?.fullName }),
+        html: accountTermConditionTemplate({as:"Client",name:client?.fullName }),
         attachments:[{
             filename: 'service_agreement.pdf',
             content: modifiedPdfBytes,
@@ -363,9 +368,9 @@ export const verifyClientEmailOtp = async (req, res) => {
 
       // ✅ Generate consultant code
       const noOfClients = await Client.countDocuments();
-      const consultantCode = `${today.getFullYear()}${
-        today.getMonth() + 1 < 10 ? `0${today.getMonth() + 1}` : today.getMonth() + 1
-      }${today.getDate()}${noOfClients + 1}`;
+      const consultantCode = `${date.getFullYear()}${
+        date.getMonth() + 1 < 10 ? `0${date.getMonth() + 1}` : date.getMonth() + 1
+      }${date.getDate()}${noOfClients + 1}`;
 
       // ✅ Update client profile
       const updatedClient = await Client.findByIdAndUpdate(
@@ -381,7 +386,7 @@ export const verifyClientEmailOtp = async (req, res) => {
             "profile.profilePhoto": "",
             "profile.consultantName": client.fullName,
             "profile.consultantCode": consultantCode,
-            "profile.associateWithUs": today,
+            "profile.associateWithUs": date,
             "profile.fatherName": "",
             "profile.primaryEmail": client.email,
             "profile.alternateEmail": "",

@@ -1,6 +1,12 @@
 import mongoose from "mongoose";
+export const FORM_TYPE_OPTIONS = {
+    "gro":"GRO",
+    "ombudsman":"Ombudsman",
+    "irdai_stage":"IRDAI Stage",
+    "reimbursment_claim_filing":"Reimbursment claim filing",
+}
 
-const FORM_TYPE = ["gro","ombudsman","irdai_stage","reimbursment_claim_filing",]
+const FORM_TYPE = Object.keys(FORM_TYPE_OPTIONS)
 const METHOD_TYPE = ['online', 'offline']
 
 

@@ -1,11 +1,11 @@
-export const accountTermConditionTemplate = ({as,name}) => {
+export const revisedAgreementTemplate = ({ as,claimType, name }) => {
   return `
   <!DOCTYPE html>
   <html lang="en">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>${process.env.COMPANY_NAME} Service Agreement</title>
+      <title>${process.env.COMPANY_NAME} – Revised Service Agreement</title>
       <style>
         body {
           margin: 0;
@@ -27,7 +27,7 @@ export const accountTermConditionTemplate = ({as,name}) => {
           box-shadow: 0 4px 10px rgba(0,0,0,0.05);
         }
         .header {
-          background: linear-gradient(135deg, #3b82f6, #2563eb);
+          background: linear-gradient(135deg, #10b981, #059669);
           color: #ffffff;
           text-align: center;
           padding: 25px 20px;
@@ -53,19 +53,14 @@ export const accountTermConditionTemplate = ({as,name}) => {
           margin: 10px 0;
           color: #4b5563;
         }
-        .body h4 {
-          font-size: 16px;
-          margin-top: 20px;
-          color: #111827;
-        }
         .highlight {
-          background: #f3f4f6;
+          background: #ecfdf5;
           padding: 12px 18px;
-          border-left: 4px solid #2563eb;
+          border-left: 4px solid #10b981;
           border-radius: 6px;
           margin: 20px 0;
           font-size: 14px;
-          color: #374151;
+          color: #065f46;
         }
         .footer {
           background: #f9fafb;
@@ -75,9 +70,8 @@ export const accountTermConditionTemplate = ({as,name}) => {
           color: #6b7280;
           border-top: 1px solid #e5e7eb;
         }
-        .company-link{
+        .company-link {
           display: inline-block;
-          text-align:"center";
           margin-top: 20px;
           font-size: 15px;
           color: #2563eb;
@@ -100,17 +94,17 @@ export const accountTermConditionTemplate = ({as,name}) => {
       <div class="container">
         <div class="email-wrapper">
           <div class="header">
-            <h1>${process.env.COMPANY_NAME} – Service Agreement</h1>
+            <h1>${process.env.COMPANY_NAME} – Revised Service Agreement</h1>
           </div>
           <div class="body">
             <div class="logo">
               <img src="https://panel.claimsolution.in/Images/icons/company-logo.png" alt="Company Logo" />
             </div>
+
             <p>Dear ${name || as || ""},</p>
             <p>
-              Thank you for choosing <b>${process.env.COMPANY_NAME}</b>.  
-              As part of your onboarding process, we are sharing our official <b>${as || "user"} Service Agreement</b> for your records and reference.  
-              A PDF copy of the agreement is attached to this email.
+              We are pleased to inform you that your case has been <b>successfully ${claimType} done</b>.  
+              As part of this approval process, we’ve updated and attached a <b>${as} Revised Service Agreement</b> for your reference and records.
             </p>
 
             <div class="highlight">
@@ -118,12 +112,19 @@ export const accountTermConditionTemplate = ({as,name}) => {
             </div>
 
             <p>
-              Please review the attached agreement carefully. If you have any questions, our support team will be happy to assist.  
-              For further information, you may also visit our website:
+              Please review the attached <b>Revised Service Agreement</b> carefully.  
+              If you have any questions or require further clarification, our support team is always here to assist you.
             </p>
 
-            <p><a class="company-link" href="https://www.claimsolution.in" target="_blank">www.claimsolution.in</a></p>
+            <p>
+              For more details, visit our official website:
+            </p>
+
+            <p>
+              <a class="company-link" href="https://www.claimsolution.in" target="_blank">www.claimsolution.in</a>
+            </p>
           </div>
+
           <div class="footer">
             <p>
               &copy; ${new Date().getFullYear()} 

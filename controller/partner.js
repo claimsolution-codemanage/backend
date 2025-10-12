@@ -4,16 +4,15 @@ import {
   validateAddCase
 
 } from "../utils/validatePatner.js";
-import { otp6Digit, getAllCaseQuery,  partnerGetDownloadCaseExcel, getValidateDate, sendNotificationAndMail } from "../utils/helper.js";
+import { otp6Digit, getAllCaseQuery,  partnerGetDownloadCaseExcel, getValidateDate, sendNotificationAndMail, dateOptions } from "../utils/helper.js";
 import { sendMail } from '../utils/sendMail.js'
 import { authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
 import Case from "../models/case/case.js";
-import { validMongooseId, validateResetPassword, validateAddCaseFile } from "../utils/helper.js";
+import { validMongooseId, validateResetPassword } from "../utils/helper.js";
 import jwt from "jsonwebtoken";
 import jwtDecode from "jwt-decode";
 import Admin from "../models/admin.js";
-import { editServiceAgreement } from "../utils/helper.js";
 import { firebaseUpload } from "../utils/helper.js";
 import CaseDoc from "../models/caseDoc.js";
 import CaseStatus from "../models/caseStatus.js";
@@ -22,6 +21,7 @@ import { Types } from "mongoose";
 import { accountVerificationTemplate } from "../utils/emailTemplates/accountVerificationTemplate.js";
 import { accountTermConditionTemplate } from "../utils/emailTemplates/accountTermConditionTemplate.js";
 import { forgetPasswordTemplate } from "../utils/emailTemplates/forgotPasswordTemplate.js";
+import { editServiceAgreement } from "../utils/createPdf/serviceAgreement.js";
 
 
 
@@ -213,13 +213,15 @@ export const verifyEmailOtp = async (req, res) => {
     }
 
     try {
-      const today = new Date();
-      const modifiedPdfBytes = await editServiceAgreement("agreement/partner.pdf", today);
+      const date = new Date()
+      const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
+      const replacements= { service_commission: `6%`, signed_on: today }
+      const modifiedPdfBytes = await editServiceAgreement("agreement/partner.pdf", replacements);
 
       await sendMail({
-        subject: "Service Agreement",
+        subject: "Partner Service Agreement",
         to: partner.email,
-        html: accountTermConditionTemplate({ as: "partner", name: partner?.fullName }),
+        html: accountTermConditionTemplate({ as: "Partner", name: partner?.fullName }),
         attachments: [{
           filename: 'service_agreement.pdf',
           content: modifiedPdfBytes,
@@ -228,14 +230,14 @@ export const verifyEmailOtp = async (req, res) => {
       });
 
       const noOfPartners = await Partner.countDocuments();
-      const consultantCode = `${today.getFullYear()}${today.getMonth() + 1 < 10 ? `0${today.getMonth() + 1}` : today.getMonth() + 1
-        }${today.getDate()}${noOfPartners + 1}`;
+      const consultantCode = `${date?.getFullYear()}${date?.getMonth() + 1 < 10 ? `0${date?.getMonth() + 1}` : date?.getMonth() + 1
+        }${date?.getDate()}${noOfPartners + 1}`;
 
       const profileData = {
         profilePhoto: "",
         consultantName: partner.fullName,
         consultantCode,
-        associateWithUs: today,
+        associateWithUs: date,
         primaryEmail: partner.email,
         alternateEmail: "",
         primaryMobileNo: partner.mobileNo,
@@ -504,13 +506,15 @@ export const signUpWithRequest = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const noOfPartners = await Partner.countDocuments();
-    const today = new Date();
-    const modifiedPdfBytes = await editServiceAgreement("agreement/partner.pdf", today);
+    const date = new Date()
+    const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
+    const replacements= { service_commission: `6%`, signed_on: today }
+    const modifiedPdfBytes = await editServiceAgreement("agreement/partner.pdf", replacements);
 
     await sendMail({
-      subject: "Service Agreement",
+      subject: "Partner Service Agreement",
       to: email,
-      html: accountTermConditionTemplate({ as: "partner", name: existingPartner?.fullName }),
+      html: accountTermConditionTemplate({ as: "Partner", name: existingPartner?.fullName }),
       attachments: [{
         filename: 'service_agreement.pdf',
         content: modifiedPdfBytes,
@@ -533,8 +537,8 @@ export const signUpWithRequest = async (req, res) => {
       profile: {
         profilePhoto: "",
         consultantName: fullName,
-        consultantCode: `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}${noOfPartners + 1}`,
-        associateWithUs: today,
+        consultantCode: `${date?.getFullYear()}${String(date?.getMonth() + 1).padStart(2, "0")}${String(date?.getDate()).padStart(2, "0")}${noOfPartners + 1}`,
+        associateWithUs: date,
         primaryEmail: email,
         alternateEmail: "",
         primaryMobileNo: mobileNo,

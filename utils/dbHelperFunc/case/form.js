@@ -1,4 +1,4 @@
-import CaseFormModal from "../../../models/caseForm/caseForm.js";
+import CaseFormModal, { FORM_TYPE_OPTIONS } from "../../../models/caseForm/caseForm.js";
 import CaseFormSectionModal from "../../../models/caseForm/caseFormSection.js";
 import CaseFormAttachmentModal from "../../../models/caseForm/caseFormAttachment.js";
 import Case from "../../../models/case/case.js";
@@ -8,6 +8,11 @@ import Statement from "../../../models/statement.js"
 import Bill from "../../../models/bill.js"
 import { isValidMongoId } from "../../utilityFunc.js";
 import mongoose from "mongoose";
+import { accountTermConditionTemplate } from "../../emailTemplates/accountTermConditionTemplate.js";
+import { sendMail } from "../../sendMail.js";
+import { editServiceAgreement } from "../../createPdf/serviceAgreement.js";
+import { dateOptions } from "../../helper.js";
+import { revisedAgreementTemplate } from "../../emailTemplates/revisedServiceAgreement.js";
 
 
 const senderDetails = {
@@ -24,7 +29,7 @@ const senderDetails = {
 
 const generateReceiverDetails = (findClient) => {
     return {
-        name: findClient?.fullName || "",
+        name: findClient?.profile?.consultantName || "",
         address: findClient?.profile?.address || "",
         state: findClient?.profile.state || "",
         country: "IN",
@@ -36,6 +41,26 @@ const generateReceiverDetails = (findClient) => {
     }
 }
 
+const sendServiceAgreement = async ({ payload }) => {
+    const { mailTo, as, fullName, replacements = {}, claimType } = payload
+    let filePath = as == "Client" ? "agreement/client.pdf" : "agreement/partner.pdf"
+    try {
+        const modifiedPdfBytes = await editServiceAgreement(filePath, replacements);
+        await sendMail({
+            subject: `${as} Service Agreement`,
+            to: mailTo,
+            html: revisedAgreementTemplate({ as, name: fullName, claimType }),
+            attachments: [{
+                filename: 'revised_service_agreement.pdf',
+                content: modifiedPdfBytes,
+                encoding: 'base64'
+            }]
+        });
+    } catch (error) {
+        console.log("sendServiceAgreement", error);
+
+    }
+}
 
 // helpers/caseFinance.js
 // 🔸 Utility: assign allowed fields
@@ -65,6 +90,7 @@ export const handleCaseFinance = async ({
 }) => {
     if (!caseForm || !findCase) return caseForm;
     const { partnerFee, consultantFee, approved, approvedAmount, } = req.body
+    const today = new Date()?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
 
     const receiverDetails = generateReceiverDetails(findClient)
 
@@ -88,11 +114,11 @@ export const handleCaseFinance = async ({
         caseForm.paymentDetailsId = paymentDetails._id;
 
         // Statement
-        if (findCase?.partnerId && partnerFee) {
+        if (findCase?.partnerObjId?._id && partnerFee) {
             let statement = await getOrCreate(
                 Statement,
                 { _id: caseForm?.statementId, isActive: true },
-                { partnerId: findCase?.partnerId, isActive: true, branchId: findCase?.branchId }
+                { partnerId: findCase?.partnerObjId?._id, isActive: true, branchId: findCase?.branchId }
             );
 
             const payAmt = (approvedAmt * Number(partnerFee)) / 100;
@@ -115,6 +141,15 @@ export const handleCaseFinance = async ({
             await statement.save();
 
             caseForm.statementId = statement._id;
+            sendServiceAgreement({
+                payload: {
+                    mailTo: findCase?.partnerObjId?.profile?.primaryEmail,
+                    as: "Partner",
+                    fullName: findCase?.partnerObjId?.profile?.consultantName,
+                    replacements: { service_commission: `${partnerFee ?? 6}%`, signed_on: today },
+                    claimType: FORM_TYPE_OPTIONS[caseForm?.formType]
+                }
+            })
         }
     }
 
@@ -159,6 +194,15 @@ export const handleCaseFinance = async ({
         }
 
         caseForm.billId = bill._id;
+        sendServiceAgreement({
+            payload: {
+                mailTo: findCase?.clientObjId?.profile?.primaryEmail,
+                as: "Client",
+                fullName: findCase?.clientObjId?.profile?.consultantName,
+                replacements: {commission: `${consultantFee ?? 20}%`, signed_on: today },
+                claimType: FORM_TYPE_OPTIONS[caseForm?.formType]
+            }
+        })
     }
 
     await caseForm.save();
@@ -168,12 +212,20 @@ export const handleCaseFinance = async ({
 export const createOrUpdateCaseForm = async (req, res, next) => {
     try {
         const { caseId, formType, sections = [] } = req.body;
-        if(!caseId) return res.status(400).json({success:false,message:"Case ID is required"})
-        if(!formType) return res.status(400).json({success:false,message:"Form type is required"})
+        if (!caseId) return res.status(400).json({ success: false, message: "Case ID is required" })
+        if (!formType) return res.status(400).json({ success: false, message: "Form type is required" })
         const caseFormId = req.body?._id
         const findCase = await Case.findOne({ _id: caseId, isActive: true })
-        const findClient = await Client.findOne({ _id: findCase.clientId }).select("fullName profile")
+            .populate("partnerObjId", "profile.primaryEmail profile.consultantName")
+            .populate("clientObjId", "profile branchId")
         if (!findCase) return res.status(400).json({ status: 0, message: "Case not found" });
+        const findClient = findCase?.clientObjId
+        console.log("clientobjid", findCase?.clientObjId);
+        console.log("partnerObjId", findCase?.partnerObjId);
+
+
+
+        // const findClient = await Client.findOne({ _id: findCase.clientObjId }).select("fullName profile")
 
         if (!findClient) return res.status(400).json({ status: 0, message: "Client not found" });
 
@@ -202,23 +254,23 @@ export const createOrUpdateCaseForm = async (req, res, next) => {
         });
         await caseForm.save();
 
-            // ✅ Keep track of sections & attachments from frontend
-    const frontendSectionIds = sections.filter(s => s._id).map(s => s._id);
-    const frontendAttachmentIds = sections.flatMap(s =>
-      (s.attachments || []).filter(a => a._id).map(a => a._id)
-    );
+        // ✅ Keep track of sections & attachments from frontend
+        const frontendSectionIds = sections.filter(s => s._id).map(s => s._id);
+        const frontendAttachmentIds = sections.flatMap(s =>
+            (s.attachments || []).filter(a => a._id).map(a => a._id)
+        );
 
-    // 🔹 Delete sections removed on frontend
-    await CaseFormSectionModal.deleteMany({
-      caseFormId: caseForm._id,
-      _id: { $nin: frontendSectionIds }
-    });
+        // 🔹 Delete sections removed on frontend
+        await CaseFormSectionModal.deleteMany({
+            caseFormId: caseForm._id,
+            _id: { $nin: frontendSectionIds }
+        });
 
-    // 🔹 Delete attachments removed on frontend
-    await CaseFormAttachmentModal.deleteMany({
-      caseFormId: caseForm._id,
-      _id: { $nin: frontendAttachmentIds }
-    });
+        // 🔹 Delete attachments removed on frontend
+        await CaseFormAttachmentModal.deleteMany({
+            caseFormId: caseForm._id,
+            _id: { $nin: frontendAttachmentIds }
+        });
 
         // ✅ Handle Sections
         for (const sec of sections) {
@@ -234,7 +286,7 @@ export const createOrUpdateCaseForm = async (req, res, next) => {
             }
 
             // Update section fields
-            const sectionFields = ["status", "remarks", "date", "isPrivate", "deliveredBy","awardType"];
+            const sectionFields = ["status", "remarks", "date", "isPrivate", "deliveredBy", "awardType"];
             sectionFields.forEach(field => {
                 if (sec[field] !== undefined) sectionDoc[field] = sec[field];
             });
@@ -278,18 +330,18 @@ export const createOrUpdateCaseForm = async (req, res, next) => {
 
 export const getCaseFormDetailsById = async (req, res, next) => {
     try {
-        const {isPrivate,isClient} = req
-        const { formId ,caseId} = req.params;
+        const { isPrivate, isClient } = req
+        const { formId, caseId } = req.params;
 
         if (!isValidMongoId(formId) || !isValidMongoId(caseId)) {
             return res.status(400).json({ success: false, message: "Invalid form ID/ case ID" });
         }
         const pipeline = [
             {
-                $match: { 
+                $match: {
                     _id: new mongoose.Types.ObjectId(formId),
                     caseId: new mongoose.Types.ObjectId(caseId),
-                 }
+                }
             },
             ...(!isClient ? [{
                 $lookup: {
@@ -301,7 +353,7 @@ export const getCaseFormDetailsById = async (req, res, next) => {
                         {
                             $match: {
                                 isActive: true,
-                                ...(!isPrivate ? {isPrivate:false}:{})
+                                ...(!isPrivate ? { isPrivate: false } : {})
                             }
                         },
                         {
@@ -314,7 +366,7 @@ export const getCaseFormDetailsById = async (req, res, next) => {
                                     {
                                         $match: {
                                             isActive: true,
-                                            ...(!isPrivate ? {isPrivate:false}:{})
+                                            ...(!isPrivate ? { isPrivate: false } : {})
                                         }
                                     }
                                 ]
@@ -323,7 +375,7 @@ export const getCaseFormDetailsById = async (req, res, next) => {
                     ]
                 }
             },
-              {
+            {
                 $lookup: {
                     from: "casepaymentdetails",
                     localField: "paymentDetailsId",
@@ -339,25 +391,27 @@ export const getCaseFormDetailsById = async (req, res, next) => {
                 }
             },
             {
-                $unwind:{
-                    path:"$paymentDetailsId",
-                    preserveNullAndEmptyArrays:true
+                $unwind: {
+                    path: "$paymentDetailsId",
+                    preserveNullAndEmptyArrays: true
                 }
-            }]:[]),
+            }] : []),
 
-            ...(isClient ? [{$project:{
+            ...(isClient ? [{
+                $project: {
                     specialCase: 0,
                     partnerFee: 0,
                     consultantFee: 0,
                     method: 0,
-            }}]:[])
+                }
+            }] : [])
         ]
         let [formDetail] = await CaseFormModal.aggregate(pipeline)
         if (!formDetail) {
             return res.status(404).json({ success: false, message: "Form not found" });
         }
 
-        if(formDetail && formDetail?.approvalLetterPrivate && !isPrivate){
+        if (formDetail && formDetail?.approvalLetterPrivate && !isPrivate) {
             delete formDetail.approvalLetter
         }
 
