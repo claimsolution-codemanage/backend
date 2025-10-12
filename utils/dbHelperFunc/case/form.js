@@ -87,6 +87,7 @@ export const handleCaseFinance = async ({
     findCase,
     req,
     findClient,
+    specialCase,
 }) => {
     if (!caseForm || !findCase) return caseForm;
     const { partnerFee, consultantFee, approved, approvedAmount, } = req.body
@@ -141,15 +142,17 @@ export const handleCaseFinance = async ({
             await statement.save();
 
             caseForm.statementId = statement._id;
-            sendServiceAgreement({
-                payload: {
-                    mailTo: findCase?.partnerObjId?.profile?.primaryEmail,
-                    as: "Partner",
-                    fullName: findCase?.partnerObjId?.profile?.consultantName,
-                    replacements: { service_commission: `${partnerFee ?? 6}%`, signed_on: today },
-                    claimType: FORM_TYPE_OPTIONS[caseForm?.formType]
-                }
-            })
+            if(specialCase){
+                sendServiceAgreement({
+                    payload: {
+                        mailTo: findCase?.partnerObjId?.profile?.primaryEmail,
+                        as: "Partner",
+                        fullName: findCase?.partnerObjId?.profile?.consultantName,
+                        replacements: { service_commission: `${partnerFee ?? 6}%`, signed_on: today },
+                        claimType: FORM_TYPE_OPTIONS[caseForm?.formType]
+                    }
+                })
+            }
         }
     }
 
@@ -194,15 +197,17 @@ export const handleCaseFinance = async ({
         }
 
         caseForm.billId = bill._id;
-        sendServiceAgreement({
-            payload: {
-                mailTo: findCase?.clientObjId?.profile?.primaryEmail,
-                as: "Client",
-                fullName: findCase?.clientObjId?.profile?.consultantName,
-                replacements: {commission: `${consultantFee ?? 20}%`, signed_on: today },
-                claimType: FORM_TYPE_OPTIONS[caseForm?.formType]
-            }
-        })
+        if(specialCase){
+            sendServiceAgreement({
+                payload: {
+                    mailTo: findCase?.clientObjId?.profile?.primaryEmail,
+                    as: "Client",
+                    fullName: findCase?.clientObjId?.profile?.consultantName,
+                    replacements: {commission: `${consultantFee ?? 20}%`, signed_on: today },
+                    claimType: FORM_TYPE_OPTIONS[caseForm?.formType]
+                }
+            })
+        }
     }
 
     await caseForm.save();
@@ -314,7 +319,7 @@ export const createOrUpdateCaseForm = async (req, res, next) => {
             }
         }
 
-        await handleCaseFinance({ caseForm, findCase, req, findClient })
+        await handleCaseFinance({ caseForm, findCase, req, findClient,specialCase:caseForm?.specialCase })
 
         return res.status(200).json({
             status: 1,
