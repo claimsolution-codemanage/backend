@@ -123,9 +123,9 @@ export const clientSignUp = async (req, res) => {
     // Send email with OTP
     try {
       await sendMail({
-        subject: "Account Verification",
+        subject: "Claim Solution Client Account Verification",
         to: normalizedEmail,
-        html: accountVerificationTemplate({ name: fullName, otp, type: "client" }),
+        html: accountVerificationTemplate({ name: fullName, otp, type: "Client" }),
       });
 
       return res
@@ -302,7 +302,7 @@ export const clientResendOtp = async (req, res) => {
       await sendMail({
         subject: "Account Verification - Resend OTP",
         to: client.email,
-        html: accountVerificationTemplate({ name: client.fullName, otp, type: "client" }),
+        html: accountVerificationTemplate({ name: client.fullName, otp, type: "Client" }),
       });
 
       return res.status(200).json({ success: true, message: "Successfully resent OTP" });

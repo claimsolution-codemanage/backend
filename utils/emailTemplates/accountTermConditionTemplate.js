@@ -30,7 +30,7 @@ export const accountTermConditionTemplate = ({as,name}) => {
           background: linear-gradient(135deg, #3b82f6, #2563eb);
           color: #ffffff;
           text-align: center;
-          padding: 25px 20px;
+          padding: 10px 10px;
         }
         .header h1 {
           margin: 0;
@@ -43,10 +43,12 @@ export const accountTermConditionTemplate = ({as,name}) => {
         }
         .logo {
           text-align: center;
-          margin-bottom: 20px;
+          margin: 10px;
         }
         .logo img {
           max-width: 150px;
+          background-color:white;
+          border-radius:10px;
         }
         .body p {
           font-size: 15px;
@@ -100,12 +102,12 @@ export const accountTermConditionTemplate = ({as,name}) => {
       <div class="container">
         <div class="email-wrapper">
           <div class="header">
+          <div class="logo">
+            <img src="https://panel.claimsolution.in/Images/icons/company-logo.png" alt="Company Logo" />
+          </div>
             <h1>${process.env.COMPANY_NAME} – Service Agreement</h1>
           </div>
           <div class="body">
-            <div class="logo">
-              <img src="https://panel.claimsolution.in/Images/icons/company-logo.png" alt="Company Logo" />
-            </div>
             <p>Dear ${name || as || ""},</p>
             <p>
               Thank you for choosing <b>${process.env.COMPANY_NAME}</b>.  

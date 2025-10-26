@@ -30,12 +30,21 @@ export const forgetPasswordTemplate = ({email,name="", link}) => {
           background: linear-gradient(135deg, #3b82f6, #2563eb);
           color: #ffffff;
           text-align: center;
-          padding: 25px 20px;
+          padding: 10px 10px;
         }
         .header h1 {
           margin: 0;
           font-size: 22px;
           font-weight: 600;
+        }
+        .logo {
+          text-align: center;
+          margin: 10px;
+        }
+        .logo img {
+          max-width: 150px;
+          background-color:white;
+          border-radius:10px;
         }
         .body {
           padding: 30px 25px;
@@ -81,6 +90,9 @@ export const forgetPasswordTemplate = ({email,name="", link}) => {
       <div class="container">
         <div class="email-wrapper">
           <div class="header">
+          <div class="logo">
+            <img src="https://panel.claimsolution.in/Images/icons/company-logo.png" alt="Company Logo" />
+          </div>
             <h1>Password Reset</h1>
           </div>
           <div class="body">

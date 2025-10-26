@@ -38,7 +38,7 @@ export const commonSendMail =(html,subject,to,bcc=[],cc=[])=>{
 export async function sendMail({ to, cc=[], bcc=[], subject, html, attachments=[] }) {
   try {
     const info = await transport.sendMail({
-      from: process.env.GMAIL_USER,
+      from: `"Claim Solution" <${process.env.GMAIL_USER}>`,
       to,
       cc,
       bcc,

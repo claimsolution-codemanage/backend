@@ -116,9 +116,9 @@ export const signUp = async (req, res) => {
     // ✅ Send OTP
     try {
       await sendMail({
-        subject: "Account Verification",
+        subject: "Claim Solution Partner Account Verification",
         to: normalizedEmail,
-        html: accountVerificationTemplate({ name: fullName, otp, type: "partner" }),
+        html: accountVerificationTemplate({ name: fullName, otp, type: "Partner" }),
       });
       return res
         .status(201)
@@ -168,7 +168,7 @@ export const partnerResendOtp = async (req, res) => {
       await sendMail({
         subject: "Account Verification - Resend OTP",
         to: partner.email,
-        html: accountVerificationTemplate({ name: partner.fullName, otp, type: "partner" }),
+        html: accountVerificationTemplate({ name: partner.fullName, otp, type: "Partner" }),
       });
       return res.status(200).json({ success: true, message: "OTP resent successfully" });
     } catch (err) {

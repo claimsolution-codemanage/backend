@@ -43,10 +43,12 @@ export const revisedAgreementTemplate = ({ as,claimType, name }) => {
         }
         .logo {
           text-align: center;
-          margin-bottom: 20px;
+          margin: 10px;
         }
         .logo img {
           max-width: 150px;
+          background-color:white;
+          border-radius:10px;
         }
         .body p {
           font-size: 15px;
@@ -85,7 +87,7 @@ export const revisedAgreementTemplate = ({ as,claimType, name }) => {
         }
         @media (max-width: 600px) {
           .body {
-            padding: 20px 15px;
+            padding: 10px 10px;
           }
         }
       </style>
@@ -94,6 +96,9 @@ export const revisedAgreementTemplate = ({ as,claimType, name }) => {
       <div class="container">
         <div class="email-wrapper">
           <div class="header">
+          <div class="logo">
+            <img src="https://panel.claimsolution.in/Images/icons/company-logo.png" alt="Company Logo" />
+          </div>
             <h1>${process.env.COMPANY_NAME} – Revised Service Agreement</h1>
           </div>
           <div class="body">

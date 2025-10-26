@@ -1,4 +1,4 @@
-export const accountVerificationTemplate = ({name, otp, type}) => {
+export const accountVerificationTemplate = ({ name, otp, type }) => {
   return `
   <!DOCTYPE html>
   <html lang="en">
@@ -30,12 +30,21 @@ export const accountVerificationTemplate = ({name, otp, type}) => {
           background: linear-gradient(135deg, #3b82f6, #2563eb);
           color: #ffffff;
           text-align: center;
-          padding: 30px 20px;
+          padding: 10px 10px;
         }
         .header h1 {
           margin: 0;
           font-size: 22px;
           font-weight: 600;
+        }
+        .logo {
+          text-align: center;
+          margin: 10px;
+        }
+        .logo img {
+          max-width: 150px;
+          background-color:white;
+          border-radius:10px;
         }
         .body {
           padding: 30px 25px;
@@ -101,21 +110,25 @@ export const accountVerificationTemplate = ({name, otp, type}) => {
       <div class="container">
         <div class="email-wrapper">
           <div class="header">
+            <div class="logo">
+            <img src="https://panel.claimsolution.in/Images/icons/company-logo.png" alt="Company Logo" />
+          </div>
             <h1>Account Verification</h1>
           </div>
           <div class="body">
             <h2>Hello ${name},</h2>
-            <p>We’re excited to have you on board! To keep your ${type?.toLowerCase() || ""} account secure, please verify your account using the OTP below:</p>
+            <p>We’re excited to have you on board! To keep your <b>${type|| ""}</b> account secure, please verify your account using the code below:</p>
 
             <div class="otp-box">${otp}</div>
 
             <p>This OTP is valid for the next <b>10 minutes</b>. For your security, please do not share it with anyone.</p>
 
-            <a href="https://www.claimsolution.in" class="verify-link">Visit claimsolution.in to continue</a>
           </div>
           <div class="footer">
+           <p>You’re receiving this email because you registered for an account at <a href="https://www.claimsolution.in">ClaimSolution.in</a>.</p>
             <p>If you didn’t request this, you can safely ignore this email.</p>
             <p>&copy; ${new Date().getFullYear()} <a href="https://www.claimsolution.in">ClaimSolution.in</a>. All rights reserved.</p>
+             Need help? Contact us at <a href="mailto:help@claimsolution.in">help@claimsolution.in</a></p>
           </div>
         </div>
       </div>
