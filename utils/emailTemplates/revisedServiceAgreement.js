@@ -1,5 +1,17 @@
-export const revisedAgreementTemplate = ({ as,claimType, name }) => {
+export const revisedAgreementTemplate = ({ as, claimType = "", name }) => {
+  const isPartner = as?.toLowerCase() === "partner"
+
+  const getClaimName = (type) => {
+    switch (type?.toLowerCase()) {
+      case "gro":
+        return "Grievance Redressal Officer (GRO)"
+      default:
+        return type
+    }
+  }
+
   return `
+  
   <!DOCTYPE html>
   <html lang="en">
     <head>
@@ -102,37 +114,25 @@ export const revisedAgreementTemplate = ({ as,claimType, name }) => {
             <h1>${process.env.COMPANY_NAME} – Revised Service Agreement</h1>
           </div>
           <div class="body">
-            <div class="logo">
-              <img src="https://panel.claimsolution.in/Images/icons/company-logo.png" alt="Company Logo" />
-            </div>
-
             <p>Dear ${name || as || ""},</p>
-            <p>
-              We are pleased to inform you that your case has been <b>successfully ${claimType} done</b>.  
-              As part of this approval process, we’ve updated and attached a <b>${as} Revised Service Agreement</b> for your reference and records.
-            </p>
+            <p>We are pleased to inform you that your ${isPartner ? "Client's" : ""} case has been successfully approved by the ${getClaimName(claimType || "")}. 
+            As part of this approval, we have updated and attached the <b>Revised ${as} Service Agreement</b> for your reference and records. </p>
 
             <div class="highlight">
               <b>Effective Date:</b> ${new Date().getDate()}/${new Date().getMonth() + 1}/${new Date().getFullYear()}
             </div>
 
-            <p>
-              Please review the attached <b>Revised Service Agreement</b> carefully.  
-              If you have any questions or require further clarification, our support team is always here to assist you.
+            <p>For more details, please visit our official website:</p>
+            <p> 👉 <a class="company-link" href="https://www.claimsolution.in" target="_blank">www.claimsolution.in</a>
             </p>
-
-            <p>
-              For more details, visit our official website:
-            </p>
-
-            <p>
-              <a class="company-link" href="https://www.claimsolution.in" target="_blank">www.claimsolution.in</a>
-            </p>
+          </div>
+          <div>
+          <p>Warm regards,</br>
+          Team Claim Solution</p>
           </div>
 
           <div class="footer">
-            <p>
-              &copy; ${new Date().getFullYear()} 
+            <p> &copy; ${new Date().getFullYear()} 
               <a href="https://www.claimsolution.in">${process.env.COMPANY_NAME}</a>.  
               All rights reserved.
             </p>
@@ -141,5 +141,6 @@ export const revisedAgreementTemplate = ({ as,claimType, name }) => {
       </div>
     </body>
   </html>
+
   `;
 };

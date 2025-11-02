@@ -4,6 +4,7 @@ export const FORM_TYPE_OPTIONS = {
     "ombudsman":"Ombudsman",
     "irdai_stage":"IRDAI Stage",
     "reimbursment_claim_filing":"Reimbursment claim filing",
+    "rti":"RTI",
 }
 
 const FORM_TYPE = Object.keys(FORM_TYPE_OPTIONS)
