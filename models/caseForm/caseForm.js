@@ -27,6 +27,7 @@ const caseFormSchema = new mongoose.Schema({
     approvalDate: { type: Date },
     approvalLetterPrivate: { type: Boolean, default: false },
     approvalLetter: { type: String },
+    isPaymentStatement: { type: Boolean, default: false },
     formType: { type: String,enum:FORM_TYPE, default: "" },
     method: {type: String,enum:METHOD_TYPE, default: 'online'},
     complaintNumber: { type: String },

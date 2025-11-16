@@ -114,15 +114,71 @@ export const handleCaseFinance = async ({
 
         caseForm.paymentDetailsId = paymentDetails._id;
 
+        // 2️⃣ Bill
+        const billCount = await Bill.countDocuments({});
+        let bill = await getOrCreate(
+            Bill,
+            { _id: caseForm?.billId, isActive: true },
+            {
+                invoiceNo: `ACS-${billCount + 1}`,
+                caseId: caseForm._id,
+                clientId: findCase?.clientId,
+                branchId: findCase?.branchId || "",
+                billDate: new Date(),
+            }
+        );
+
+        const totalAmt = approvedAmt
+        if (!bill.isPaid && totalAmt) {
+            const gstRate = 18;
+            // const totalAmt = (Number(approvedAmount || 0) * Number(consultantFee || 0)) / 100;
+            // const gstAmt = (totalAmt * gstRate) / 100 || 0;
+            // const subAmt = totalAmt - gstAmt;
+            const gstAmt = totalAmt * (gstRate / 100)
+            const subAmt = totalAmt - gstAmt;
+
+            bill.sender = senderDetails;
+            bill.receiver = receiverDetails;
+            bill.invoiceItems = {
+                name: "fee",
+                description: "consultant fee",
+                quantity: 0,
+                gstRate,
+                rate: 0,
+                gstAmt,
+                amt: subAmt,
+                totalAmt,
+            };
+            bill.subAmt = subAmt;
+            bill.gstAmt = gstAmt;
+            bill.totalAmt = totalAmt;            
+            await bill.save();
+        }
+
+        caseForm.billId = bill._id;
+        if (specialCase) {
+            sendServiceAgreement({
+                payload: {
+                    mailTo: findCase?.clientObjId?.profile?.primaryEmail,
+                    as: "Client",
+                    fullName: findCase?.clientObjId?.profile?.consultantName,
+                    replacements: { commission: `${consultantFee ?? 20}%`, signed_on: today },
+                    claimType: FORM_TYPE_OPTIONS[caseForm?.formType]
+                }
+            })
+        }
+
         // Statement
-        if (findCase?.partnerObjId?._id && partnerFee) {
+        if (findCase?.partnerObjId?._id && partnerFee && req.body.isPaymentStatement) {
             let statement = await getOrCreate(
                 Statement,
                 { _id: caseForm?.statementId, isActive: true },
                 { partnerId: findCase?.partnerObjId?._id, isActive: true, branchId: findCase?.branchId }
             );
 
-            const payAmt = (approvedAmt * Number(partnerFee)) / 100;
+            // const payAmt = (approvedAmt * Number(partnerFee)) / 100;
+            const payAmt = totalAmt * (Number(partnerFee) / 100);
+
             const statementDefaults = {
                 caseLogin: findCase?.createdAt,
                 policyHolder: findCase?.name,
@@ -140,7 +196,6 @@ export const handleCaseFinance = async ({
 
             assignAllowedFields(statement, statementDefaults, Object.keys(statementDefaults));
             await statement.save();
-
             caseForm.statementId = statement._id;
             if(specialCase){
                 sendServiceAgreement({
@@ -153,60 +208,6 @@ export const handleCaseFinance = async ({
                     }
                 })
             }
-        }
-    }
-
-    // 2️⃣ Bill
-    if (approved) {
-        const billCount = await Bill.countDocuments({});
-        let bill = await getOrCreate(
-            Bill,
-            { _id: caseForm?.billId, isActive: true },
-            {
-                invoiceNo: `ACS-${billCount + 1}`,
-                caseId: caseForm._id,
-                clientId: findCase?.clientId,
-                branchId: findCase?.branchId || "",
-                billDate: new Date(),
-            }
-        );
-
-        if (!bill.isPaid) {
-            const gstRate = 18;
-            const totalAmt = (Number(approvedAmount || 0) * Number(consultantFee || 0)) / 100;
-            const gstAmt = (totalAmt * gstRate) / 100 || 0;
-            const subAmt = totalAmt - gstAmt;
-
-            bill.sender = senderDetails;
-            bill.receiver = receiverDetails;
-            bill.invoiceItems = {
-                name: "fee",
-                description: "consultant fee",
-                quantity: 0,
-                gstRate,
-                rate: 0,
-                gstAmt,
-                amt: subAmt,
-                totalAmt,
-            };
-            bill.subAmt = subAmt;
-            bill.gstAmt = gstAmt;
-            bill.totalAmt = totalAmt;
-
-            await bill.save();
-        }
-
-        caseForm.billId = bill._id;
-        if(specialCase){
-            sendServiceAgreement({
-                payload: {
-                    mailTo: findCase?.clientObjId?.profile?.primaryEmail,
-                    as: "Client",
-                    fullName: findCase?.clientObjId?.profile?.consultantName,
-                    replacements: {commission: `${consultantFee ?? 20}%`, signed_on: today },
-                    claimType: FORM_TYPE_OPTIONS[caseForm?.formType]
-                }
-            })
         }
     }
 
@@ -225,10 +226,8 @@ export const createOrUpdateCaseForm = async (req, res, next) => {
             .populate("clientObjId", "profile branchId")
         if (!findCase) return res.status(400).json({ status: 0, message: "Case not found" });
         const findClient = findCase?.clientObjId
-        console.log("clientobjid", findCase?.clientObjId);
-        console.log("partnerObjId", findCase?.partnerObjId);
-
-
+        // console.log("clientobjid", findCase?.clientObjId);
+        // console.log("partnerObjId", findCase?.partnerObjId);
 
         // const findClient = await Client.findOne({ _id: findCase.clientObjId }).select("fullName profile")
 
@@ -252,7 +251,7 @@ export const createOrUpdateCaseForm = async (req, res, next) => {
         const caseFormFields = [
             "partnerFee", "consultantFee", "filingDate", "isSettelment",
             "approved", "approvedAmount", "approvalDate",
-            "approvalLetter", "approvalLetterPrivate", "specialCase"
+            "approvalLetter", "approvalLetterPrivate", "specialCase","isPaymentStatement"
         ];
         caseFormFields.forEach(field => {
             if (req.body[field] !== undefined) caseForm[field] = req.body[field];
