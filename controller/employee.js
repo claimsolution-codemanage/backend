@@ -1095,7 +1095,7 @@ export const empAddPartnerRefToEmp = async (req, res) => {
 export const viewAllEmployeeCase = async (req, res) => {
    try {
       const { employee } = req
-      let { limit = 10, pageNo = 1, search = "", status = "", startDate = "", endDate = "", empId = "", isReject = "" } = req.query
+      let { limit = 10, pageNo = 1, search = "", status = "", startDate = "", endDate = "", empId = "", isReject = "",isWeeklyFollowUp=false } = req.query
       const skip = (pageNo - 1) * limit;
       const caseAccess = ["operation", "finance", "branch"]
 
@@ -1373,6 +1373,67 @@ export const viewAllEmployeeCase = async (req, res) => {
                ]
             }
          },
+         ...(isWeeklyFollowUp == "true" ? [
+            {
+               $lookup: {
+                  from: "casestatuses",
+                  let: { id: "$_id" },
+                  pipeline: [
+                     {
+                        $match: {
+                           $expr: {
+                              $and: [
+                                 { $eq: ["$isActive", true] },
+                                 {
+                                    $or: [
+                                       { $eq: ["$caseId", "$$id"] },
+                                       { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
+                                    ]
+                                 }
+                              ]
+                           }
+                        }
+                     },
+                     { $project: { caseId: 1, caseMargeId: 1, createdAt: 1, status: 1 } },
+                     { $sort: { createdAt: -1 } }, // newest first
+                     { $limit: 1 } // get only last update
+                  ],
+                  as: "lastStatus"
+               }
+            },
+            {
+               $addFields: {
+                  lastUpdateDate: {
+                     $ifNull: [
+                        { $arrayElemAt: ["$lastStatus.createdAt", 0] },
+                        null
+                     ]
+                  }
+               }
+            },
+            {
+               $addFields: {
+                  daysSinceUpdate: {
+                     $cond: [
+                        { $not: ["$lastUpdateDate"] },   // if no status
+                        9999,                              // treat as very old
+                        {
+                           $dateDiff: {
+                              startDate: "$lastUpdateDate",
+                              endDate: "$$NOW",
+                              unit: "day"
+                           }
+                        }
+                     ]
+                  }
+               }
+            },
+            {
+               $match: {
+                  daysSinceUpdate: { $gte: 7 }
+               }
+            }
+         ] : []),
          { '$sort': { 'createdAt': -1 } },
          {
             "$facet": {
