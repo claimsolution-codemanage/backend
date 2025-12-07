@@ -1296,7 +1296,7 @@ export const adminEditCaseStatus = async (req, res) => {
 export const viewAllAdminCase = async (req, res) => {
    try {
       const { admin } = req
-      let { limit = 10, pageNo = 1, search = "", status = "", startDate = "", endDate = "", empId = "", type, isReject,isWeeklyFollowUp=false } = req.query
+      let { limit = 10, pageNo = 1, search = "", status = "", startDate = "", endDate = "", empId = "", type, isReject = "", isWeeklyFollowUp = false, isClosed = false } = req.query
       const skip = (pageNo - 1) * limit;
 
       let matchQuery = []
@@ -1310,6 +1310,8 @@ export const viewAllAdminCase = async (req, res) => {
 
       matchQuery.push({ isActive: type == "true" ? true : false })
       matchQuery.push(isReject == "true" ? { currentStatus: { $in: ["Reject"] } } : { currentStatus: { $nin: ["Reject"] } })
+      isClosed == "true" && matchQuery.push({ currentStatus: { $in: ["Closed"] } })
+      isWeeklyFollowUp == "true" && matchQuery.push({ currentStatus: { $nin: ["Closed", "Reject"] } })
 
       //  date-wise filter
       if (startDate && endDate) {
@@ -4043,12 +4045,7 @@ export const adminResetForgetPassword = async (req, res) => {
 export const adminDownloadAllCase = async (req, res) => {
    try {
       const { admin } = req
-      const searchQuery = req.query.search ? req.query.search : "";
-      const statusType = req.query.status ? req.query.status : "";
-      const startDate = req.query.startDate ? req.query.startDate : "";
-      const endDate = req.query.endDate ? req.query.endDate : "";
-      const type = req?.query?.type ? req.query.type : true
-      const isReject = req?.query?.isReject == "true" ? { $in: ["Reject"] } : { $nin: ["Reject"] }
+      const {search:searchQuery="",status:statusType="",startDate="",endDate="",type="",isReject="",isClosed="",isWeeklyFollowUp=""} = req.query
 
 
       if (startDate && endDate) {
@@ -4062,7 +4059,10 @@ export const adminDownloadAllCase = async (req, res) => {
          { isPartnerReferenceCase: false },
          { isEmpSaleReferenceCase: false },
          { isActive: Boolean(req.query.type == "true" ? true : false) },
-         req?.query?.isReject == "true" ? { currentStatus: { $in: ["Reject"] } } : { currentStatus: { $nin: ["Reject"] } },
+         isReject == "true" ? { currentStatus: { $in: ["Reject"] } } : { currentStatus: { $nin: ["Reject"] } },
+         ...(isClosed == "true" ? [{ currentStatus: { $in: ["Closed"] } }] :[]),
+         ...(isWeeklyFollowUp == "true" ? [{ currentStatus: { $nin: ["Closed", "Reject"] } }] :[]),
+         
       ]
       if (statusType) {
          andCondition.push(

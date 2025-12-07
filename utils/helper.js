@@ -940,7 +940,7 @@ export const commonDownloadCaseExcel = async (getAllCase = [],_id) => {
         branchId:caseData?.branchId || "",
         currentStatus: caseData?.currentStatus || "",
         statusDate: ind==0 ? (caseData?.latestCaseStatus?.date || caseData?.latestCaseStatus?.createdAt || "-") :"" ,
-        statusRemark: ind==0 ? (caseData?.latestCaseStatus?.remark || "-") :"" ,
+        statusRemark: ind == 0 ? (caseData?.latestCaseStatus?.remark || "-").replace(/<\/?[^>]+>/g, ""): "",
         date: ind==0 ? (caseData?.createdAt || "") :"" ,
         caseFrom: ind==0 ? (caseData?.caseFrom || "") :"" ,
         addedBy: ind==0 ?( caseData?.employeeDetails?.fullName ? `${caseData?.employeeDetails?.fullName} | ${caseData?.employeeDetails?.type} | ${caseData?.employeeDetails?.designation}` : "-") :"" ,
