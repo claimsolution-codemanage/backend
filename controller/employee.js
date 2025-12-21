@@ -18,7 +18,7 @@ import { validateEmployeeSignIn, validateEmployeeResetPassword, validateUpdateEm
 import { authEmployee, authPartner } from "../middleware/authentication.js";
 import { validMongooseId, getAllCaseQuery, getAllPartnerSearchQuery, generatePassword, getDownloadCaseExcel, getAllPartnerDownloadExcel, getAllEmployeeSearchQuery, getValidateDate, getEmployeeByIdQuery, getAllSathiDownloadExcel, getAllClientDownloadExcel, commonInvoiceDownloadExcel, sendNotificationAndMail, getAllStatementDownloadExcel, commonDownloadCaseExcel, getAllClientResult, getAllPartnerResult, getAllCaseDocQuery } from "../utils/helper.js";
 import * as dbFunction from "../utils/dbFunction.js"
-import { sendAddClientRequest, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
+import { sendAddClientRequest, sendEmployeeSigninMail, sendForgetPasswordMail, sendMail } from "../utils/sendMail.js";
 import { validateAddClientCase, validateClientProfileBody } from "../utils/validateClient.js";
 import jwtDecode from "jwt-decode";
 import { validateInvoice } from "../utils/validateEmployee.js";
@@ -30,6 +30,7 @@ import { validateAdminAddEmployeeToCase, validateAdminSharePartner } from "../ut
 import { createOrUpdateCaseStatusForm } from "../utils/dbFunction.js";
 import { Types } from "mongoose";
 import CaseMergeDetails from "../models/caseMergeDetails.js";
+import { caseUpdateStatusTemplate } from "../utils/emailTemplates/caseUpdateStatusTemplate.js";
 
 export const employeeAuthenticate = async (req, res) => {
    try {
@@ -455,15 +456,18 @@ export const changeStatusEmployeeCase = async (req, res) => {
 
       const { error } = validateUpdateEmployeeCase(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-      console.log("case body", req.body);
 
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+         const statusRemark = req.body.remark
+         const caseStatus = req.body.status
 
-      const updateCase = await Case.findByIdAndUpdate(req.body._id, { currentStatus: req.body.status }, { new: true })
+      const updateCase = await Case.findById(req.body._id).populate("partnerObjId","profile.consultantName profile.primaryEmail").populate("clientObjId","profile.consultantName profile.primaryEmail")
       if (!updateCase) return res.status(404).json({ success: false, message: "Case not found" })
+      updateCase.currentStatus = req.body.status
+      await updateCase.save()
       const addNewStatus = new CaseStatus({
-         remark: req.body.remark,
-         status: req.body.status,
+         remark: statusRemark,
+         status: caseStatus,
          consultant: employee?.fullName,
          employeeId: req?.user?._id,
          caseId: req.body._id
@@ -471,6 +475,7 @@ export const changeStatusEmployeeCase = async (req, res) => {
       await addNewStatus.save()
 
       // send notification through email and db notification
+      const caseNumber = updateCase.fileNo
       const notificationEmpUrl = `/employee/view case/${req.body._id}`
       const notificationAdminUrl = `/admin/view case/${req.body._id}`
 
@@ -482,6 +487,24 @@ export const changeStatusEmployeeCase = async (req, res) => {
          notificationEmpUrl,
          notificationAdminUrl
       )
+
+      const  subject = "Update on Your Case – Status Changed"
+      // client
+      if(updateCase?.clientObjId?.profile?.primaryEmail){
+         sendMail({
+            to:updateCase?.clientObjId?.profile?.primaryEmail,
+            subject,
+            html:caseUpdateStatusTemplate({type:"Client",caseNumber,statusRemark,caseStatus,caseUrl:process.env.PANEL_FRONTEND_URL + `/client/view case/${req.body._id}`})
+         })
+      }
+      // partner
+      if(updateCase?.partnerObjId?.profile?.primaryEmail){
+         sendMail({
+            to:updateCase?.partnerObjId?.profile?.primaryEmail,
+            subject,
+            html:caseUpdateStatusTemplate({type:"Partner",caseNumber,statusRemark,caseStatus,caseUrl:process.env.PANEL_FRONTEND_URL + `/partner/view case/${req.body._id}`})
+         })
+      }
       return res.status(200).json({ success: true, message: `Case status change to ${req.body.status}` });
 
    } catch (error) {
@@ -1545,6 +1568,7 @@ export const employeeViewCaseByIdBy = async (req, res) => {
    try {
       const { employee } = req;
       const isOperation = employee?.type?.toLowerCase() === "operation";
+      const employeeId = employee?._id;
       const { _id } = req.query;
 
       if (!validMongooseId(_id)) {
@@ -1607,22 +1631,82 @@ export const employeeViewCaseByIdBy = async (req, res) => {
             }
          },
          { $unwind: { path: "$clientDetails", preserveNullAndEmptyArrays: true } },
+         // {
+         //    $lookup: {
+         //       from: "casedocs",
+         //       let: { id: "$_id" },
+         //       pipeline: [
+         //          {
+         //             $match: {
+         //                $expr: {
+         //                   $and: [
+         //                      { $eq: ["$isActive", true] },
+         //                      ...(!isOperation
+         //                         ? [
+         //                            {
+         //                               $or: [
+         //                                  { $eq: ["$isPrivate", false] },
+         //                                  { $eq: [{ $ifNull: ["$isPrivate", false] }, false] }
+         //                               ]
+         //                            }
+         //                         ]
+         //                         : []),
+         //                      {
+         //                         $or: [
+         //                            { $eq: ["$caseId", "$$id"] },
+         //                            { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
+         //                         ]
+         //                      }
+         //                   ]
+         //                }
+         //             }
+         //          },
+         //          { $project: { adminId: 0 } }
+         //       ],
+         //       as: "caseDocs"
+         //    }
+         // },
          {
             $lookup: {
                from: "casedocs",
-               let: { id: "$_id" },
+               let: {
+                  id: "$_id",
+                  employeeId: employeeId
+               },
                pipeline: [
                   {
                      $match: {
                         $expr: {
                            $and: [
                               { $eq: ["$isActive", true] },
+
+                              // case mapping
                               {
                                  $or: [
                                     { $eq: ["$caseId", "$$id"] },
-                                    { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
+                                    { $eq: ["$caseMargeId", { $toString: "$$id" }] }
                                  ]
-                              }
+                              },
+
+                              // access control
+                              ...(isOperation
+                                 ? [] // operation user → NO restriction
+                                 : [
+                                    {
+                                       $or: [
+                                          // non-private docs
+                                       { $ne: ["$isPrivate", true] },
+
+                                          // private docs only if employee matches
+                                          {
+                                             $and: [
+                                                { $eq: ["$isPrivate", true] },
+                                                { $eq: ["$employeeId", "$$employeeId"] }
+                                             ]
+                                          }
+                                       ]
+                                    }
+                                 ])
                            ]
                         }
                      }
@@ -1750,7 +1834,7 @@ export const empSetIsActiveCase = async (req, res) => {
 
 export const empAddCaseFile = async (req, res) => {
    try {
-      await dbFunction.commonAddCaseFile(req, res)
+      await dbFunction.commonAddCaseFile(req, res,"employeeId")
    } catch (error) {
       console.log("add case file in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });

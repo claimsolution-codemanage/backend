@@ -185,7 +185,7 @@ export const createOrUpdateCaseStatusForm = async (req, res, next) => {
     }
 }
 
-export const commonAddCaseFile = async (req, res) => {
+export const commonAddCaseFile = async (req, res,refIdType) => {
     try {
         const { _id } = req.query
         if (!helperFunc.validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
@@ -203,7 +203,8 @@ export const commonAddCaseFile = async (req, res) => {
                         format: doc?.docFormat,
                         url: doc?.docURL,
                         caseId: mycase._id?.toString(),
-                        clientId: req?.user?._id
+                        [refIdType || "client"]: req?.user?._id,
+                        isPrivate:doc?.isPrivate
                     }
                 }
             });

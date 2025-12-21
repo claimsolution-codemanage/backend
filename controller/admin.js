@@ -17,7 +17,7 @@ import {
    validateEditAdminCaseStatus, validateAdminSharePartner, validateAdminRemovePartner,
 } from "../utils/validateAdmin.js";
 import { commonDownloadCaseExcel, commonInvoiceDownloadExcel, generatePassword, getAllCaseDocQuery, getAllClientResult, getAllInvoiceQuery, getAllPartnerResult, getAllSathiDownloadExcel, getAllStatementDownloadExcel, getEmployeeByIdQuery, getValidateDate, sendNotificationAndMail } from "../utils/helper.js";
-import { sendAdminSigninMail, sendEmployeeSigninMail, sendForgetPasswordMail } from "../utils/sendMail.js";
+import { sendAdminSigninMail, sendEmployeeSigninMail, sendForgetPasswordMail, sendMail } from "../utils/sendMail.js";
 import { validateEmployeeSignUp } from "../utils/validateEmployee.js";
 import { validMongooseId } from "../utils/helper.js";
 import { validateResetPassword } from "../utils/helper.js";
@@ -991,13 +991,17 @@ export const changeStatusAdminCase = async (req, res) => {
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+      const statusRemark = req.body.remark
+      const caseStatus = req.body.status
 
-      const updateCase = await Case.findByIdAndUpdate(req.body._id, { currentStatus: req.body.status }, { new: true })
+      const updateCase = await Case.findById(req.body._id).populate("partnerObjId", "profile.consultantName profile.primaryEmail").populate("clientObjId", "profile.consultantName profile.primaryEmail")
       if (!updateCase) return res.status(404).json({ success: false, message: "Case not found" })
+      updateCase.currentStatus = req.body.status
+      await updateCase.save()
 
       const addNewStatus = new CaseStatus({
-         remark: req.body.remark,
-         status: req.body.status,
+         remark: statusRemark,
+         status: caseStatus,
          consultant: admin?.fullName,
          adminId: req?.user?._id,
          caseId: req.body._id
@@ -1005,6 +1009,7 @@ export const changeStatusAdminCase = async (req, res) => {
       await addNewStatus.save()
 
       // send notification through email and db notification
+      const caseNumber = updateCase.fileNo
       const notificationEmpUrl = `/employee/view case/${updateCase?._id?.toString()}`
       const notificationAdminUrl = `/admin/view case/${updateCase?._id?.toString()}`
 
@@ -1016,6 +1021,24 @@ export const changeStatusAdminCase = async (req, res) => {
          notificationEmpUrl,
          notificationAdminUrl
       )
+
+      const subject = "Update on Your Case – Status Changed"
+      // client
+      if (updateCase?.clientObjId?.profile?.primaryEmail) {
+         sendMail({
+            to: updateCase?.clientObjId?.profile?.primaryEmail,
+            subject,
+            html: caseUpdateStatusTemplate({ type: "Client", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/client/view case/${req.body._id}` })
+         })
+      }
+      // partner
+      if (updateCase?.partnerObjId?.profile?.primaryEmail) {
+         sendMail({
+            to: updateCase?.partnerObjId?.profile?.primaryEmail,
+            subject,
+            html: caseUpdateStatusTemplate({ type: "Partner", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/partner/view case/${req.body._id}` })
+         })
+      }
       return res.status(200).json({ success: true, message: `Case status change to ${req.body.status}` });
    } catch (error) {
       console.log("updateAdminCase in error:", error);
@@ -1448,7 +1471,7 @@ export const viewAllAdminCase = async (req, res) => {
                ]
             }
          },
-           ...(isWeeklyFollowUp == "true" ? [
+         ...(isWeeklyFollowUp == "true" ? [
             {
                $lookup: {
                   from: "casestatuses",
@@ -2593,7 +2616,7 @@ export const viewCaseByIdByAdmin = async (req, res) => {
                foreignField: "caseId",
                pipeline: [
                   { $match: { isActive: true } },
-                  { $project: { formType: 1,caseId:1 } },
+                  { $project: { formType: 1, caseId: 1 } },
                ],
                as: "case_forms"
             }
@@ -2623,7 +2646,7 @@ export const viewCaseByIdByAdmin = async (req, res) => {
 
 export const adminAddCaseFile = async (req, res) => {
    try {
-      await dbFunction.commonAddCaseFile(req, res)
+      await dbFunction.commonAddCaseFile(req, res, "adminId")
    } catch (error) {
       console.log("add case file in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -4045,7 +4068,7 @@ export const adminResetForgetPassword = async (req, res) => {
 export const adminDownloadAllCase = async (req, res) => {
    try {
       const { admin } = req
-      const {search:searchQuery="",status:statusType="",startDate="",endDate="",type="",isReject="",isClosed="",isWeeklyFollowUp=""} = req.query
+      const { search: searchQuery = "", status: statusType = "", startDate = "", endDate = "", type = "", isReject = "", isClosed = "", isWeeklyFollowUp = "" } = req.query
 
 
       if (startDate && endDate) {
@@ -4060,9 +4083,9 @@ export const adminDownloadAllCase = async (req, res) => {
          { isEmpSaleReferenceCase: false },
          { isActive: Boolean(req.query.type == "true" ? true : false) },
          isReject == "true" ? { currentStatus: { $in: ["Reject"] } } : { currentStatus: { $nin: ["Reject"] } },
-         ...(isClosed == "true" ? [{ currentStatus: { $in: ["Closed"] } }] :[]),
-         ...(isWeeklyFollowUp == "true" ? [{ currentStatus: { $nin: ["Closed", "Reject"] } }] :[]),
-         
+         ...(isClosed == "true" ? [{ currentStatus: { $in: ["Closed"] } }] : []),
+         ...(isWeeklyFollowUp == "true" ? [{ currentStatus: { $nin: ["Closed", "Reject"] } }] : []),
+
       ]
       if (statusType) {
          andCondition.push(
@@ -6460,6 +6483,7 @@ import OmbudsmanStatus from "../models/ombudsmanStatus.js"; // old model
 import CaseFormModal from "../models/caseForm/caseForm.js";
 import CaseFormSectionModal from "../models/caseForm/caseFormSection.js";
 import CaseFormAttachmentModal from "../models/caseForm/caseFormAttachment.js";
+import { caseUpdateStatusTemplate } from "../utils/emailTemplates/caseUpdateStatusTemplate.js";
 
 export const migrateGROForms = async (req, res) => {
    try {

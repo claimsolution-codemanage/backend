@@ -1009,7 +1009,8 @@ export const partnerViewCaseById = async (req, res) => {
                 $expr: {
                   $and: [
                     { $eq: ["$isActive", true] },
-                    { $or: [{ $eq: ["$caseId", "$$id"] }, { $eq: ["$caseMargeId", "$$id"] }] }
+                    { $or: [{ $eq: ["$caseId", "$$id"] }, { $eq: ["$caseMargeId", "$$id"] }] },
+                     { $ne: ["$isPrivate", true] },
                   ]
                 }
               }
@@ -1184,7 +1185,7 @@ export const partnerAddCaseFile = async (req, res) => {
             format: doc?.docFormat,
             url: doc?.docURL,
             caseId: mycase._id?.toString(),
-            clientId: req?.user?._id
+            partnerId: req?.user?._id
           }
         }
       });

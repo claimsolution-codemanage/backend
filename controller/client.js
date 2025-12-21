@@ -788,7 +788,8 @@ if (!validMongooseId(_id)) {
                     {
                       $or: [
                         { $eq: ["$caseId", "$$caseId"] },
-                        { $eq: ["$caseMargeId", { $toString: "$$caseId" }] }
+                        { $eq: ["$caseMargeId", { $toString: "$$caseId" }] },
+                        { $ne: ["$isPrivate", true] },
                       ]
                     },
                     {
