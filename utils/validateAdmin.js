@@ -35,6 +35,8 @@ export const validateUpdateAdminCase =(body)=>{
     _id: Joi.string().required(),
     status: Joi.string().required(),
     remark: Joi.string().required(),
+    mailMethod:Joi.string().allow('').optional(),
+    nextFollowUp:Joi.string().allow('').optional(),
    })
  
    return bodySchema.validate(body)

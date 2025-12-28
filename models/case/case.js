@@ -54,37 +54,40 @@ const caseSchema = new mongoose.Schema({
    isActive:{type:Boolean,required:true,default:true},
    fileNo:{type:String,required:true},
    currentStatus:{type:String,required:true,default:"pending"},
-   processSteps:{type:[{
-      date:{type:Date,default:Date.now()},
-      status:{type:String,default:"pending"},
-      remark:{type:String,default:"pending stage."},
-      consultant:{type:String,default:""},
-   }]},
-   caseDocs:{
-      type:[
-         {docDate:{type:String},
-         docName:{type:String},
-         docType:{type:String},
-         docFormat:{type:String},
-         docFormat:{type:String},
-         docURL:{type:String},
-         isMerge:{type:String,default:false},
-      },
-      ]
-   },
+   // processSteps:{type:[{
+   //    date:{type:Date,default:Date.now()},
+   //    status:{type:String,default:"pending"},
+   //    remark:{type:String,default:"pending stage."},
+   //    consultant:{type:String,default:""},
+   // }]},
+   // caseDocs:{
+   //    type:[
+   //       {docDate:{type:String},
+   //       docName:{type:String},
+   //       docType:{type:String},
+   //       docFormat:{type:String},
+   //       docFormat:{type:String},
+   //       docURL:{type:String},
+   //       isMerge:{type:String,default:false},
+   //    },
+   //    ]
+   // },
    addEmployee:{type:Array,default:[]},
-   caseCommit:{type:[{
-      _id:{type:String},
-      name:{type:String},
-      role:{type:String},
-      type:{type:String},
-      commit:{type:String},
-      Date:{type:Date}
-   }]},
+   // caseCommit:{type:[{
+   //    _id:{type:String},
+   //    name:{type:String},
+   //    role:{type:String},
+   //    type:{type:String},
+   //    commit:{type:String},
+   //    Date:{type:Date}
+   // }]},
    branchId:{
       type:String,
       default:"",
-   }
+   },
+   nextFollowUp:{type:Date,default:null},
+   lastStatusDate:{type:Date,default:Date.now()},
+
 
 },{timestamps:true});
 

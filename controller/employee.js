@@ -454,16 +454,20 @@ export const changeStatusEmployeeCase = async (req, res) => {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
 
+      const { mailMethod = "", nextFollowUp = "" } = req.body
+
       const { error } = validateUpdateEmployeeCase(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
-         const statusRemark = req.body.remark
-         const caseStatus = req.body.status
+      const statusRemark = req.body.remark
+      const caseStatus = req.body.status
 
-      const updateCase = await Case.findById(req.body._id).populate("partnerObjId","profile.consultantName profile.primaryEmail").populate("clientObjId","profile.consultantName profile.primaryEmail")
+      const updateCase = await Case.findById(req.body._id).populate("partnerObjId", "profile.consultantName profile.primaryEmail").populate("clientObjId", "profile.consultantName profile.primaryEmail")
       if (!updateCase) return res.status(404).json({ success: false, message: "Case not found" })
       updateCase.currentStatus = req.body.status
+      updateCase.nextFollowUp = nextFollowUp || null
+      updateCase.lastStatusDate = new Date()
       await updateCase.save()
       const addNewStatus = new CaseStatus({
          remark: statusRemark,
@@ -488,21 +492,21 @@ export const changeStatusEmployeeCase = async (req, res) => {
          notificationAdminUrl
       )
 
-      const  subject = "Update on Your Case – Status Changed"
+      const subject = "Update on Your Case – Status Changed"
       // client
-      if(updateCase?.clientObjId?.profile?.primaryEmail){
+      if (updateCase?.clientObjId?.profile?.primaryEmail && (["client", "both"]?.includes(mailMethod?.toLowerCase()))) {
          sendMail({
-            to:updateCase?.clientObjId?.profile?.primaryEmail,
+            to: updateCase?.clientObjId?.profile?.primaryEmail,
             subject,
-            html:caseUpdateStatusTemplate({type:"Client",caseNumber,statusRemark,caseStatus,caseUrl:process.env.PANEL_FRONTEND_URL + `/client/view case/${req.body._id}`})
+            html: caseUpdateStatusTemplate({ type: "Client", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/client/view case/${req.body._id}` })
          })
       }
       // partner
-      if(updateCase?.partnerObjId?.profile?.primaryEmail){
+      if (updateCase?.partnerObjId?.profile?.primaryEmail && (["partner", "both"]?.includes(mailMethod?.toLowerCase()))) {
          sendMail({
-            to:updateCase?.partnerObjId?.profile?.primaryEmail,
+            to: updateCase?.partnerObjId?.profile?.primaryEmail,
             subject,
-            html:caseUpdateStatusTemplate({type:"Partner",caseNumber,statusRemark,caseStatus,caseUrl:process.env.PANEL_FRONTEND_URL + `/partner/view case/${req.body._id}`})
+            html: caseUpdateStatusTemplate({ type: "Partner", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/partner/view case/${req.body._id}` })
          })
       }
       return res.status(200).json({ success: true, message: `Case status change to ${req.body.status}` });
@@ -1310,6 +1314,8 @@ export const viewAllEmployeeCase = async (req, res) => {
                "empObjId": 1,
                "partnerObjId": 1,
                "clientObjId": 1,
+               "nextFollowUp":1,
+               "lastStatusDate":1
             }
          },
          {
@@ -1400,64 +1406,73 @@ export const viewAllEmployeeCase = async (req, res) => {
          },
          ...(isWeeklyFollowUp == "true" ? [
             {
-               $lookup: {
-                  from: "casestatuses",
-                  let: { id: "$_id" },
-                  pipeline: [
-                     {
-                        $match: {
-                           $expr: {
-                              $and: [
-                                 { $eq: ["$isActive", true] },
-                                 {
-                                    $or: [
-                                       { $eq: ["$caseId", "$$id"] },
-                                       { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
-                                    ]
-                                 }
-                              ]
-                           }
-                        }
-                     },
-                     { $project: { caseId: 1, caseMargeId: 1, createdAt: 1, status: 1 } },
-                     { $sort: { createdAt: -1 } }, // newest first
-                     { $limit: 1 } // get only last update
-                  ],
-                  as: "lastStatus"
-               }
-            },
-            {
-               $addFields: {
-                  lastUpdateDate: {
-                     $ifNull: [
-                        { $arrayElemAt: ["$lastStatus.createdAt", 0] },
-                        null
-                     ]
-                  }
-               }
-            },
-            {
-               $addFields: {
-                  daysSinceUpdate: {
-                     $cond: [
-                        { $not: ["$lastUpdateDate"] },   // if no status
-                        9999,                              // treat as very old
-                        {
-                           $dateDiff: {
-                              startDate: "$lastUpdateDate",
-                              endDate: "$$NOW",
-                              unit: "day"
-                           }
-                        }
-                     ]
-                  }
-               }
-            },
-            {
                $match: {
-                  daysSinceUpdate: { $gte: 7 }
+                  nextFollowUp: {
+                     $ne: null,
+                     $lte: new Date()
+                  }
                }
             }
+
+            // {
+            //    $lookup: {
+            //       from: "casestatuses",
+            //       let: { id: "$_id" },
+            //       pipeline: [
+            //          {
+            //             $match: {
+            //                $expr: {
+            //                   $and: [
+            //                      { $eq: ["$isActive", true] },
+            //                      {
+            //                         $or: [
+            //                            { $eq: ["$caseId", "$$id"] },
+            //                            { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
+            //                         ]
+            //                      }
+            //                   ]
+            //                }
+            //             }
+            //          },
+            //          { $project: { caseId: 1, caseMargeId: 1, createdAt: 1, status: 1 } },
+            //          { $sort: { createdAt: -1 } }, // newest first
+            //          { $limit: 1 } // get only last update
+            //       ],
+            //       as: "lastStatus"
+            //    }
+            // },
+            // {
+            //    $addFields: {
+            //       lastUpdateDate: {
+            //          $ifNull: [
+            //             { $arrayElemAt: ["$lastStatus.createdAt", 0] },
+            //             null
+            //          ]
+            //       }
+            //    }
+            // },
+            // {
+            //    $addFields: {
+            //       daysSinceUpdate: {
+            //          $cond: [
+            //             { $not: ["$lastUpdateDate"] },   // if no status
+            //             9999,                              // treat as very old
+            //             {
+            //                $dateDiff: {
+            //                   startDate: "$lastUpdateDate",
+            //                   endDate: "$$NOW",
+            //                   unit: "day"
+            //                }
+            //             }
+            //          ]
+            //       }
+            //    }
+            // },
+            // {
+            //    $match: {
+            //       daysSinceUpdate: { $gte: 7 }
+            //    }
+            // }
          ] : []),
          { '$sort': { 'createdAt': -1 } },
          {
@@ -1485,7 +1500,7 @@ export const viewAllEmployeeCase = async (req, res) => {
       const getAllCase = result[0].cases;
       const noOfCase = result[0].totalCount[0]?.count || 0;
       const totalAmount = result?.[0]?.totalAmt
-      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase,totalAmt:totalAmount });
+      return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: totalAmount });
 
    } catch (error) {
       console.log("updateAdminCase in error:", error);
@@ -1695,7 +1710,7 @@ export const employeeViewCaseByIdBy = async (req, res) => {
                                     {
                                        $or: [
                                           // non-private docs
-                                       { $ne: ["$isPrivate", true] },
+                                          { $ne: ["$isPrivate", true] },
 
                                           // private docs only if employee matches
                                           {
@@ -1796,6 +1811,41 @@ export const employeeViewCaseByIdBy = async (req, res) => {
                as: "case_forms"
             }
          },
+         ...(isOperation ? [
+            {
+               $lookup: {
+                  from: "cases",
+                  let: {
+                     clientId: "$clientObjId",
+                     caseId: "$_id",
+                     branchId:"$branchId"
+                  },
+                  as: "clientOtherCases",
+                  pipeline: [
+                     {
+                        $match: {
+                           $expr: {
+                              $and: [
+                                 { $eq: ["$clientObjId", "$$clientId"] },
+                                 { $eq: ["$branchId", "$$branchId"] },
+                                 { $ne: ["$_id", "$$caseId"] }
+                              ]
+                           }
+                        }
+                     },
+                     {
+                        $project: {
+                           name: 1,
+                           currentStatus: 1,
+                           policyNo: 1,
+                           fileNo: 1,
+                           createdAt: 1
+                        }
+                     }
+                  ]
+               }
+            },
+         ] : [])
       ]);
 
       if (!caseData.length) {
@@ -1834,7 +1884,7 @@ export const empSetIsActiveCase = async (req, res) => {
 
 export const empAddCaseFile = async (req, res) => {
    try {
-      await dbFunction.commonAddCaseFile(req, res,"employeeId")
+      await dbFunction.commonAddCaseFile(req, res, "employeeId")
    } catch (error) {
       console.log("add case file in error:", error);
       res.status(500).json({ success: false, message: "Internal server error", error: error });
