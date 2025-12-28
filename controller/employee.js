@@ -1818,18 +1818,29 @@ export const employeeViewCaseByIdBy = async (req, res) => {
                   let: {
                      clientId: "$clientObjId",
                      caseId: "$_id",
-                     branchId:"$branchId"
+                     branchId: "$branchId"
                   },
                   as: "clientOtherCases",
                   pipeline: [
                      {
                         $match: {
                            $expr: {
-                              $and: [
-                                 { $eq: ["$clientObjId", "$$clientId"] },
-                                 { $eq: ["$branchId", "$$branchId"] },
-                                 { $ne: ["$_id", "$$caseId"] }
-                              ]
+                              $cond: {
+                                 if: {
+                                    $or: [
+                                       { $eq: ["$$clientId", null] },
+                                       { $not: ["$$clientId"] }
+                                    ]
+                                 },
+                                 then: false,
+                                 else: {
+                                    $and: [
+                                       { $eq: ["$clientObjId", "$$clientId"] },
+                                       { $eq: ["$branchId", "$$branchId"] },
+                                       { $ne: ["$_id", "$$caseId"] }
+                                    ]
+                                 }
+                              }
                            }
                         }
                      },
@@ -1839,7 +1850,8 @@ export const employeeViewCaseByIdBy = async (req, res) => {
                            currentStatus: 1,
                            policyNo: 1,
                            fileNo: 1,
-                           createdAt: 1
+                           createdAt: 1,
+                           clientObjId: 1
                         }
                      }
                   ]
