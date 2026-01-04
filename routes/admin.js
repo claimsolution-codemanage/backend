@@ -82,7 +82,7 @@ router.get("/allUnactiveCaseDoc",authAdmin,adminController.adminAllUnactiveCaseD
 
 // share case
 router.put("/addEmployeeToCase",authAdmin,adminController.adminShareCaseToEmployee)
-router.put("/addCaseCommit",authAdmin,adminController.adminAddCaseComment)
+router.put("/add_or_update_case_comment",authAdmin,adminController.adminAddOrUpdateCaseComment)
 
 
 // share partner

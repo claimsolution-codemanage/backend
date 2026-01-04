@@ -1409,7 +1409,7 @@ export const viewAllEmployeeCase = async (req, res) => {
                $match: {
                   nextFollowUp: {
                      $ne: null,
-                     $lte: new Date()
+                     // $lte: new Date()
                   }
                }
             }
@@ -1474,7 +1474,10 @@ export const viewAllEmployeeCase = async (req, res) => {
             //    }
             // }
          ] : []),
-         { '$sort': { 'createdAt': -1 } },
+         ...(isWeeklyFollowUp == "true" 
+            ? [{ '$sort': { 'nextFollowUp': 1 } }] 
+            :[{ '$sort': { 'createdAt': -1 } }]),
+         
          {
             "$facet": {
                "cases": [
@@ -2662,17 +2665,28 @@ export const employeeResetForgetPassword = async (req, res) => {
    }
 }
 
-export const employeeAddCaseComment = async (req, res) => {
+export const empAddOrUpdateCaseComment = async (req, res) => {
    try {
       const { employee } = req
-      const { comment, isPrivate } = req.body
+      const { comment,caseCommentId, isPrivate } = req.body
 
       if (!comment) return res.status(400).json({ success: false, message: "Case Comment required" })
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
+      if(caseCommentId && !validMongooseId(caseCommentId)) return res.status(400).json({ success: false, message: "Not a valid comment ID" })
+
 
       const getCase = await Case.findById(req.body._id)
       if (!getCase) return res.status(400).json({ success: false, message: "Case not found" })
+
+      if(caseCommentId){
+         await CaseComment.findByIdAndUpdate(caseCommentId,{$set:{
+         message: comment?.trim(),
+         isPrivate: isPrivate ?? false,
+         employeeId: req?.user?._id,
+         }})
+      return res.status(200).json({ success: true, message: "Successfully updated case comment" });
+      }
 
       const newComment = new CaseComment({
          role: req?.user?.role,
@@ -2699,7 +2713,7 @@ export const employeeAddCaseComment = async (req, res) => {
          notificationAdminUrl
       )
 
-      return res.status(200).json({ success: true, message: "Successfully add case comment" });
+      return res.status(200).json({ success: true, message: "Successfully added case comment" });
    } catch (error) {
       console.log("employeeAddCaseCommit in error:", error);
       return res.status(500).json({ success: false, message: "Internal server error", error: error });
@@ -2777,8 +2791,6 @@ export const employeeCreateInvoice = async (req, res) => {
       if (employee?.type?.toLowerCase() != "finance") return res.status(400).json({ success: false, message: "Access Denied" })
 
       const { clientId, caseId } = req.query
-      // console.log(clientId, caseId);
-
       let getClient = false
       let getCase = false
       let billRef = {}
@@ -2786,7 +2798,8 @@ export const employeeCreateInvoice = async (req, res) => {
       const { error } = validateInvoice(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      if (caseId && clientId) {
+      if (caseId && clientId && caseId!=="null" && clientId!=="null") {
+         
          if (!validMongooseId(clientId) || !validMongooseId(caseId)) return res.status(400).json({ success: false, message: "caseId and clientId must be valid" })
          getClient = await Client.findById(clientId)
          if (!getClient) return res.status(400).json({ success: false, message: "Client not found" })

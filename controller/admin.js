@@ -1482,7 +1482,7 @@ export const viewAllAdminCase = async (req, res) => {
                $match: {
                   nextFollowUp: {
                      $ne: null,
-                     $lte: new Date()
+                     // $lte: new Date()
                   }
                }
             }
@@ -1546,7 +1546,10 @@ export const viewAllAdminCase = async (req, res) => {
             //    }
             // }
          ] : []),
-         { '$sort': { 'createdAt': -1 } },
+         // { '$sort': { 'createdAt': -1 } },
+            ...(isWeeklyFollowUp == "true" 
+            ? [{ '$sort': { 'nextFollowUp': 1 } }] 
+            :[{ '$sort': { 'createdAt': -1 } }]),
          {
             "$facet": {
                "cases": [
@@ -3359,15 +3362,28 @@ export const adminShareClientToSaleEmp = async (req, res) => {
    }
 }
 
-export const adminAddCaseComment = async (req, res) => {
+export const adminAddOrUpdateCaseComment = async (req, res) => {
    try {
       const { admin } = req
-      const { comment, isPrivate } = req.body
+      const { comment,caseCommentId, isPrivate } = req.body
       if (!comment?.trim()) return res.status(400).json({ success: false, message: "Case Comment required" })
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+      if(caseCommentId && !validMongooseId(caseCommentId)) return res.status(400).json({ success: false, message: "Not a valid comment ID" })
+         
 
       const getCase = await Case.findById(req.body._id,)
       if (!getCase) return res.status(400).json({ success: false, message: "Case not found" })
+
+      if (caseCommentId) {
+         await CaseComment.findByIdAndUpdate(caseCommentId, {
+            $set: {
+               message: comment?.trim(),
+               isPrivate: isPrivate ?? false,
+               adminId: req?.user?._id,
+            }
+         })
+         return res.status(200).json({ success: true, message: "Successfully updated case comment" });
+      }
 
       const newComment = new CaseComment({
          role: req?.user?.role,
@@ -5330,7 +5346,7 @@ export const adminCreateInvoice = async (req, res) => {
       const { error } = validateInvoice(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      if (caseId && clientId) {
+      if (caseId && clientId  && caseId!=="null" && clientId!=="null") {
          if (!validMongooseId(clientId) || !validMongooseId(caseId)) return res.status(400).json({ success: false, message: "caseId and clientId must be valid" })
          getClient = await Client.findById(clientId)
          if (!getClient) return res.status(400).json({ success: false, message: "Client not found" })

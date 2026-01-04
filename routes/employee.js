@@ -28,7 +28,7 @@ router.put("/changeCaseIsActive",authEmployee,employeeController.empSetIsActiveC
 router.post("/empAddCaseFile",authEmployee,employeeController.empAddCaseFile)
 router.get("/employeeFindCaseByFileNo",authEmployee,employeeController.employeeFindCaseByFileNo)
 router.put("/changeCaseStatus",authEmployee,employeeController.changeStatusEmployeeCase)
-router.put("/addCaseComment",authEmployee,employeeController.employeeAddCaseComment)
+router.put("/add_or_update_case_comment",authEmployee,employeeController.empAddOrUpdateCaseComment)
 router.put("/updateCaseById",authEmployee,employeeController.employeeUpdateCaseById)
 router.put("/operation/addReferenceCaseAndMarge",authEmployee,employeeController.empAddReferenceCaseAndMarge)
 router.put("/operation/removeReferenceCase",authEmployee,employeeController.empRemoveReferenceCase)
