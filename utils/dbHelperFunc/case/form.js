@@ -49,6 +49,7 @@ const sendServiceAgreement = async ({ payload }) => {
         await sendMail({
             subject: `${as} Service Agreement`,
             to: mailTo,
+            cc:[process.env.CC_MAIL_ID],
             html: revisedAgreementTemplate({ as, name: fullName, claimType }),
             attachments: [{
                 filename: 'revised_service_agreement.pdf',

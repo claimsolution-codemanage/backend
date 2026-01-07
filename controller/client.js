@@ -184,6 +184,7 @@ export const signUpWithRequest = async (req, res) => {
         await sendMail({
         subject: "Client Service Agreement",
         to: clientEmail,
+        cc:[process.env.CC_MAIL_ID],
         html: accountTermConditionTemplate({as:"Client",name:existingClient?.fullName }),
         attachments:[{
             filename: 'service_agreement.pdf',
@@ -358,6 +359,7 @@ export const verifyClientEmailOtp = async (req, res) => {
         await sendMail({
         subject: "Client Service Agreement",
         to: client.email,
+        cc:[process.env.CC_MAIL_ID],
         html: accountTermConditionTemplate({as:"Client",name:client?.fullName }),
         attachments:[{
             filename: 'service_agreement.pdf',
