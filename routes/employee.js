@@ -3,6 +3,12 @@ const router = express.Router();
 import * as employeeController from '../controller/employee.js'
 import caseFormRoutes from "../routes/caseForm/empCaseFormRoutes.js"
 import { authEmployee } from '../middleware/authentication.js';
+import * as employeeCaseController from '../controller/case/employeeCaseController.js'
+import * as empPartnerController from '../controller/partner/empPartnerController.js'
+import * as empClientController from '../controller/client/empClientController.js'
+import * as empInvoiceController from '../controller/invoice/empInvoiceController.js'
+import * as empTeamController from '../controller/team/empTeamController.js'
+
 
 
 router.post("/signin",employeeController.employeeSignin)
@@ -17,28 +23,33 @@ router.get("/view/sathiTeam",authEmployee,employeeController.empViewSathiEmploye
 router.get("/download/sathiTeam",authEmployee,employeeController.empDownloadSathiEmployee)
 router.get("/operation/normalEmployee",authEmployee,employeeController.empOptGetNormalEmployee)
 router.get('/opeation/sale-employee',authEmployee,employeeController.empOpGetSaleEmployee)
+router.delete("/team/deleteTeamEmpAccount",authEmployee,empTeamController.deleteTeamEmpAccount)
+
 
 
 router.get("/all/dashboard",authEmployee,employeeController.allEmployeeDashboard)
 
 // case
-router.get("/viewAllCase",authEmployee,employeeController.viewAllEmployeeCase)
-router.get("/viewCaseById",authEmployee,employeeController.employeeViewCaseByIdBy)
-router.put("/changeCaseIsActive",authEmployee,employeeController.empSetIsActiveCase)
-router.post("/empAddCaseFile",authEmployee,employeeController.empAddCaseFile)
-router.get("/employeeFindCaseByFileNo",authEmployee,employeeController.employeeFindCaseByFileNo)
-router.put("/changeCaseStatus",authEmployee,employeeController.changeStatusEmployeeCase)
-router.put("/add_or_update_case_comment",authEmployee,employeeController.empAddOrUpdateCaseComment)
-router.put("/updateCaseById",authEmployee,employeeController.employeeUpdateCaseById)
-router.put("/operation/addReferenceCaseAndMarge",authEmployee,employeeController.empAddReferenceCaseAndMarge)
-router.put("/operation/removeReferenceCase",authEmployee,employeeController.empRemoveReferenceCase)
-router.post("/emp/empAddOrUpdatePayment",authEmployee,employeeController.empAddOrUpdatePayment)
+router.get("/case/viewAllCase",authEmployee,employeeCaseController.viewAllCase)
+router.get("/case/viewCaseById",authEmployee,employeeCaseController.viewCaseById)
+router.put("/case/updateCaseById",authEmployee,employeeCaseController.updateCaseById)
+router.put("/case/changeCaseIsActive",authEmployee,employeeCaseController.changeCaseIsActive)
+router.post("/case/addCaseFile",authEmployee,employeeCaseController.addCaseFile)
+router.get("/case/findCaseByFileNo",authEmployee,employeeCaseController.empFindCaseByFileNo)
+router.put("/case/updateCaseStatus",authEmployee,employeeCaseController.updateCaseStatus)
+router.put("/case/add_or_update_case_comment",authEmployee,employeeCaseController.empAddOrUpdateCaseComment)
+router.put("/case/addReferenceCaseAndMarge",authEmployee,employeeCaseController.addReferenceCaseAndMarge)
+router.put("/case/removeCaseReference",authEmployee,employeeCaseController.removeCaseReference)
+router.post("/case/addOrUpdateCasePayment",authEmployee,employeeCaseController.addOrUpdateCasePayment)
+router.delete("/case/deleteCaseById",authEmployee,employeeCaseController.deleteCaseById)
 // router.post('/opeation/empOpCreateOrUpdateCaseForm',authEmployee,employeeCaseFormController.empOpCreateOrUpdateCaseForm)
 // router.get('/opeation/empOpGetCaseFormById/:formId/:caseId',authEmployee,employeeCaseFormController.empOpGetCaseFormById)
 
 // case doc
 router.put("/unActiveDoc",authEmployee,employeeController.empUnactiveCaseDoc)
 router.get("/allUnactiveCaseDoc",authEmployee,employeeController.empAllUnactiveCaseDoc)
+router.delete("/case/deleteCaseDocById",authEmployee,employeeCaseController.deleteCaseDocById)
+
 
 
 // client
@@ -47,6 +58,8 @@ router.get("/viewClientById",authEmployee,employeeController.employeeViewClientB
 router.put("/changeClientStatus",authEmployee,employeeController.empSetIsActiveClient)
 router.put("/updateClient",authEmployee,employeeController.employeeEditClient)
 router.get("/download/allClient",authEmployee,employeeController.empClientDownload)
+router.delete("/client/deleteClientById",authEmployee,empClientController.deleteClientById)
+
 
 // partner
 router.get("/viewAllPartner",authEmployee,employeeController.employeeViewAllPartner)
@@ -55,6 +68,8 @@ router.put("/changePartnerStatus",authEmployee,employeeController.employeeSetIsA
 router.put("/updatePartnerProfile",authEmployee,employeeController.employeeupdateParnterProfile)
 router.put("/updatePartnerBankingDetails",authEmployee,employeeController.employeeUpdatePartnerBankingDetails)
 router.put("/operation/addPartnerRefToEmp",authEmployee,employeeController.empAddPartnerRefToEmp)
+router.delete("/partner/deletePartnerById",authEmployee,empPartnerController.deletePartnerById)
+
 
 
 
@@ -69,6 +84,8 @@ router.get("/emp/empDownloadAllInvoice",authEmployee,employeeController.empDownl
 router.put("/finance/unActiveInvoiceById",authEmployee,employeeController.employeeUnActiveInvoice)
 router.get("/finance/downloadInvoiceById",authEmployee,employeeController.employeeDownloadInvoiceById)
 router.delete("/finance/removeInvoiceById",authEmployee,employeeController.employeeRemoveInvoice)
+router.delete("/invoice/deleteInvoiceById",authEmployee,empInvoiceController.deleteInvoiceById)
+
 
 // for sales employee
 router.post("/addPartner",authEmployee,employeeController.saleEmployeeAddPartner)
