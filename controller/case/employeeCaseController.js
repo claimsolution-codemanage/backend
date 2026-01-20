@@ -14,6 +14,7 @@ import CaseComment from "../../models/caseComment.js";
 import Partner from "../../models/partner.js";
 import CaseMergeDetails from "../../models/caseMergeDetails.js";
 import CasePaymentDetails from "../../models/casePaymentDetails.js";
+import { caseUpdateStatusTemplate } from "../../utils/emailTemplates/caseUpdateStatusTemplate.js";
 
 export const viewAllCase = async (req, res) => {
    try {
