@@ -215,7 +215,7 @@ export const verifyEmailOtp = async (req, res) => {
     try {
       const date = new Date()
       const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
-      const replacements= { service_commission: `6%`, signed_on: today }
+      const replacements= { service_commission: `4%`, signed_on: today }
       const modifiedPdfBytes = await editServiceAgreement("agreement/partner.pdf", replacements);
 
       await sendMail({
@@ -509,7 +509,7 @@ export const signUpWithRequest = async (req, res) => {
     const noOfPartners = await Partner.countDocuments();
     const date = new Date()
     const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
-    const replacements= { service_commission: `6%`, signed_on: today }
+    const replacements= { service_commission: `4%`, signed_on: today }
     const modifiedPdfBytes = await editServiceAgreement("agreement/partner.pdf", replacements);
 
     await sendMail({
