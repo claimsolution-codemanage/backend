@@ -4,6 +4,8 @@ import { adminAddJob,adminDeleteJob } from '../controller/job.js';
 import { viewAllAdminComplaint,adminRemoveComplaintById } from '../controller/complaint.js';
 import { authAdmin } from '../middleware/authentication.js';
 import * as adminController from '../controller/admin.js'
+import adminLeadRoutes from "../routes/leads/adminLeadRoutes.js"
+
 
 
 // sub routes
@@ -158,6 +160,8 @@ router.put("/updateNotification",authAdmin,adminController.updateNotification)
 
 // use sub-routes 
 router.use("/caseForm",adminCaseFormRoutes)
+router.use("/lead",adminLeadRoutes)
+
 
 // router.get("/migrateGROForms",adminController.migrateGROForms)
 // router.get("/migrateOmbusmanForms",adminController.migrateOmbusmanForms)

@@ -9,8 +9,6 @@ export const authPartner = async(req,res)=>{
    if(!req.headers["x-auth-token"]) return {success:false,message:"UnAuth token"}
 
    const token = req.headers["x-auth-token"]
-   console.log("token",token);
-
    try {
       await jwt.verify(token,process.env.PARTNER_SECRET_KEY)
       const decode = await jwtDecode(token)
@@ -62,7 +60,6 @@ export const authEmployee = async (req, res, next) => {
       if (!employee?.isActive) return res.status(401).json({ success: false, message:Messages?.account_not_active})
       req.employee = employee
       req.user = payload
-      console.log(payload);
       next()
    } catch (error) {
       return res.status(401).json({ success: false, message:Messages?.access_denied})
