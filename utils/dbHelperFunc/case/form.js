@@ -157,7 +157,7 @@ export const handleCaseFinance = async ({
         }
 
         caseForm.billId = bill._id;
-        if (specialCase) {
+        if (specialCase && consultantFee) {
             sendServiceAgreement({
                 payload: {
                     mailTo: findCase?.clientObjId?.profile?.primaryEmail,

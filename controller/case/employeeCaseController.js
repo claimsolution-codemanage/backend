@@ -689,8 +689,12 @@ export const changeCaseIsActive = async (req, res) => {
 export const updateCaseStatus = async (req, res) => {
    try {
       const { employee } = req
-      if (employee?.type?.toLowerCase() != "operation") {
+      if (!["operation","sales"].includes(employee?.type?.toLowerCase())) {
          return res.status(400).json({ success: false, message: "Access denied" })
+      }
+
+      if(employee?.type?.toLowerCase()==="sales" && !["Accept","Under Expert Review","Processing","Query"]?.includes(req.body.status)){
+         return res.status(400).json({ success: false, message: "You don't have the permission" })
       }
 
       const { mailMethod = "", nextFollowUp = "" } = req.body
