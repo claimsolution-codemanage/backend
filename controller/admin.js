@@ -1337,7 +1337,7 @@ export const viewAllAdminCase = async (req, res) => {
 
       matchQuery.push({ isActive: type == "true" ? true : false })
       matchQuery.push(isReject == "true" ? { currentStatus: { $in: ["Reject"] } } : { currentStatus: { $nin: ["Reject"] } })
-      isClosed == "true" && matchQuery.push({ currentStatus: { $in: ["Closed"] } })
+      matchQuery.push(isClosed == "true" ? { currentStatus: { $in: ["Closed"] } } : { currentStatus: { $nin: ["Closed"] } })
       isWeeklyFollowUp == "true" && matchQuery.push({ currentStatus: { $nin: ["Closed", "Reject"] } })
 
       //  date-wise filter
