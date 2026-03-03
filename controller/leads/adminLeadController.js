@@ -182,13 +182,13 @@ export const addOrUpdateLead = async (req, res) => {
     for (let item of payload) {
       const { _id, assignedTo, followUpDate, data, order } = item;
 
-      const { error } = validateLeadData(data);
-      if (error) {
-        return res.status(400).json({
-          success: false,
-          message: error.details[0].message,
-        });
-      }
+      // const { error } = validateLeadData(data);
+      // if (error) {
+      //   return res.status(400).json({
+      //     success: false,
+      //     message: error.details[0].message,
+      //   });
+      // }
 
       if (_id) {
         // UPDATE

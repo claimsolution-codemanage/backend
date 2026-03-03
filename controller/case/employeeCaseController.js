@@ -37,7 +37,7 @@ export const viewAllCase = async (req, res) => {
 
       matchQuery.push({ isActive: Boolean(req.query.type == "true" ? true : false) })
       matchQuery.push(isReject == "true" ? { currentStatus: { $in: ["Reject"] } } : { currentStatus: { $nin: ["Reject"] } })
-      isClosed == "true" && matchQuery.push({ currentStatus: { $in: ["Closed"] } })
+      matchQuery.push(isClosed == "true" ? { currentStatus: { $in: ["Closed"] } } : { currentStatus: { $nin: ["Closed"] } })
       isWeeklyFollowUp == "true" && matchQuery.push({ currentStatus: { $nin: ["Closed", "Reject"] } })
 
 
