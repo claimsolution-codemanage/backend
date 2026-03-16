@@ -67,11 +67,13 @@ export default function leadQueryParser(req, res, next) {
         }
 
         else if (key === "assignedTo") {
-            where[key] = new Types.ObjectId(query[key])
+            const hasMultiOption = query[key]?.includes(",")
+            where[key] = hasMultiOption ? {$in:query[key]?.split(",")?.map(id=>new Types.ObjectId(id))} : new Types.ObjectId(query[key]) 
         }
         // 🔹 Normal Filter
         else {
-            where[`data.${key}`] = { $regex: query[key], $options: "i" };
+            const hasMultiOption = query[key]?.includes(",")
+            where[`data.${key}`] = hasMultiOption ? {$in:query[key]?.split(",")} : { $regex: query[key], $options: "i" };
         }
     });
 

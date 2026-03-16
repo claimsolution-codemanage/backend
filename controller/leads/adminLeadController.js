@@ -51,6 +51,31 @@ export const createColumn = async (req, res) => {
   }
 };
 
+export const updateColumn = async (req, res) => {
+    try {
+        const { employee } = req
+        let { _id,label, options,} = req.body;
+
+        if (!label || !_id) {
+            return res.status(400).json({ success: false, message: "Label is required" });
+        }
+
+        const exists = await LeadColumnModel.findById(_id);
+        if (!exists) {
+            return res.status(400).json({ success: false, message: "Column not exists", });
+        }
+
+       exists.label = label
+       exists.options = options ?? []
+       await exists.save()
+
+        return res.status(201).json({ success: true, message: "Column updated successfully", });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: "Something went wrong",error:err?.message });
+    }
+};
+
 export const allLeadColumns = async (req, res) => {
     try {
         const result = await LeadColumnModel.find({isActive:true}).sort({order:1})

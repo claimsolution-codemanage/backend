@@ -6,6 +6,7 @@ import leadQueryParser from '../../middleware/leadFilterMiddleware.js';
 
 router.use(authAdmin)
 router.post('/add-column',authAdmin,adminLeadController.createColumn)
+router.put('/update-column',authAdmin,adminLeadController.createColumn)
 router.get('/all-lead-column',authAdmin,adminLeadController.allLeadColumns)
 router.post('/add-lead',authAdmin,adminLeadController.addNewLead)
 router.put('/update-lead',authAdmin,adminLeadController.updateLead)
