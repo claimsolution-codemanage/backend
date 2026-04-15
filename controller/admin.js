@@ -990,7 +990,7 @@ export const changeStatusAdminCase = async (req, res) => {
       const { error } = validateUpdateAdminCase(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      const {mailMethod="",nextFollowUp=""} = req.body
+      const { mailMethod = "", nextFollowUp = "" } = req.body
 
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
       const statusRemark = req.body.remark
@@ -1028,7 +1028,7 @@ export const changeStatusAdminCase = async (req, res) => {
 
       const subject = "Update on Your Case – Status Changed"
       // client
-      if (updateCase?.clientObjId?.profile?.primaryEmail && (["client","both"]?.includes(mailMethod?.toLowerCase()))) {
+      if (updateCase?.clientObjId?.profile?.primaryEmail && (["client", "both"]?.includes(mailMethod?.toLowerCase()))) {
          sendMail({
             to: updateCase?.clientObjId?.profile?.primaryEmail,
             subject,
@@ -1036,7 +1036,7 @@ export const changeStatusAdminCase = async (req, res) => {
          })
       }
       // partner
-      if (updateCase?.partnerObjId?.profile?.primaryEmail && (["partner","both"]?.includes(mailMethod?.toLowerCase()))) {
+      if (updateCase?.partnerObjId?.profile?.primaryEmail && (["partner", "both"]?.includes(mailMethod?.toLowerCase()))) {
          sendMail({
             to: updateCase?.partnerObjId?.profile?.primaryEmail,
             subject,
@@ -1387,8 +1387,8 @@ export const viewAllAdminCase = async (req, res) => {
                "empObjId": 1,
                "partnerObjId": 1,
                "clientObjId": 1,
-                "nextFollowUp":1,
-               "lastStatusDate":1
+               "nextFollowUp": 1,
+               "lastStatusDate": 1
             }
          },
          {
@@ -1547,9 +1547,9 @@ export const viewAllAdminCase = async (req, res) => {
             // }
          ] : []),
          // { '$sort': { 'createdAt': -1 } },
-            ...(isWeeklyFollowUp == "true" 
-            ? [{ '$sort': { 'nextFollowUp': 1 } }] 
-            :[{ '$sort': { 'createdAt': -1 } }]),
+         ...(isWeeklyFollowUp == "true"
+            ? [{ '$sort': { 'nextFollowUp': 1 } }]
+            : [{ '$sort': { 'createdAt': -1 } }]),
          {
             "$facet": {
                "cases": [
@@ -3365,11 +3365,11 @@ export const adminShareClientToSaleEmp = async (req, res) => {
 export const adminAddOrUpdateCaseComment = async (req, res) => {
    try {
       const { admin } = req
-      const { comment,caseCommentId, isPrivate } = req.body
+      const { comment, caseCommentId, isPrivate } = req.body
       if (!comment?.trim()) return res.status(400).json({ success: false, message: "Case Comment required" })
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
-      if(caseCommentId && !validMongooseId(caseCommentId)) return res.status(400).json({ success: false, message: "Not a valid comment ID" })
-         
+      if (caseCommentId && !validMongooseId(caseCommentId)) return res.status(400).json({ success: false, message: "Not a valid comment ID" })
+
 
       const getCase = await Case.findById(req.body._id,)
       if (!getCase) return res.status(400).json({ success: false, message: "Case not found" })
@@ -5346,7 +5346,7 @@ export const adminCreateInvoice = async (req, res) => {
       const { error } = validateInvoice(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      if (caseId && clientId  && caseId!=="null" && clientId!=="null") {
+      if (caseId && clientId && caseId !== "null" && clientId !== "null") {
          if (!validMongooseId(clientId) || !validMongooseId(caseId)) return res.status(400).json({ success: false, message: "caseId and clientId must be valid" })
          getClient = await Client.findById(clientId)
          if (!getClient) return res.status(400).json({ success: false, message: "Client not found" })
@@ -5788,63 +5788,172 @@ export const adminSyncModal = async (req, res) => {
    }
 }
 
-export const createOrUpdateStatement = async (req, res) => {
+export const bulkCreateOrUpdateStatement = async (req, res) => {
    try {
       const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
-      const { _id, partnerEmail, empEmail, partnerId, empId } = req.body
+      const { statements = [] } = req.body
 
-      let isExistStatement = {}
-      if (_id) {
-         isExistStatement = await Statement.findById(_id)
-         if (!isExistStatement) {
-            return res.status(400).json({ success: false, message: "Statment is not found" })
-         }
-      } else {
-         if (partnerEmail || partnerId) {
-            let filter = {}
-            if (partnerEmail) { filter.email = { $regex: partnerEmail, $options: "i" } }
-            if (partnerId) { filter._id = partnerId }
-            const findPartner = await Partner.findOne({ $or: [filter] })
-            if (!findPartner) return res.status(400).json({ success: false, message: "Partner is not found" })
-            req.body.partnerId = findPartner._id?.toString()
-            req.body.branchId = findPartner?.branchId
-         } else if (empEmail || empId) {
-            let filter = {}
-            if (empEmail) { filter.email = { $regex: empEmail, $options: "i" } }
-            if (empId) { filter._id = empId }
-            const findEmp = await Employee.findOne({ $or: [filter] })
-            if (!findEmp) return res.status(400).json({ success: false, message: "Employee is not found" })
-            req.body.empId = findEmp._id?.toString()
-            req.body.branchId = findEmp?.branchId
-         }
-         isExistStatement = new Statement({ isActive: true })
+      if (!Array.isArray(statements) || !statements.length) {
+         return res.status(400).json({ success: false, message: "No statements provided" })
       }
 
-      const updateKeys = ["empId", "partnerId", "caseLogin", "policyHolder", "fileNo", "policyNo", "insuranceCompanyName"
-         , "claimAmount", "approvedAmt", "constultancyFee", "TDS", "modeOfLogin", "payableAmt", "utrDetails", "fileUrl", "branchId"]
+      // 🔹 Helpers
+      const clean = (val) => (val !== "" && val !== null && val !== undefined ? val : undefined)
+      const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id)
 
-      updateKeys.forEach(key => {
-         if (req.body[key]) {
-            isExistStatement[key] = req.body[key]
-         }
+      // 🔹 Step 1: Collect identifiers
+      const partnerEmails = new Set()
+      const empEmails = new Set()
+      const partnerIds = new Set()
+      const empIds = new Set()
+
+      statements.forEach(s => {
+         if (clean(s.partnerEmail)) partnerEmails.add(s.partnerEmail.toLowerCase())
+         if (clean(s.empEmail)) empEmails.add(s.empEmail.toLowerCase())
+         if (clean(s.partnerId) && isValidObjectId(s.partnerId)) partnerIds.add(s.partnerId)
+         if (clean(s.empId) && isValidObjectId(s.empId)) empIds.add(s.empId)
       })
 
-      await isExistStatement.save()
-      return res.status(200).json({ success: true, message: `Successfully ${_id ? "update" : "create"} statement` });
+      // 🔹 Step 2: Fetch in bulk
+      const partners = await Partner.find({
+         $or: [
+            { email: { $in: [...partnerEmails] } },
+            { _id: { $in: [...partnerIds] } }
+         ]
+      })
+
+      const employees = await Employee.find({
+         $or: [
+            { email: { $in: [...empEmails] } },
+            { _id: { $in: [...empIds] } }
+         ]
+      })
+
+      // 🔹 Step 3: Create lookup maps
+      const partnerMap = new Map()
+      partners.forEach(p => {
+         if (p.email) partnerMap.set(p.email.toLowerCase(), p)
+         partnerMap.set(p._id.toString(), p)
+      })
+
+      const empMap = new Map()
+      employees.forEach(e => {
+         if (e.email) empMap.set(e.email.toLowerCase(), e)
+         empMap.set(e._id.toString(), e)
+      })
+
+      // 🔹 Step 4: Prepare bulk ops
+      const bulkOps = []
+      const failed = []
+
+      const updateKeys = [
+         "caseLogin", "policyHolder", "fileNo", "policyNo",
+         "insuranceCompanyName", "claimAmount", "approvedAmt",
+         "constultancyFee", "TDS", "modeOfLogin",
+         "payableAmt", "utrDetails", "fileUrl"
+      ]
+
+      for (let s of statements) {
+         try {
+            let doc = {}
+
+            // 🔸 Clean IDs
+            const partnerEmail = clean(s.partnerEmail)?.toLowerCase()
+            const empEmail = clean(s.empEmail)
+            const partnerId = clean(s.partnerId)
+            const empId = clean(s.empId)
+
+            // 🔸 Resolve Partner
+            if (partnerEmail || partnerId) {
+               const partner =
+                  partnerMap.get(partnerEmail) ||
+                  partnerMap.get(partnerId)
+
+               if (!partner) {
+                  failed.push({ statement: s, reason: "Partner not found" })
+                  continue
+               }
+
+               doc.partnerId = partner._id
+               doc.branchId = partner.branchId
+            }
+
+            // 🔸 Resolve Employee
+            if (empEmail || empId) {
+               const emp =
+                  empMap.get(empEmail?.toLowerCase()) ||
+                  empMap.get(empId)
+
+               if (!emp) {
+                  failed.push({ statement: s, reason: "Employee not found" })
+                  continue
+               }
+
+               doc.empId = emp._id
+               doc.branchId = emp.branchId
+            }
+
+            // 🔸 Assign safe fields
+            updateKeys.forEach(key => {
+               if (clean(s[key]) !== undefined) {
+                  doc[key] = s[key]
+               }
+            })
+
+            // 🔸 Default branch
+            if (!doc.branchId) {
+               doc.branchId = employee?.branchId
+            }
+
+            // 🔸 Update vs Insert
+            if (clean(s._id) && isValidObjectId(s._id)) {
+               bulkOps.push({
+                  updateOne: {
+                     filter: { _id: s._id },
+                     update: { $set: doc }
+                  }
+               })
+            } else {
+               bulkOps.push({
+                  insertOne: {
+                     document: {
+                        ...doc,
+                        isActive: true
+                     }
+                  }
+               })
+            }
+
+         } catch (err) {
+            failed.push({ statement: s, reason: err.message })
+         }
+      }
+
+      // 🔹 Step 5: Execute bulk
+      if (bulkOps.length) {
+         await Statement.bulkWrite(bulkOps)
+      }
+
+      return res.status(200).json({
+         success: true,
+         message: "Bulk operation completed",
+         processed: bulkOps.length,
+         failedCount: failed.length,
+         failed
+      })
 
    } catch (error) {
-      console.log("createOrUpdateStatement in error:", error);
-      res.status(500).json({ success: false, message: "Oops! something went wrong", error: error });
-
+      console.log("bulkCreateOrUpdateStatement error:", error)
+      return res.status(500).json({
+         success: false,
+         message: "Something went wrong",
+         error: error.message
+      })
    }
 }
+
 
 export const getStatement = async (req, res) => {
    try {
