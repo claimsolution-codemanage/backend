@@ -177,27 +177,26 @@ export const signUpWithRequest = async (req, res) => {
       const hashedPassword = await bcrypt.hash(password, 10);
       const date = new Date()
       const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
-      const replacements= { commission: `20%`, signed_on: today }
-      
+      const replacements = { commission: `20%`, signed_on: today }
+
       // ✅ Generate agreement with timestamp
       const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", replacements);
-        await sendMail({
+      await sendMail({
         subject: "Client Service Agreement",
         to: clientEmail,
-        cc:[process.env.CC_MAIL_ID],
-        html: accountTermConditionTemplate({as:"Client",name:existingClient?.fullName }),
-        attachments:[{
-            filename: 'service_agreement.pdf',
-            content: modifiedPdfBytes,
-            encoding: 'base64'
+        cc: [process.env.CC_MAIL_ID],
+        html: accountTermConditionTemplate({ as: "Client", name: existingClient?.fullName }),
+        attachments: [{
+          filename: 'service_agreement.pdf',
+          content: modifiedPdfBytes,
+          encoding: 'base64'
         }]
       });
 
       // ✅ Consultant code
       const noOfClients = await Client.countDocuments();
-      const consultantCode = `${date?.getFullYear()}${
-        date?.getMonth() + 1 < 10 ? `0${date?.getMonth() + 1}` : date?.getMonth() + 1
-      }${date?.getDate()}${noOfClients + 1}`;
+      const consultantCode = `${date?.getFullYear()}${date?.getMonth() + 1 < 10 ? `0${date?.getMonth() + 1}` : date?.getMonth() + 1
+        }${date?.getDate()}${noOfClients + 1}`;
 
       // ✅ Create client
       const newClient = new Client({
@@ -352,27 +351,26 @@ export const verifyClientEmailOtp = async (req, res) => {
     try {
       const date = new Date()
       const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
-      const replacements= { commission: `20%`, signed_on: today }
+      const replacements = { commission: `20%`, signed_on: today }
 
       // ✅ Generate agreement with timestamp
       const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", replacements);
-        await sendMail({
+      await sendMail({
         subject: "Client Service Agreement",
         to: client.email,
-        cc:[process.env.CC_MAIL_ID],
-        html: accountTermConditionTemplate({as:"Client",name:client?.fullName }),
-        attachments:[{
-            filename: 'service_agreement.pdf',
-            content: modifiedPdfBytes,
-            encoding: 'base64'
+        cc: [process.env.CC_MAIL_ID],
+        html: accountTermConditionTemplate({ as: "Client", name: client?.fullName }),
+        attachments: [{
+          filename: 'service_agreement.pdf',
+          content: modifiedPdfBytes,
+          encoding: 'base64'
         }]
       });
 
       // ✅ Generate consultant code
       const noOfClients = await Client.countDocuments();
-      const consultantCode = `${date.getFullYear()}${
-        date.getMonth() + 1 < 10 ? `0${date.getMonth() + 1}` : date.getMonth() + 1
-      }${date.getDate()}${noOfClients + 1}`;
+      const consultantCode = `${date.getFullYear()}${date.getMonth() + 1 < 10 ? `0${date.getMonth() + 1}` : date.getMonth() + 1
+        }${date.getDate()}${noOfClients + 1}`;
 
       // ✅ Update client profile
       const updatedClient = await Client.findByIdAndUpdate(
@@ -384,6 +382,8 @@ export const verifyClientEmailOtp = async (req, res) => {
             acceptClientTls: true,
             isActive: true,
             isProfileCompleted: false,
+            lastLogin: date,
+            recentLogin: date,
             tlsUrl: "",
             "profile.profilePhoto": "",
             "profile.consultantName": client.fullName,
@@ -669,7 +669,7 @@ export const addNewClientCase = async (req, res) => {
     // req.body.acceptPayment = true
     // req.body.pendingPayment = true
     req.body.processSteps = []
-    const newAddCase = new Case({ ...req.body, caseDocs: [],branchId:client?.branchId })
+    const newAddCase = new Case({ ...req.body, caseDocs: [], branchId: client?.branchId })
     const noOfCase = await Case.count()
     newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
     await newAddCase.save()
@@ -678,7 +678,7 @@ export const addNewClientCase = async (req, res) => {
     })
     await defaultStatus.save()
 
-//  add case doc
+    //  add case doc
     let bulkOps = [];
     (req?.body?.caseDocs || [])?.forEach((doc) => {
       bulkOps.push({
@@ -748,7 +748,7 @@ export const clientUpdateCaseById = async (req, res) => {
     // })
 
 
-    const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body,caseDocs:[] } }, { new: true })
+    const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body, caseDocs: [] } }, { new: true })
     return res.status(200).json({ success: true, message: "Successfully update case", data: updateCase });
 
   } catch (error) {
@@ -762,7 +762,7 @@ export const clientUpdateCaseById = async (req, res) => {
 
 export const viewClientCaseById = async (req, res) => {
   try {
-    const {_id} = req.query
+    const { _id } = req.query
     const verify = await authClient(req, res)
     if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
 
@@ -771,7 +771,7 @@ export const viewClientCaseById = async (req, res) => {
     if (!client?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
 
     //  console.log("query",query?.query);
-if (!validMongooseId(_id)) {
+    if (!validMongooseId(_id)) {
       return res.status(400).json({ success: false, message: "Not a valid id" });
     }
 
@@ -859,18 +859,18 @@ if (!validMongooseId(_id)) {
           partnerReferenceCaseDetails: 0,
           caseCommit: 0
         }
-      },  {
-            $lookup: {
-               from: "case_forms",
-               localField: "_id",
-               foreignField: "caseId",
-               pipeline: [
-                  { $match: { isActive: true } },
-                  { $project: { formType: 1,caseId:1 } },
-               ],
-               as: "case_forms"
-            }
-         },
+      }, {
+        $lookup: {
+          from: "case_forms",
+          localField: "_id",
+          foreignField: "caseId",
+          pipeline: [
+            { $match: { isActive: true } },
+            { $project: { formType: 1, caseId: 1 } },
+          ],
+          as: "case_forms"
+        }
+      },
     ]);
 
     if (!caseData) {
@@ -915,14 +915,14 @@ export const viewClientAllCase = async (req, res) => {
     const aggregationPipeline = [
       { $match: query?.query }, // Match the documents based on the query
       {
-         $group: {
-            _id: null,
-            totalAmtSum: { $sum: "$claimAmount" }, // Calculate the sum of totalAmt
-         }
+        $group: {
+          _id: null,
+          totalAmtSum: { $sum: "$claimAmount" }, // Calculate the sum of totalAmt
+        }
       }
-   ];
-   const aggregateResult = await Case.aggregate(aggregationPipeline);
-    return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase,totalAmt:aggregateResult });
+    ];
+    const aggregateResult = await Case.aggregate(aggregationPipeline);
+    return res.status(200).json({ success: true, message: "get case data", data: getAllCase, noOfCase: noOfCase, totalAmt: aggregateResult });
 
   } catch (error) {
     console.log("get all client case in error:", error);
@@ -1038,123 +1038,9 @@ export const clientAddCaseFile = async (req, res) => {
   }
 }
 
-// export const clientDashboard = async (req, res) => {
-//   try {
-//     const year = Number(req.query.year || new Date().getFullYear())
-//     const verify = await authClient(req, res);
-//     if (!verify.success) return res.status(401).json({ success: false, message: verify.message });
-
-//     const client = await Client.findById(req?.user?._id);
-//     if (!client) return res.status(401).json({ success: false, message: "User account not found" });
-//     if (!client?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
-
-//     const clientNeccessaryData = {
-//       lastLogin: client?.lastLogin,
-//       recentLogin: client?.recentLogin,
-//       fullName:client?.fullName
-//     }
-
-//     let currentYear = new Date().getFullYear()
-//     const currentYearStart = new Date(new Date(new Date().setFullYear(year ||  currentYear)).getFullYear(), 0, 1); // Start of the current year
-//     const endYearStart = new Date(new Date(new Date().setFullYear((year ||  currentYear)+1)).getFullYear(), 0, 1); // Start of the current year
-//     const currentMonth = year==currentYear ?  new Date().getMonth() + 1 : 12;
-//     const allMonths = [];
-//     for (let i = 0; i < currentMonth; i++) {
-//       allMonths.push({
-//         _id: {
-//           year: year || new Date().getFullYear(),
-//           month: i + 1
-//         },
-//         totalCases: 0
-//       });
-//     }
- 
-//     console.log("start",currentYearStart,endYearStart);
-    
-    
-//     const pieChartData = await Case.aggregate([
-//       {
-//         '$match': {
-//           'createdAt': { $gte: currentYearStart },
-//           'createdAt': { $lte: endYearStart },
-//           'clientObjId': new Types.ObjectId(req?.user?._id), // Assuming 'clientId' is the field to match
-//           'isActive': true,
-//           'isPartnerReferenceCase': false,
-//           'isEmpSaleReferenceCase': false,
-//         }
-//       },
-//       {
-//         '$group': {
-//           '_id': '$currentStatus',
-//           'totalCases': {
-//             '$sum': 1
-//           },
-//           'totalCaseAmount': {
-//             '$sum': '$claimAmount' // Assuming 'amount' is the field to sum
-//           }
-//         }
-//       },
-//       {
-//         '$group': {
-//           '_id': null,
-//           'totalCase': {
-//             '$sum': '$totalCases'
-//           },
-//           'totalCaseAmount': {
-//             '$sum': '$totalCaseAmount'
-//           },
-//           'allCase': {
-//             '$push': '$$ROOT'
-//           }
-//         }
-//       }
-//     ]);
-
-//     const graphData = await Case.aggregate([
-//       {
-//         $match: {
-//           'createdAt': { $gte: currentYearStart },
-//           'createdAt': { $lte: endYearStart },
-//           'clientObjId': new Types.ObjectId(req?.user?._id),
-//           'isActive': true,
-//           'isPartnerReferenceCase': false,
-//           'isEmpSaleReferenceCase': false,
-//         }
-//       },
-//       {
-//         $group: {
-//           _id: {
-//             year: { $year: '$createdAt' },
-//             month: { $month: '$createdAt' }
-//           },
-//           totalCases: { $sum: 1 }
-//         }
-//       },
-//       {
-//         $sort: { '_id.year': 1, '_id.month': 1 }
-//       },])
-
-//     // Merge aggregated data with the array representing all months
-//     const mergedGraphData = allMonths.map((month) => {
-//       const match = graphData.find((data) => {
-//         return data._id.year === month._id.year && data._id.month === month._id.month;
-//       });
-//       return match || month;
-//     });
-
-//     return res.status(200).json({ success: true, message: "get dashboard data", graphData: mergedGraphData, pieChartData, clientNeccessaryData });
-
-//   } catch (error) {
-//     console.log("get dashbaord data error:", error);
-//     res.status(500).json({ success: false, message: "Internal server error", error: error });
-
-//   }
-// };
-
 
 export const clientDashboard = async (req, res) => {
   try {
-    // const year = Number(req.query.year || new Date().getFullYear());
 
     const verify = await authClient(req, res);
     if (!verify.success)
@@ -1173,31 +1059,31 @@ export const clientDashboard = async (req, res) => {
       fullName: client?.fullName,
     };
 
-      const year = Number(req.query.year || new Date().getFullYear());
-      const startYear = Number(year || 2024); // default April 2024
-      const endYear = Number(startYear + 1);     // default March 2035
+    const year = Number(req.query.year || new Date().getFullYear());
+    const startYear = Number(year || 2024); // default April 2024
+    const endYear = Number(startYear + 1);     // default March 2035
 
-      // Dates range
-      const financialYearStart = new Date(startYear, 3, 1); // April 1 startYear
-      const financialYearEnd = new Date(endYear, 2, 31, 23, 59, 59, 999); // March 31 endYear
-      const currentYear = new Date().getFullYear();
+    // Dates range
+    const financialYearStart = new Date(startYear, 3, 1); // April 1 startYear
+    const financialYearEnd = new Date(endYear, 2, 31, 23, 59, 59, 999); // March 31 endYear
+    const currentYear = new Date().getFullYear();
 
 
-      const allMonths = [];
-      const currentMonth = new Date().getMonth();
-      const totalMonths = currentYear == year && currentMonth > 2 ? currentMonth - 2 : (endYear - startYear - 1) * 12 + 12;
+    const allMonths = [];
+    const currentMonth = new Date().getMonth();
+    const totalMonths = currentYear == year && currentMonth > 2 ? currentMonth - 2 : (endYear - startYear - 1) * 12 + 12;
 
-      for (let i = 0; i < totalMonths; i++) {
-         const date = new Date(financialYearStart);
-         date.setMonth(date.getMonth() + i);
-         allMonths.push({
-            _id: {
-               year: date.getFullYear(),
-               month: date.getMonth() + 1
-            },
-            totalCases: 0
-         });
-      }
+    for (let i = 0; i < totalMonths; i++) {
+      const date = new Date(financialYearStart);
+      date.setMonth(date.getMonth() + i);
+      allMonths.push({
+        _id: {
+          year: date.getFullYear(),
+          month: date.getMonth() + 1
+        },
+        totalCases: 0
+      });
+    }
 
     // Get case distribution by currentStatus (for pie chart)
     const pieChartData = await Case.aggregate([

@@ -1,6 +1,7 @@
 import { validMongooseId } from "../../utils/helper.js";
 import LeadRowModel from "../../models/leads/leadRow.js";
 import LeadColumnModel from "../../models/leads/leadColumn.js";
+import LeadFollowUp from "../../models/leads/leadFollowUpModel.js";
 import { validateLeadData } from "../../utils/validator/leads/validateLeadData.js";
 
 const generateKey = (label) =>
@@ -59,7 +60,7 @@ export const createColumn = async (req, res) => {
 export const updateColumn = async (req, res) => {
     try {
         const { employee } = req
-        let { _id,label, options,} = req.body;
+        let { _id, label, options, } = req.body;
 
         if (employee?.type?.toLowerCase() != "operation") {
             return res.status(400).json({ success: false, message: "Access denied" })
@@ -74,14 +75,14 @@ export const updateColumn = async (req, res) => {
             return res.status(400).json({ success: false, message: "Column not exists", });
         }
 
-       exists.label = label
-       exists.options = options ?? []
-       await exists.save()
+        exists.label = label
+        exists.options = options ?? []
+        await exists.save()
 
         return res.status(201).json({ success: true, message: "Column updated successfully", });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ success: false, message: "Something went wrong",error:err?.message });
+        res.status(500).json({ success: false, message: "Something went wrong", error: err?.message });
     }
 };
 
@@ -225,14 +226,6 @@ export const addOrUpdateLead = async (req, res) => {
         for (let item of payload) {
             const { _id, assignedTo, followUpDate, data, order } = item;
 
-            // const { error } = validateLeadData(data);
-            // if (error) {
-            //     return res.status(400).json({
-            //         success: false,
-            //         message: error.details[0].message,
-            //     });
-            // }
-
             if (_id) {
                 // UPDATE
                 updateOperations.push({
@@ -292,8 +285,6 @@ export const addOrUpdateLead = async (req, res) => {
     }
 };
 
-
-
 export const deleteLead = async (req, res) => {
     try {
         const { employee } = req
@@ -305,6 +296,7 @@ export const deleteLead = async (req, res) => {
         if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Lead ID is not valid" })
         const isExist = await LeadRowModel.findByIdAndDelete(_id)
         if (!isExist) return res.status(400).json({ success: false, message: "Lead not found", });
+        await LeadFollowUp.deleteMany({ leadRowId: _id })
 
         return res.status(200).json({ success: true, message: "Successfully deleted lead" });
     } catch (error) {
@@ -312,3 +304,151 @@ export const deleteLead = async (req, res) => {
         return res.status(500).json({ success: false, message: "Internal server error", error: error });
     }
 }
+
+
+// Main API function
+export const addOrUpdateLeadFollowUp = async (req, res) => {
+    try {
+        const { employee } = req;
+        const payload = req.body;
+
+        const isFullAccess =
+            employee?.designation?.toLowerCase() === "manager" &&
+            employee?.type?.toLowerCase() === "operation";
+
+        const { lead = {}, followup = {} } = payload;
+
+        // ---------------- VALIDATION ----------------
+        if (!followup.mode || !followup.summary || !followup.nextFollowUpDate) {
+            return res.status(400).json({
+                success: false,
+                message: "Required: mode, summary, nextFollowUpDate"
+            });
+        }
+
+        let leadRowId = lead?._id;
+
+        // ---------------- LEAD UPSERT ----------------
+        let leadData;
+
+        if (leadRowId) {
+            leadData = await LeadRowModel.findByIdAndUpdate(
+                leadRowId,
+                {
+                    $set: {
+                        "data.next_follow_up_date": followup.nextFollowUpDate,
+                        updatedBy: employee?._id,
+                        updatedAt: new Date()
+                    }
+                },
+                { new: true }
+            );
+        } else {
+            if (!lead?.data) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Lead data required for new lead"
+                });
+            }
+
+            leadData = await LeadRowModel.create({
+                data: {
+                    ...lead.data,
+                    next_follow_up_date: followup.nextFollowUpDate
+                },
+                assignedTo: isFullAccess ? lead.assignedTo || null : employee?._id,
+                followUpDate: lead?.followUpDate || null,
+                order: lead?.order || 1,
+                branchId: employee?.branchId,
+                createdBy: employee?._id,
+                createdByModel: "Employee",
+                updatedBy: employee?._id,
+                updatedByModel: "Employee"
+            });
+
+            leadRowId = leadData._id;
+        }
+
+        // ---------------- FOLLOWUP UPSERT ----------------
+        const followUpPayload = {
+            leadRowId,
+            dateTime: followup.dateTime || new Date(),
+            mode: followup.mode,
+            summary: followup.summary,
+            nextFollowUpDate: followup.nextFollowUpDate,
+            isActive: true,
+            branchId: employee?.branchId,
+            updatedBy: employee?._id,
+            updatedAt: new Date()
+        };
+
+        let savedFollowUp;
+
+        if (followup?._id) {
+            savedFollowUp = await LeadFollowUp.findByIdAndUpdate(
+                followup._id,
+                { $set: followUpPayload },
+                { new: true }
+            );
+        } else {
+            savedFollowUp = await LeadFollowUp.create({
+                ...followUpPayload,
+                createdBy: employee?._id,
+                createdByModel: "Employee"
+            });
+        }
+
+        // ---------------- RESPONSE ----------------
+        return res.status(200).json({
+            success: true,
+            message: followup?._id
+                ? "Follow-up updated successfully"
+                : "Follow-up added successfully",
+            data: {
+                lead: leadData,
+                followUp: savedFollowUp
+            }
+        });
+
+    } catch (error) {
+        console.error("addOrUpdateLeadFollowUp error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+            error: error.message
+        });
+    }
+};
+
+// Get all follow-ups for a specific lead
+export const getLeadFollowUps = async (req, res) => {
+    try {
+        const { leadId } = req.params;
+
+        if (!leadId) {
+            return res.status(400).json({
+                success: false,
+                message: "lead Id is required"
+            });
+        }
+
+        // Fetch all follow-ups for this lead, sorted by dateTime descending (newest first)
+        const followUps = await LeadFollowUp.find({
+            leadRowId: leadId,
+            isActive: true
+        }).sort({ dateTime: -1 });
+
+        return res.status(200).json({
+            success: true,
+            data: followUps
+        });
+
+    } catch (error) {
+        console.error("getLeadFollowUps error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+            error: error.message
+        });
+    }
+};
