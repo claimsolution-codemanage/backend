@@ -44,6 +44,7 @@ export const editServiceAgreement = async (path, replacements = {}) => {
     for (const rule of rules) {
       const newText = text.replace(rule.pattern, rule.replacement);
       if (newText !== text) {
+        console.log("newText", newText)
         text = newText;
         modified = true;
       }

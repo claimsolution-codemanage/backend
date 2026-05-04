@@ -209,8 +209,8 @@ export const viewAllCase = async (req, res) => {
                "empObjId": 1,
                "partnerObjId": 1,
                "clientObjId": 1,
-               "nextFollowUp":1,
-               "lastStatusDate":1
+               "nextFollowUp": 1,
+               "lastStatusDate": 1
             }
          },
          {
@@ -309,10 +309,10 @@ export const viewAllCase = async (req, res) => {
                }
             }
          ] : []),
-         ...(isWeeklyFollowUp == "true" 
-            ? [{ '$sort': { 'nextFollowUp': 1 } }] 
-            :[{ '$sort': { 'createdAt': -1 } }]),
-         
+         ...(isWeeklyFollowUp == "true"
+            ? [{ '$sort': { 'nextFollowUp': 1 } }]
+            : [{ '$sort': { 'createdAt': -1 } }]),
+
          {
             "$facet": {
                "cases": [
@@ -689,11 +689,11 @@ export const changeCaseIsActive = async (req, res) => {
 export const updateCaseStatus = async (req, res) => {
    try {
       const { employee } = req
-      if (!["operation","sales"].includes(employee?.type?.toLowerCase())) {
+      if (!["operation", "sales"].includes(employee?.type?.toLowerCase())) {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
 
-      if(employee?.type?.toLowerCase()==="sales" && !["Accept","Under Expert Review","Processing","Query"]?.includes(req.body.status)){
+      if (employee?.type?.toLowerCase() === "sales" && !["Accept", "Under Expert Review", "Processing", "Query"]?.includes(req.body.status)) {
          return res.status(400).json({ success: false, message: "You don't have the permission" })
       }
 
@@ -764,24 +764,27 @@ export const updateCaseStatus = async (req, res) => {
 export const empAddOrUpdateCaseComment = async (req, res) => {
    try {
       const { employee } = req
-      const { comment,caseCommentId, isPrivate } = req.body
+      const { comment, caseCommentId, isPrivate, attachments } = req.body
 
       if (!comment) return res.status(400).json({ success: false, message: "Case Comment required" })
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-      if(caseCommentId && !validMongooseId(caseCommentId)) return res.status(400).json({ success: false, message: "Not a valid comment ID" })
+      if (caseCommentId && !validMongooseId(caseCommentId)) return res.status(400).json({ success: false, message: "Not a valid comment ID" })
 
 
       const getCase = await Case.findById(req.body._id)
       if (!getCase) return res.status(400).json({ success: false, message: "Case not found" })
 
-      if(caseCommentId){
-         await CaseComment.findByIdAndUpdate(caseCommentId,{$set:{
-         message: comment?.trim(),
-         isPrivate: isPrivate ?? false,
-         employeeId: req?.user?._id,
-         }})
-      return res.status(200).json({ success: true, message: "Successfully updated case comment" });
+      if (caseCommentId) {
+         await CaseComment.findByIdAndUpdate(caseCommentId, {
+            $set: {
+               message: comment?.trim(),
+               isPrivate: isPrivate ?? false,
+               employeeId: req?.user?._id,
+               attachments: attachments
+            }
+         })
+         return res.status(200).json({ success: true, message: "Successfully updated case comment" });
       }
 
       const newComment = new CaseComment({
@@ -792,6 +795,7 @@ export const empAddOrUpdateCaseComment = async (req, res) => {
          isPrivate: isPrivate ?? false,
          caseId: getCase?._id?.toString(),
          employeeId: req?.user?._id,
+         attachments: attachments
 
       })
       await newComment.save()
@@ -1092,70 +1096,95 @@ export const empFindCaseByFileNo = async (req, res) => {
 }
 
 export const deleteCaseById = async (req, res) => {
-    try {
-        const { employee } = req
-        if (employee?.designation?.toLowerCase() != "manager" || employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
+   try {
+      const { employee } = req
+      if (employee?.designation?.toLowerCase() != "manager" || employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
 
-        const { caseId } = req?.query
-        if (!caseId) return res.status(400).json({ success: false, message: "caseId id required" })
-        if (!validMongooseId(caseId)) return res.status(400).json({ success: false, message: "Not a valid caseId" })
+      const { caseId } = req?.query
+      if (!caseId) return res.status(400).json({ success: false, message: "caseId id required" })
+      if (!validMongooseId(caseId)) return res.status(400).json({ success: false, message: "Not a valid caseId" })
 
-        const deleteCaseById = await Case.findByIdAndDelete(caseId);
-        if (!deleteCaseById) return res.status(404).json({ success: false, message: "Case not found" })
+      const deleteCaseById = await Case.findByIdAndDelete(caseId);
+      if (!deleteCaseById) return res.status(404).json({ success: false, message: "Case not found" })
 
-        return res.status(200).json({ success: true, message: "Successfully case deleted" });
-    } catch (error) {
-        console.log("deleteCaseById in error:", error);
-        return res.status(500).json({ success: false, message: "Something went wrong!", error: error });
-    }
+      return res.status(200).json({ success: true, message: "Successfully case deleted" });
+   } catch (error) {
+      console.log("deleteCaseById in error:", error);
+      return res.status(500).json({ success: false, message: "Something went wrong!", error: error });
+   }
 }
 
 export const deleteCaseDocById = async (req, res) => {
-    try {
-        const { employee } = req
-        if (employee?.designation?.toLowerCase() != "manager" || employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
+   try {
+      const { employee } = req
+      if (employee?.designation?.toLowerCase() != "manager" || employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
 
-        const { _id } = req?.query
-        if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid  docId" })
+      const { _id } = req?.query
+      if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid  docId" })
 
-        const getCase = await CaseDoc.findById(_id);
-        if (!getCase) return res.status(404).json({ success: false, message: "Case-doc not found" })
+      const getCase = await CaseDoc.findById(_id);
+      if (!getCase) return res.status(404).json({ success: false, message: "Case-doc not found" })
 
-        const docUrl = getCase?.url?.toString()
-        if (docUrl) {
-            if (docUrl?.includes("https://firebasestorage.googleapis.com/")) {
-                const parts = docUrl.split('/');
-                const encodedFilename = parts[parts.length - 1];
-                const endParts = encodedFilename?.split("?")?.[0]
-                const decodedFilename = decodeURIComponent(endParts);
-                if (decodedFilename) {
-                    const file = bucket.file(decodedFilename);
-                    await file.delete()
-                }
-
-            } else {
-                const setAdminHeaders = {
-                    "x-auth-token": req?.headers["x-auth-token"]
-                };
-
-                const requestBody = {
-                    files: [docUrl]
-                };
-
-                const docRes = await axios.delete(
-                    `${process.env.STORAGE_URL}/api/storage/deleteSelectedFiles`,
-                    {
-                        headers: setAdminHeaders,
-                        data: requestBody
-                    }
-                );
+      const docUrl = getCase?.url?.toString()
+      if (docUrl) {
+         if (docUrl?.includes("https://firebasestorage.googleapis.com/")) {
+            const parts = docUrl.split('/');
+            const encodedFilename = parts[parts.length - 1];
+            const endParts = encodedFilename?.split("?")?.[0]
+            const decodedFilename = decodeURIComponent(endParts);
+            if (decodedFilename) {
+               const file = bucket.file(decodedFilename);
+               await file.delete()
             }
-        }
 
-        await CaseDoc.findByIdAndDelete(_id)
-        return res.status(200).json({ success: true, message: "Successfully case-doc deleted" });
-    } catch (error) {
-        console.log("deleteCaseDocById in error:", error);
-        return res.status(500).json({ success: false, message: "Something went wrong", error: error });
-    }
+         } else {
+            const setAdminHeaders = {
+               "x-auth-token": req?.headers["x-auth-token"]
+            };
+
+            const requestBody = {
+               files: [docUrl]
+            };
+
+            const docRes = await axios.delete(
+               `${process.env.STORAGE_URL}/api/storage/deleteSelectedFiles`,
+               {
+                  headers: setAdminHeaders,
+                  data: requestBody
+               }
+            );
+         }
+      }
+
+      await CaseDoc.findByIdAndDelete(_id)
+      return res.status(200).json({ success: true, message: "Successfully case-doc deleted" });
+   } catch (error) {
+      console.log("deleteCaseDocById in error:", error);
+      return res.status(500).json({ success: false, message: "Something went wrong", error: error });
+   }
+}
+
+// rename doc folder
+export const renameCaseDocFolder = async (req, res) => {
+   try {
+      const { employee } = req
+      if (employee?.designation?.toLowerCase() != "manager" || employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
+
+      const { documentIds, newFolderName } = req?.body
+      if (!documentIds || documentIds?.length == 0) return res.status(400).json({ success: false, message: "documentIds required" })
+      if (!newFolderName || newFolderName?.trim() == "") return res.status(400).json({ success: false, message: "newFolderName required" })
+
+      const validIds = []
+      for (let id of documentIds) {
+         if (validMongooseId(id)) validIds.push(new Types.ObjectId(id))
+      }
+      if (validIds.length == 0) return res.status(400).json({ success: false, message: "No valid documentIds found" })
+
+      await CaseDoc.updateMany({ _id: { $in: validIds } }, { $set: { name: newFolderName } })
+
+      return res.status(200).json({ success: true, message: "Successfully case-doc renamed" });
+   } catch (error) {
+      console.log("renameCaseDocFolder in error:", error);
+      return res.status(500).json({ success: false, message: "Something went wrong", error: error });
+   }
 }

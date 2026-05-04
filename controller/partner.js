@@ -4,7 +4,7 @@ import {
   validateAddCase
 
 } from "../utils/validatePatner.js";
-import { otp6Digit, getAllCaseQuery,  partnerGetDownloadCaseExcel, getValidateDate, sendNotificationAndMail, dateOptions } from "../utils/helper.js";
+import { otp6Digit, getAllCaseQuery, partnerGetDownloadCaseExcel, getValidateDate, sendNotificationAndMail, dateOptions } from "../utils/helper.js";
 import { sendMail } from '../utils/sendMail.js'
 import { authPartner } from "../middleware/authentication.js";
 import bcrypt from 'bcrypt'
@@ -215,13 +215,13 @@ export const verifyEmailOtp = async (req, res) => {
     try {
       const date = new Date()
       const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
-      const replacements= { service_commission: `4%`, signed_on: today }
+      const replacements = { service_commission: `4.5%`, signed_on: today }
       const modifiedPdfBytes = await editServiceAgreement("agreement/partner.pdf", replacements);
 
       await sendMail({
         subject: "Partner Service Agreement",
         to: partner.email,
-        cc:[process.env.CC_MAIL_ID],
+        cc: [process.env.CC_MAIL_ID],
         html: accountTermConditionTemplate({ as: "Partner", name: partner?.fullName }),
         attachments: [{
           filename: 'service_agreement.pdf',
@@ -509,13 +509,13 @@ export const signUpWithRequest = async (req, res) => {
     const noOfPartners = await Partner.countDocuments();
     const date = new Date()
     const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
-    const replacements= { service_commission: `4%`, signed_on: today }
+    const replacements = { service_commission: `4.5%`, signed_on: today }
     const modifiedPdfBytes = await editServiceAgreement("agreement/partner.pdf", replacements);
 
     await sendMail({
       subject: "Partner Service Agreement",
       to: email,
-      cc:[process.env.CC_MAIL_ID],
+      cc: [process.env.CC_MAIL_ID],
       html: accountTermConditionTemplate({ as: "Partner", name: existingPartner?.fullName }),
       attachments: [{
         filename: 'service_agreement.pdf',
@@ -1012,7 +1012,7 @@ export const partnerViewCaseById = async (req, res) => {
                   $and: [
                     { $eq: ["$isActive", true] },
                     { $or: [{ $eq: ["$caseId", "$$id"] }, { $eq: ["$caseMargeId", "$$id"] }] },
-                     { $ne: ["$isPrivate", true] },
+                    { $ne: ["$isPrivate", true] },
                   ]
                 }
               }

@@ -43,6 +43,7 @@ router.put("/case/addReferenceCaseAndMarge", authEmployee, employeeCaseControlle
 router.put("/case/removeCaseReference", authEmployee, employeeCaseController.removeCaseReference)
 router.post("/case/addOrUpdateCasePayment", authEmployee, employeeCaseController.addOrUpdateCasePayment)
 router.delete("/case/deleteCaseById", authEmployee, employeeCaseController.deleteCaseById)
+router.put("/case/renameCaseDocFolder", authEmployee, employeeCaseController.renameCaseDocFolder)
 // router.post('/opeation/empOpCreateOrUpdateCaseForm',authEmployee,employeeCaseFormController.empOpCreateOrUpdateCaseForm)
 // router.get('/opeation/empOpGetCaseFormById/:formId/:caseId',authEmployee,employeeCaseFormController.empOpGetCaseFormById)
 

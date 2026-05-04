@@ -4,6 +4,7 @@ import { adminAddJob, adminDeleteJob } from '../controller/job.js';
 import { viewAllAdminComplaint, adminRemoveComplaintById } from '../controller/complaint.js';
 import { authAdmin } from '../middleware/authentication.js';
 import * as adminController from '../controller/admin.js'
+import * as adminCaseController from '../controller/case/adminCaseController.js'
 import adminLeadRoutes from "../routes/leads/adminLeadRoutes.js"
 
 
@@ -75,6 +76,7 @@ router.put("/removeReferenceCase", authAdmin, adminController.adminRemoveReferen
 router.delete("/deleteCaseById", authAdmin, adminController.adminDeleteCaseById)
 router.delete("/deleteCaseDocId", authAdmin, adminController.adminDeleteCaseDocById)
 router.post("/adminCreateOrUpdateCaseForm", authAdmin, adminController.adminCreateOrUpdateCaseForm)
+router.put("/case/renameCaseDocFolder", authAdmin, adminCaseController.renameCaseDocFolder)
 
 
 // case doc

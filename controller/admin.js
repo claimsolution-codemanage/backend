@@ -906,7 +906,8 @@ export const adminGetNormalEmployee = async (req, res) => {
    try {
       const { admin } = req
       let { limit = 10, pageNo = 1, search = "", isAddEmp = "" } = req.query
-      pageNo = (pageNo - 1) * limit;
+      limit = limit ? Number(limit) : 10
+      pageNo = ((pageNo ? Number(pageNo) : 1) - 1) * limit;
 
       let excludedTypes = ["Sales", "Operation", "Finance", "Sathi Team", "Branch"];
       if (isAddEmp == "true") {
@@ -3233,7 +3234,7 @@ export const adminShareCaseToEmployee = async (req, res) => {
       let bulkOps = []
       for (const toEmployeeId of shareEmployee) {
          const exists = await ShareSection.find({ toEmployeeId, caseId: { $in: shareCase } }, { caseId: 1 })
-         let filter = shareClients?.filter(caseId => !exists?.map(ele => ele?.caseId?.toString())?.includes(caseId))
+         let filter = shareCase?.filter(caseId => !exists?.map(ele => ele?.caseId?.toString())?.includes(caseId))
          filter?.forEach(caseId => {
             bulkOps.push({
                insertOne: {
@@ -3296,8 +3297,25 @@ export const adminSharePartnerToSaleEmp = async (req, res) => {
 
       if (!shareEmployee[0]) return res.status(400).json({ success: true, message: "Please add employee to share" });
 
-      await ShareSection.deleteMany({ toEmployeeId: { $exists: true }, partnerId: { $in: sharePartners }, clientId: { $exists: false }, caseId: { $exists: false } })
-      await Partner.updateMany({ _id: { $in: sharePartners } }, { $set: { salesId: shareEmployee[0] } })
+      // bulkinsert if not exists
+      const bulkOps = []
+      for (const toEmployeeId of shareEmployee) {
+         const exists = await ShareSection.find({ toEmployeeId, partnerId: { $in: sharePartners }, clientId: { $exists: false }, caseId: { $exists: false } }, { partnerId: 1 })
+         let filter = sharePartners?.filter(partnerId => !exists?.map(ele => ele?.partnerId?.toString())?.includes(partnerId))
+         filter?.forEach(partnerId => {
+            bulkOps.push({
+               insertOne: {
+                  document: {
+                     partnerId,
+                     toEmployeeId
+                  }
+               }
+            })
+         })
+      }
+      await ShareSection.bulkWrite(bulkOps)
+      // await ShareSection.deleteMany({ toEmployeeId: { $exists: true }, partnerId: { $in: sharePartners }, clientId: { $exists: false }, caseId: { $exists: false } })
+      // await Partner.updateMany({ _id: { $in: sharePartners } }, { $set: { salesId: shareEmployee[0] } })
 
       return res.status(200).json({ success: true, message: "Successfully share partner" });
 
@@ -3365,7 +3383,7 @@ export const adminShareClientToSaleEmp = async (req, res) => {
 export const adminAddOrUpdateCaseComment = async (req, res) => {
    try {
       const { admin } = req
-      const { comment, caseCommentId, isPrivate } = req.body
+      const { comment, caseCommentId, isPrivate, attachments } = req.body
       if (!comment?.trim()) return res.status(400).json({ success: false, message: "Case Comment required" })
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
       if (caseCommentId && !validMongooseId(caseCommentId)) return res.status(400).json({ success: false, message: "Not a valid comment ID" })
@@ -3380,6 +3398,7 @@ export const adminAddOrUpdateCaseComment = async (req, res) => {
                message: comment?.trim(),
                isPrivate: isPrivate ?? false,
                adminId: req?.user?._id,
+               attachments: attachments,
             }
          })
          return res.status(200).json({ success: true, message: "Successfully updated case comment" });
@@ -3393,6 +3412,7 @@ export const adminAddOrUpdateCaseComment = async (req, res) => {
          isPrivate: isPrivate ?? false,
          caseId: getCase?._id?.toString(),
          adminId: req?.user?._id,
+         attachments: attachments,
       })
       await newComment.save()
 

@@ -383,8 +383,25 @@ export const empOpSharePartnerToSaleEmp = async (req, res) => {
 
       // show in added by
       if (!shareEmployee[0]) return res.status(400).json({ success: true, message: "Please add employee to share" });
-      await ShareSection.deleteMany({ toEmployeeId: { $exists: true }, partnerId: { $in: sharePartners }, clientId: { $exists: false }, caseId: { $exists: false } })
-      await Partner.updateMany({ _id: { $in: sharePartners } }, { $set: { salesId: shareEmployee[0] } })
+      // bulkinsert if not exists
+      const bulkOps = []
+      for (const toEmployeeId of shareEmployee) {
+         const exists = await ShareSection.find({ toEmployeeId, partnerId: { $in: sharePartners }, clientId: { $exists: false }, caseId: { $exists: false } }, { partnerId: 1 })
+         let filter = sharePartners?.filter(partnerId => !exists?.map(ele => ele?.partnerId?.toString())?.includes(partnerId))
+         filter?.forEach(partnerId => {
+            bulkOps.push({
+               insertOne: {
+                  document: {
+                     partnerId,
+                     toEmployeeId
+                  }
+               }
+            })
+         })
+      }
+      await ShareSection.bulkWrite(bulkOps)
+      // await ShareSection.deleteMany({ toEmployeeId: { $exists: true }, partnerId: { $in: sharePartners }, clientId: { $exists: false }, caseId: { $exists: false } })
+      // await Partner.updateMany({ _id: { $in: sharePartners } }, { $set: { salesId: shareEmployee[0] } })
       return res.status(200).json({ success: true, message: "Successfully share partner" });
 
    } catch (error) {
@@ -3600,7 +3617,7 @@ export const empOptShareCaseToEmployee = async (req, res) => {
       let bulkOps = []
       for (const toEmployeeId of shareEmployee) {
          const exists = await ShareSection.find({ toEmployeeId, caseId: { $in: shareCase } }, { caseId: 1 })
-         let filter = shareClients?.filter(caseId => !exists?.map(ele => ele?.caseId?.toString())?.includes(caseId))
+         let filter = shareCase?.filter(caseId => !exists?.map(ele => ele?.caseId?.toString())?.includes(caseId))
          filter?.forEach(caseId => {
             bulkOps.push({
                insertOne: {
@@ -3793,7 +3810,7 @@ export const bulkCreateOrUpdateStatement = async (req, res) => {
 export const getStatement = async (req, res) => {
    try {
       const { employee } = req
-      const caseAccess = ["operation", "finance", "sathi team"]
+      const caseAccess = ["operation", "finance", "sathi team", "advocate", "surveyor"]
       if (!caseAccess.includes(employee?.type?.toLowerCase())) {
          return res.status(400).json({ success: false, message: "Access denied" })
       }
