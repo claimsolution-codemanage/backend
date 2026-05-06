@@ -3810,7 +3810,7 @@ export const bulkCreateOrUpdateStatement = async (req, res) => {
 export const getStatement = async (req, res) => {
    try {
       const { employee } = req
-      const caseAccess = ["operation", "finance", "sathi team", "advocate", "surveyor"]
+      const caseAccess = ["operation", "finance", "sathi team", "advocate", "surveyor", "doctor"]
       if (!caseAccess.includes(employee?.type?.toLowerCase())) {
          return res.status(400).json({ success: false, message: "Access denied" })
       }

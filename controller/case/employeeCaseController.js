@@ -358,6 +358,14 @@ export const viewCaseById = async (req, res) => {
          return res.status(400).json({ success: false, message: "Not a valid id" });
       }
 
+      const caseAccess = ["advocate", "surveyor", "doctor"]
+      const isStatusAccess = !caseAccess.includes(employee?.type?.toLowerCase())
+      const isCommentAccess = !caseAccess.includes(employee?.type?.toLowerCase())
+      const isPaymentAccess = !caseAccess.includes(employee?.type?.toLowerCase())
+      const isDocAccess = true
+      const isCaseFormAccess = !caseAccess.includes(employee?.type?.toLowerCase())
+
+
       const caseId = new Types.ObjectId(_id);
 
       const caseData = await Case.aggregate([
@@ -414,7 +422,7 @@ export const viewCaseById = async (req, res) => {
             }
          },
          { $unwind: { path: "$clientDetails", preserveNullAndEmptyArrays: true } },
-         {
+         ...(isDocAccess ? [{
             $lookup: {
                from: "casedocs",
                let: {
@@ -461,8 +469,8 @@ export const viewCaseById = async (req, res) => {
                ],
                as: "caseDocs"
             }
-         },
-         {
+         }] : []),
+         ...(isStatusAccess ? [{
             $lookup: {
                from: "casestatuses",
                let: { id: "$_id" },
@@ -486,8 +494,8 @@ export const viewCaseById = async (req, res) => {
                ],
                as: "processSteps"
             }
-         },
-         {
+         }] : []),
+         ...(isCommentAccess ? [{
             $lookup: {
                from: "casecomments",
                let: { id: "$_id" },
@@ -520,8 +528,8 @@ export const viewCaseById = async (req, res) => {
                ],
                as: "caseCommit"
             }
-         },
-         {
+         }] : []),
+         ...(isPaymentAccess ? [{
             $lookup: {
                from: "casepaymentdetails",
                localField: "_id",
@@ -529,8 +537,8 @@ export const viewCaseById = async (req, res) => {
                pipeline: [{ $match: { isActive: true } }],
                as: "casePayment"
             }
-         },
-         {
+         }] : []),
+         ...(isCaseFormAccess ? [{
             $lookup: {
                from: "case_forms",
                localField: "_id",
@@ -541,7 +549,7 @@ export const viewCaseById = async (req, res) => {
                ],
                as: "case_forms"
             }
-         },
+         }] : []),
          ...(isOperation ? [
             {
                $lookup: {
