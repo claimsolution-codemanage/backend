@@ -177,7 +177,7 @@ export const signUpWithRequest = async (req, res) => {
       const hashedPassword = await bcrypt.hash(password, 10);
       const date = new Date()
       const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
-      const replacements = { commission: `20%`, signed_on: today }
+      const replacements = { commission: `18%`, signed_on: today }
 
       // ✅ Generate agreement with timestamp
       const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", replacements);
@@ -351,7 +351,7 @@ export const verifyClientEmailOtp = async (req, res) => {
     try {
       const date = new Date()
       const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
-      const replacements = { commission: `20%`, signed_on: today }
+      const replacements = { commission: `18%`, signed_on: today }
 
       // ✅ Generate agreement with timestamp
       const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", replacements);
