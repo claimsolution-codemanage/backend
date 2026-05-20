@@ -552,7 +552,7 @@ export const payCasePaymentSchedule = async (req, res) => {
 
         await paymentDetail.save();
         // generate invoice if gst is enabled
-        if (paymentDetail.gstPercent > 0 && paymentDetail.gstOption) {
+        if (paymentDetail.gstPercent > 0 && paymentDetail.gstOption && !paymentDetail?.advocateMode) {
             await generateEmiInvoice({
                 clientId: paymentDetail.clientId,
                 caseId: paymentDetail.caseId,
