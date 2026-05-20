@@ -490,7 +490,8 @@ export const viewCaseById = async (req, res) => {
                         }
                      }
                   },
-                  { $project: { adminId: 0 } }
+                  { $project: { adminId: 0 } },
+                  { $sort: { createdAt: -1 } },
                ],
                as: "processSteps"
             }
@@ -1040,6 +1041,30 @@ export const empFindCaseByFileNo = async (req, res) => {
                'policyNo': 1,
                'claimAmount': 1,
                'insuranceCompanyName': 1,
+               'currentStatus': 1,
+            }
+         },
+         {
+            '$lookup': {
+               'from': 'clients',
+               "localField": "clientObjId",
+               "foreignField": "_id",
+               "as": "clientDetails",
+               'pipeline': [
+                  {
+                     '$project': {
+                        'fullName': 1,
+                        'email': 1,
+                        'mobileNo': 1,
+                     }
+                  }
+               ],
+            }
+         },
+         {
+            '$unwind': {
+               'path': '$clientDetails',
+               'preserveNullAndEmptyArrays': true
             }
          },
          {

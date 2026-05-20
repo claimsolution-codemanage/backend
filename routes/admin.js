@@ -11,6 +11,8 @@ import adminLeadRoutes from "../routes/leads/adminLeadRoutes.js"
 
 // sub routes
 import adminCaseFormRoutes from "../routes/caseForm/adminCaseFormRoutes.js"
+import empCasePaymentRoutes from "../routes/casePayment/adminCasePaymentRoutes.js"
+
 
 //  for admin 
 router.get("/dashboard", authAdmin, adminController.adminDashboard)
@@ -163,6 +165,8 @@ router.put("/updateNotification", authAdmin, adminController.updateNotification)
 // use sub-routes 
 router.use("/caseForm", adminCaseFormRoutes)
 router.use("/lead", adminLeadRoutes)
+router.use("/case_payment", empCasePaymentRoutes)
+
 
 
 // router.get("/migrateGROForms",adminController.migrateGROForms)

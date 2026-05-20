@@ -3,20 +3,21 @@ import jwtDecode from 'jwt-decode'
 import Employee from '../models/employee.js'
 import { Messages } from '../utils/constant.js'
 import Admin from '../models/admin.js'
+import Client from '../models/client.js'
 
-export const authPartner = async(req,res)=>{
+export const authPartner = async (req, res) => {
    // console.log("header",req.headers);
-   if(!req.headers["x-auth-token"]) return {success:false,message:"UnAuth token"}
+   if (!req.headers["x-auth-token"]) return { success: false, message: "UnAuth token" }
 
    const token = req.headers["x-auth-token"]
    try {
-      await jwt.verify(token,process.env.PARTNER_SECRET_KEY)
+      await jwt.verify(token, process.env.PARTNER_SECRET_KEY)
       const decode = await jwtDecode(token)
-      req.user =decode
-      console.log("decode",decode);
-      return {success:true,message:"auth token verified"}
+      req.user = decode
+      console.log("decode", decode);
+      return { success: true, message: "auth token verified" }
    } catch (error) {
-      return {success:false,message:"Access Denied"}
+      return { success: false, message: "Access Denied" }
    }
 
 }
@@ -52,36 +53,53 @@ export const authEmployee = async (req, res, next) => {
    try {
       let payload = await jwt.verify(token, process.env.EMPLOYEE_SECRET_KEY)
       let _id = payload?._id
-      if(!_id){
+      if (!_id) {
          return res.status(401).json({ success: false, message: Messages?.un_auth_token })
       }
       const employee = await Employee.findById(_id)
       if (!employee) return res.status(401).json({ success: false, message: Messages?.account_not_found })
-      if (!employee?.isActive) return res.status(401).json({ success: false, message:Messages?.account_not_active})
+      if (!employee?.isActive) return res.status(401).json({ success: false, message: Messages?.account_not_active })
       req.employee = employee
       req.user = payload
       next()
    } catch (error) {
-      return res.status(401).json({ success: false, message:Messages?.access_denied})
+      return res.status(401).json({ success: false, message: Messages?.access_denied })
+   }
+}
+
+export const authClient = async (req, res) => {
+   // console.log("header",req.headers);
+   if (!req.headers["x-auth-token"]) return { success: false, message: "UnAuth token" }
+
+   const token = req.headers["x-auth-token"]
+
+   try {
+      await jwt.verify(token, process.env.CLIENT_SECRET_KEY)
+      const decode = await jwtDecode(token)
+      req.user = decode
+      return { success: true, message: "auth token verified" }
+   } catch (error) {
+      return { success: false, message: "Access Denied" }
    }
 
 }
 
-export const authClient = async(req,res)=>{
-   // console.log("header",req.headers);
-   if(!req.headers["x-auth-token"]) return {success:false,message:"UnAuth token"}
-
-   const token = req.headers["x-auth-token"]
-   console.log("token",token);
-
+export const authClientNext = async (req, res, next) => {
+   const token = req?.headers["x-auth-token"]
+   if (!token) return res.status(401).json({ success: false, message: Messages?.un_auth_token })
    try {
-      await jwt.verify(token,process.env.CLIENT_SECRET_KEY)
-      const decode = await jwtDecode(token)
-      req.user =decode
-      console.log("decode",decode);
-      return {success:true,message:"auth token verified"}
+      let payload = await jwt.verify(token, process.env.CLIENT_SECRET_KEY)
+      let _id = payload?._id
+      if (!_id) {
+         return res.status(401).json({ success: false, message: Messages?.un_auth_token })
+      }
+      const client = await Client.findById(_id)
+      if (!client) return res.status(401).json({ success: false, message: Messages?.account_not_found })
+      if (!client?.isActive) return res.status(401).json({ success: false, message: Messages?.account_not_active })
+      req.client = client
+      req.user = payload
+      next()
    } catch (error) {
-      return {success:false,message:"Access Denied"}
+      return res.status(401).json({ success: false, message: Messages?.access_denied })
    }
-
 }

@@ -1037,7 +1037,8 @@ export const partnerViewCaseById = async (req, res) => {
                 }
               }
             },
-            { $project: { adminId: 0 } }
+            { $project: { adminId: 0 } },
+            { $sort: { createdAt: -1 } },
           ],
           as: "processSteps"
         }

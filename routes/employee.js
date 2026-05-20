@@ -1,14 +1,18 @@
 import express from 'express';
 const router = express.Router();
 import * as employeeController from '../controller/employee.js'
-import caseFormRoutes from "../routes/caseForm/empCaseFormRoutes.js"
-import empLeadRoutes from "../routes/leads/empLeadRoutes.js"
 import { authEmployee } from '../middleware/authentication.js';
 import * as employeeCaseController from '../controller/case/employeeCaseController.js'
 import * as empPartnerController from '../controller/partner/empPartnerController.js'
 import * as empClientController from '../controller/client/empClientController.js'
 import * as empInvoiceController from '../controller/invoice/empInvoiceController.js'
 import * as empTeamController from '../controller/team/empTeamController.js'
+
+// other routes
+import empLeadRoutes from "../routes/leads/empLeadRoutes.js"
+import caseFormRoutes from "../routes/caseForm/empCaseFormRoutes.js"
+import empCasePaymentRoutes from "./casePayment/empCasePaymentRoutes.js"
+
 
 
 
@@ -136,6 +140,8 @@ router.put("/emp/updateNotification", authEmployee, employeeController.updateNot
 
 router.use("/caseForm", caseFormRoutes)
 router.use("/lead", empLeadRoutes)
+router.use("/case_payment", empCasePaymentRoutes)
+
 
 
 export default router

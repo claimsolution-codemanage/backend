@@ -7,7 +7,7 @@ import cors from 'cors'
 import admin from './routes/admin.js'
 import partner from './routes/partner.js'
 import employee from './routes/employee.js'
-import imageUpload from './routes/imageUpload.js' 
+import imageUpload from './routes/imageUpload.js'
 import client from './routes/client.js'
 import job from './routes/job.js'
 import complaint from "./routes/complaint.js"
@@ -20,6 +20,7 @@ import fs from 'fs'
 import path from 'path'
 
 import { backupMongoDB } from "./utils/helper.js";
+import cronJobs from "./cron/cronJob.js";
 
 // firebaseAdmin.initializeApp({
 // 	credential:firebaseAdmin.credential.cert(serviceAccount),
@@ -43,15 +44,15 @@ app.use(cors())
 // app.use((req, res, next) => {
 // 	const allowedOrigins = ['https://www.claimsolution.in', 'http://www.claimsolution.in'];
 // 	const origin = req.headers.origin;
-  
+
 // 	if (allowedOrigins.includes(origin)) {
 // 	  res.setHeader('Access-Control-Allow-Origin', origin);
 // 	}
-  
+
 // 	res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
 // 	res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-auth-token');
 // 	res.setHeader('Access-Control-Allow-Credentials', 'true');
-  
+
 // 	if (req.method === 'OPTIONS') {
 // 	  // Respond to CORS preflight requests
 // 	  res.sendStatus(204);
@@ -63,20 +64,21 @@ app.use(express.json());
 // Parse application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: false }));
 
-app.use("/api/upload",imageUpload)
-app.use("/api/admin",admin)
-app.use("/api/employee",employee)
-app.use("/api/partner",partner)
-app.use("/api/client",client)
-app.use("/api/job",job)
-app.use("/api/complaint",complaint)
-app.use("/api/payment",payment)
+app.use("/api/upload", imageUpload)
+app.use("/api/admin", admin)
+app.use("/api/employee", employee)
+app.use("/api/partner", partner)
+app.use("/api/client", client)
+app.use("/api/job", job)
+app.use("/api/complaint", complaint)
+app.use("/api/payment", payment)
+cronJobs();
 
-app.get("/",async(req,res)=>{
+app.get("/", async (req, res) => {
 	try {
-		res.status(200).send({success:true,message:'Backend server is working!',});
+		res.status(200).send({ success: true, message: 'Backend server is working!', });
 	} catch (error) {
-		res.status(500).json({success:false,message:"Oops something went wrong"})
+		res.status(500).json({ success: false, message: "Oops something went wrong" })
 	}
 })
 
