@@ -22,6 +22,11 @@ import { accountVerificationTemplate } from "../utils/emailTemplates/accountVeri
 import { accountTermConditionTemplate } from "../utils/emailTemplates/accountTermConditionTemplate.js";
 import { forgetPasswordTemplate } from "../utils/emailTemplates/forgotPasswordTemplate.js";
 import { editServiceAgreement } from "../utils/createPdf/serviceAgreement.js";
+import { sendOTPMsg } from "../services/messageService.js";
+
+const MAX_OTP_ATTEMPTS = 5;
+const LOCK_DURATION = 60 * 60 * 1000; // 1 hour
+const OTP_EXPIRY = 5 * 60 * 1000; // 5 min
 
 export const clientUploadImage = async (req, res) => {
   try {
@@ -61,46 +66,92 @@ export const clientAuthenticate = async (req, res) => {
 export const clientSignUp = async (req, res) => {
   try {
     const { error } = validateClientSignUp(req.body);
+
     if (error) {
-      return res.status(400).json({ success: false, message: error.details[0].message });
+      return res.status(400).json({ success: false, message: error.details[0].message, });
     }
 
-    const { fullName, email, mobileNo, password, agreement } = req.body;
+    const { fullName, email, mobileNo, password, agreement, } = req.body;
+
     if (!agreement) {
-      return res.status(400).json({ success: false, message: "Must agree with our service agreement" });
+      return res.status(400).json({ success: false, message: "Must agree with our service agreement", });
     }
 
-    const normalizedEmail = email?.trim()?.toLowerCase();
-    const otp = otp6Digit();
+    const normalizedEmail = email.trim().toLowerCase();
 
-    // Check existing clients
     const existingClientByMobile = await Client.findOne({ mobileNo });
-    const existingClientByEmail = await Client.findOne({ email: normalizedEmail });
+    const existingClientByEmail = await Client.findOne({ email: normalizedEmail, });
 
     if (existingClientByMobile?.mobileVerify) {
-      return res.status(400).json({ success: false, message: "Mobile No. already registered with us" });
-    }
-    if (existingClientByEmail?.mobileVerify) {
-      return res.status(400).json({ success: false, message: "Email already registered with us" });
+      return res.status(400).json({ success: false, message: "Mobile No. already registered with us", });
     }
 
+    if (existingClientByEmail?.mobileVerify) {
+      return res.status(400).json({ success: false, message: "Email already registered with us", });
+    }
+
+    const targetClient = existingClientByMobile || existingClientByEmail;
+
+    /** * CHECK OTP RATE LIMIT */
+    if (targetClient?.mobileOTP) {
+      const attempts = targetClient.mobileOTP.attempts || 0;
+      const lockedAt = targetClient.mobileOTP.lockedAt;
+
+      if (attempts >= MAX_OTP_ATTEMPTS && lockedAt) {
+        const lockExpiry = new Date(lockedAt).getTime() + LOCK_DURATION;
+
+        if (Date.now() < lockExpiry) {
+          const minutesLeft = Math.ceil((lockExpiry - Date.now()) / (1000 * 60));
+
+          return res.status(429).json({ success: false, message: `Too many OTP requests. Try again after sometime`, });
+        }
+
+        // Reset after 1 hour
+        targetClient.mobileOTP.attempts = 0;
+        targetClient.mobileOTP.lockedAt = null;
+
+        await targetClient.save();
+      }
+    }
+
+    const otp = otp6Digit();
     const hashedPassword = await bcrypt.hash(password, 10);
 
     let clientDoc;
-    if (!existingClientByMobile && !existingClientByEmail) {
-      // Create new client
+
+    /** * NEW CLIENT */
+    if (!targetClient) {
       clientDoc = new Client({
         fullName,
         email: normalizedEmail,
         mobileNo,
         password: hashedPassword,
-        emailOTP: { otp, createAt: Date.now() },
         acceptClientTls: agreement,
+        mobileOTP: {
+          otp,
+          attempts: 1,
+          createdAt: new Date(),
+          lockedAt: null,
+        },
       });
+
       await clientDoc.save();
+      console.log("client Doc", clientDoc);
+
     } else {
-      // Update existing client (by mobile or email)
-      const targetClient = existingClientByMobile || existingClientByEmail;
+      /** * EXISTING UNVERIFIED CLIENT */
+      const newAttempts = (targetClient.mobileOTP?.attempts || 0) + 1;
+
+      const mobileOTPData = {
+        otp,
+        attempts: newAttempts,
+        createdAt: new Date(),
+        lockedAt:
+          newAttempts >= MAX_OTP_ATTEMPTS
+            ? new Date()
+            : null,
+      };
+
       clientDoc = await Client.findByIdAndUpdate(
         targetClient._id,
         {
@@ -109,40 +160,37 @@ export const clientSignUp = async (req, res) => {
             email: normalizedEmail,
             mobileNo,
             password: hashedPassword,
-            emailOTP: { otp, createAt: Date.now() },
             acceptClientTls: agreement,
+            mobileOTP: mobileOTPData,
           },
         },
         { new: true }
       );
     }
 
-    // Generate token
     const token = await clientDoc.getAuth();
 
-    // Send email with OTP
+    console.log("clientDoc0000", clientDoc);
+
+
     try {
-      await sendMail({
-        subject: "Claim Solution Client Account Verification",
-        to: normalizedEmail,
-        html: accountVerificationTemplate({ name: fullName, otp, type: "Client" }),
-      });
+      const result = await sendOTPMsg({ mobile: mobileNo, otp, });
+      console.log("Result---", result)
 
       return res
         .status(201)
         .header("x-auth-token", token)
         .header("Access-Control-Expose-Headers", "x-auth-token")
-        .json({ success: true, message: "Successfully sent OTP" });
-    } catch (mailErr) {
-      console.error("send otp error:", mailErr);
-      return res.status(400).json({ success: false, message: "Failed to send OTP" });
+        .json({ success: true, message: "OTP sent successfully to your mobile number", });
+    } catch (otpError) {
+      console.error("OTP send error:", otpError);
+      return res.status(400).json({ success: false, message: "Failed to send OTP", });
     }
   } catch (error) {
-    console.error("signup error:", error);
-    return res.status(500).json({ success: false, message: "Internal server error", error });
+    console.error("Signup Error:", error);
+    return res.status(500).json({ success: false, message: "Something went wrong!", error: error?.message });
   }
 };
-
 
 export const signUpWithRequest = async (req, res) => {
   try {
@@ -271,170 +319,246 @@ export const signUpWithRequest = async (req, res) => {
   }
 };
 
-export const clientResendOtp = async (req, res) => {
+
+// send email otp
+export const sendClientEmailOtp = async (req, res) => {
   try {
-    const verify = await authClient(req, res);
-    if (!verify.success) {
-      return res.status(401).json({ success: false, message: verify.message });
-    }
-
     const client = await Client.findById(req?.user?._id);
+
     if (!client) {
-      return res.status(401).json({ success: false, message: "Not signed up with us" });
+      return res.status(404).json({
+        success: false,
+        message: "Client not found",
+      });
     }
 
-    if (client.mobileVerify || client.isActive || client.emailVerify) {
-      return res.status(400).json({ success: false, message: "Already registered with us" });
+    if (client.emailVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Email already verified",
+      });
+    }
+
+    const now = Date.now();
+
+    // Initialize if missing
+    if (!client.emailOTP) {
+      client.emailOTP = {
+        otp: "",
+        attempts: 0,
+        createdAt: null,
+        lockedAt: null,
+      };
+    }
+
+    /** * Check lock status */
+    if (client.emailOTP.lockedAt) {
+      const lockTime = new Date(client.emailOTP.lockedAt).getTime();
+      const lockExpired = now - lockTime >= LOCK_DURATION;
+
+      if (!lockExpired) {
+        const remainingMinutes = Math.ceil((LOCK_DURATION - (now - lockTime)) / (60 * 1000));
+
+        return res.status(429).json({
+          success: false,
+          message: `Maximum OTP limit reached. Please try again after sometime`,
+        });
+      }
+
+      // Lock expired → reset to initial state
+      client.emailOTP = {
+        otp: "",
+        attempts: 0,
+        createdAt: null,
+        lockedAt: null,
+      };
+    }
+
+    /** * Check max OTP send attempts */
+    if (client.emailOTP.attempts >= MAX_OTP_ATTEMPTS) {
+      client.emailOTP.lockedAt = new Date();
+      await client.save();
+
+      return res.status(429).json({
+        success: false,
+        message: "Maximum OTP limit reached. Please try again after sometime",
+      });
     }
 
     const otp = otp6Digit();
-    const updatedClient = await Client.findByIdAndUpdate(
-      req.user._id,
-      { $set: { emailOTP: { otp, createAt: Date.now() } } },
-      { new: true }
-    );
 
-    if (!updatedClient) {
-      return res.status(401).json({ success: false, message: "Not signed up with us" });
+    client.emailOTP.otp = otp;
+    client.emailOTP.createdAt = new Date();
+    client.emailOTP.attempts += 1;
+
+    // Lock immediately after reaching max limit
+    if (client.emailOTP.attempts >= MAX_OTP_ATTEMPTS) {
+      client.emailOTP.lockedAt = new Date();
     }
 
-    try {
-      await sendMail({
-        subject: "Account Verification - Resend OTP",
-        to: client.email,
-        html: accountVerificationTemplate({ name: client.fullName, otp, type: "Client" }),
-      });
+    await client.save();
 
-      return res.status(200).json({ success: true, message: "Successfully resent OTP" });
-    } catch (err) {
-      console.error("send otp error:", err);
-      return res.status(400).json({ success: false, message: "Failed to send OTP" });
-    }
+    await sendMail({
+      subject: "Claim Solution Client Account Verification",
+      to: client.email.trim().toLowerCase(),
+      html: accountVerificationTemplate({
+        name: client.fullName,
+        otp,
+        type: "Client",
+      }),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Verification OTP sent successfully",
+    });
   } catch (error) {
-    console.error("resend otp error:", error);
-    return res.status(500).json({ success: false, message: "Internal server error", error });
+    console.error("sendClientEmailOtp:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send verification OTP",
+    });
   }
 };
 
 //  for email verification check
 export const verifyClientEmailOtp = async (req, res) => {
   try {
-    // ✅ Authenticate client
-    const verify = await authClient(req, res);
-    if (!verify.success) {
-      return res.status(401).json({ success: false, message: verify.message });
-    }
+    const client = await Client.findById(req.user._id);
 
-    const client = await Client.findById(req?.user?._id);
     if (!client) {
-      return res.status(401).json({ success: false, message: "Not registered with us" });
+      return res.status(401).json({
+        success: false,
+        message: "Not registered with us",
+      });
     }
 
-    if (client.mobileVerify) {
-      return res.status(400).json({ success: false, message: "Account is already verified" });
+    if (!client.mobileVerify) {
+      return res.status(400).json({
+        success: false,
+        message: "Mobile number is not verified",
+      });
+    }
+
+    if (client.emailVerify) {
+      return res.status(400).json({
+        success: false,
+        message: "Email already verified",
+      });
     }
 
     const { otp } = req.body;
+
     if (!otp) {
-      return res.status(400).json({ success: false, message: "OTP is required" });
+      return res.status(400).json({ success: false, message: "OTP is required", });
     }
 
-    // ✅ OTP validity: 5 minutes
-    const otpValidFrom = Date.now() - 5 * 60 * 1000;
-    const otpCreatedAt = new Date(client.emailOTP?.createAt).getTime();
-    const isOtpValid = otpCreatedAt >= otpValidFrom && client.emailOTP?.otp == otp;
+    /**
+     * CHECK LOCK STATUS
+     */
+    const attempts = client.emailOTP?.attempts || 0;
+    const lockedAt = client.emailOTP?.lockedAt;
 
-    if (!isOtpValid) {
-      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+    if (attempts >= MAX_OTP_ATTEMPTS && lockedAt) {
+      const lockExpiry =
+        new Date(lockedAt).getTime() + LOCK_DURATION;
+
+      if (Date.now() < lockExpiry) {
+        const minutesLeft = Math.ceil(
+          (lockExpiry - Date.now()) / 60000
+        );
+
+        return res.status(429).json({
+          success: false,
+          message: `Too many invalid attempts. Try again after sometime`,
+        });
+      }
+
+      // Reset after 1 hour
+      client.emailOTP.attempts = 0;
+      client.emailOTP.lockedAt = null;
+
+      await client.save();
     }
 
-    try {
-      const date = new Date()
-      const today = date?.toLocaleString('en-US', dateOptions)?.split("GMT")?.[0]
-      const replacements = { commission: `18%`, signed_on: today }
+    /*** OTP VALIDATION*/
+    const otpCreatedAt = new Date(client.emailOTP?.createdAt).getTime();
 
-      // ✅ Generate agreement with timestamp
-      const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", replacements);
-      await sendMail({
-        subject: "Client Service Agreement",
-        to: client.email,
-        cc: [process.env.CC_MAIL_ID],
-        html: accountTermConditionTemplate({ as: "Client", name: client?.fullName }),
-        attachments: [{
-          filename: 'service_agreement.pdf',
-          content: modifiedPdfBytes,
-          encoding: 'base64'
-        }]
+    const isExpired = !otpCreatedAt || Date.now() - otpCreatedAt > OTP_EXPIRY;
+
+    const isValidOtp = !isExpired && String(client.emailOTP?.otp) === String(otp);
+
+    /*** INVALID OTP*/
+    if (!isValidOtp) {
+      const newAttempts = (client.emailOTP?.attempts || 0) + 1;
+
+      client.emailOTP.attempts = newAttempts;
+      if (newAttempts >= MAX_OTP_ATTEMPTS) {
+        client.emailOTP.lockedAt = new Date();
+      }
+
+      await client.save();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          newAttempts >= MAX_OTP_ATTEMPTS
+            ? "Too many invalid attempts. Please try after sometime."
+            : "Invalid or expired OTP",
       });
-
-      // ✅ Generate consultant code
-      const noOfClients = await Client.countDocuments();
-      const consultantCode = `${date.getFullYear()}${date.getMonth() + 1 < 10 ? `0${date.getMonth() + 1}` : date.getMonth() + 1
-        }${date.getDate()}${noOfClients + 1}`;
-
-      // ✅ Update client profile
-      const updatedClient = await Client.findByIdAndUpdate(
-        client._id,
-        {
-          $set: {
-            emailVerify: false,
-            mobileVerify: true,
-            acceptClientTls: true,
-            isActive: true,
-            isProfileCompleted: false,
-            lastLogin: date,
-            recentLogin: date,
-            tlsUrl: "",
-            "profile.profilePhoto": "",
-            "profile.consultantName": client.fullName,
-            "profile.consultantCode": consultantCode,
-            "profile.associateWithUs": date,
-            "profile.fatherName": "",
-            "profile.primaryEmail": client.email,
-            "profile.alternateEmail": "",
-            "profile.primaryMobileNo": client.mobileNo,
-            "profile.whatsupNo": "",
-            "profile.alternateMobileNo": "",
-            "profile.panNo": "",
-            "profile.aadhaarNo": "",
-            "profile.dob": "",
-            "profile.gender": "",
-            "profile.address": "",
-            "profile.state": "",
-            "profile.district": "",
-            "profile.city": "",
-            "profile.pinCode": "",
-            "profile.about": "",
-            "profile.kycPhoto": "",
-            "profile.kycAadhar": "",
-            "profile.kycAadhaarBack": "",
-            "profile.kycPan": "",
-          },
-        },
-        { new: true }
-      );
-
-      // ✅ Generate token
-      const token = await updatedClient.getAuth(true);
-
-      return res
-        .status(200)
-        .header("x-auth-token", token)
-        .header("Access-Control-Expose-Headers", "x-auth-token")
-        .json({ success: true, message: "Successfully signed up" });
-    } catch (err) {
-      console.error("email verify error:", err);
-      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
     }
+
+    /*** EMAIL VERIFIED*/
+    const date = new Date();
+    const today = date?.toLocaleString("en-US", dateOptions)?.split("GMT")?.[0];
+
+    const replacements = { commission: "18%", signed_on: today, };
+    const modifiedPdfBytes = await editServiceAgreement("agreement/client.pdf", replacements);
+
+    await sendMail({
+      subject: "Client Service Agreement",
+      to: client.email,
+      cc: [process.env.CC_MAIL_ID],
+      html: accountTermConditionTemplate({
+        as: "Client",
+        name: client.fullName,
+      }),
+      attachments: [
+        {
+          filename: "service_agreement.pdf",
+          content: modifiedPdfBytes,
+          encoding: "base64",
+        },
+      ],
+    });
+
+    await Client.findByIdAndUpdate(client._id, {
+      $set: {
+        emailVerify: true,
+        emailOTP: {
+          otp: null,
+          attempts: 0,
+          createdAt: null,
+          lockedAt: null,
+        },
+      },
+    });
+
+    return res.status(200).json({ success: true, message: "Email verified successfully", });
   } catch (error) {
-    console.error("verifyEmailOtp error:", error);
-    return res.status(500).json({ success: false, message: "Internal server error", error });
+    console.error("verifyClientEmailOtp error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong!",
+      error: error?.message
+    });
   }
 };
 
 
-
-
+// mobile otp
 export const clientSendMobileOtpCode = async (req, res) => {
   try {
     const verify = await authClient(req, res)
@@ -454,30 +578,229 @@ export const clientSendMobileOtpCode = async (req, res) => {
   }
 }
 
-
-export const clientMobileNoVerify = async (req, res) => {
+// resent otp
+export const clientResendOtp = async (req, res) => {
   try {
-    const verify = await authClient(req, res)
-    if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+    const verify = await authClient(req, res);
 
-    const client = await Client.findById(req?.user?._id);
-    if (!client) return res.status(404).json({ success: false, message: "Not register with us" })
-    if (client.acceptClientTls) return res.status(400).json({ success: false, message: "Account Already verified" })
-    if (!client.emailVerify) return res.status(400).json({ success: false, message: "Account not verified with mail" })
+    if (!verify.success) {
+      return res.status(401).json({ success: false, message: verify.message, });
+    }
+
+    const client = await Client.findById(req.user._id);
+
+    if (!client) {
+      return res.status(401).json({ success: false, message: "Not signed up with us", });
+    }
+
+    if (client.mobileVerify || client.isActive || client.emailVerify) {
+      return res.status(400).json({ success: false, message: "Already registered with us", });
+    }
+
+    /** * CHECK LOCK STATUS */
+    const attempts = client.mobileOTP?.attempts || 0;
+    const lockedAt = client.mobileOTP?.lockedAt;
+
+    if (attempts >= MAX_OTP_ATTEMPTS && lockedAt) {
+      const lockExpiry = new Date(lockedAt).getTime() + LOCK_DURATION;
+
+      if (Date.now() < lockExpiry) {
+        const minutesLeft = Math.ceil((lockExpiry - Date.now()) / (1000 * 60));
+
+        return res.status(429).json({ success: false, message: `Too many OTP requests. Try again after sometime`, });
+      }
+
+      /*** RESET AFTER 1 HOUR */
+      client.mobileOTP.attempts = 0;
+      client.mobileOTP.lockedAt = null;
+
+      await client.save();
+    }
+
+    const otp = otp6Digit();
+
+    /** * SEND OTP FIRST */
     try {
-      const updateClient = await Client.findByIdAndUpdate(req?.user?._id, { $set: { mobileVerify: true } })
-      const admin = await Admin.find({}).select("-password")
-      const jwtToken = await jwt.sign({ _id: client?._id, email: client?.email }, process.env.CLIENT_SECRET_KEY, { expiresIn: '6h' })
-      res.status(200).json({ success: true, message: "Please check your mail" });
+      await sendOTPMsg({ mobile: client.mobileNo, otp, });
+
+      const newAttempts = (client.mobileOTP?.attempts || 0) + 1;
+
+      client.mobileOTP = {
+        otp,
+        attempts: newAttempts,
+        createdAt: new Date(),
+        lockedAt: newAttempts >= MAX_OTP_ATTEMPTS
+          ? new Date()
+          : null,
+      };
+
+      await client.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Successfully resent OTP"
+      });
     } catch (err) {
-      console.log("send forget password mail error", err);
-      return res.status(400).json({ success: false, message: "Failed to send mail to activate account" });
+      console.error("send otp error:", err);
+
+      return res.status(400).json({ success: false, message: "Failed to send OTP", });
     }
   } catch (error) {
-    console.log("clientMobileNoVerify: ", error);
-    return res.status(500).json({ success: false, message: "Internal server error", error: error });
+    console.error("resend otp error:", error);
+
+    return res.status(500).json({
+      success: false, message: "Something went wrong",
+    });
   }
-}
+};
+
+export const verifyClientMobileOtp = async (req, res) => {
+  try {
+    const verify = await authClient(req, res);
+
+    if (!verify.success) {
+      return res.status(401).json({ success: false, message: verify.message, });
+    }
+
+    const client = await Client.findById(req.user._id);
+
+    if (!client) {
+      return res.status(401).json({ success: false, message: "Not registered with us", });
+    }
+
+    if (client.mobileVerify) {
+      return res.status(400).json({ success: false, message: "Account is already verified", });
+    }
+
+    const { otp } = req.body;
+
+    if (!otp) {
+      return res.status(400).json({ success: false, message: "OTP is required", });
+    }
+
+    /** * CHECK LOCK STATUS*/
+    const attempts = client.mobileOTP?.attempts || 0;
+    const lockedAt = client.mobileOTP?.lockedAt;
+
+    if (attempts >= MAX_OTP_ATTEMPTS && lockedAt) {
+      const lockExpiry = new Date(lockedAt).getTime() + LOCK_DURATION;
+
+      if (Date.now() < lockExpiry) {
+        const minutesLeft = Math.ceil(
+          (lockExpiry - Date.now()) / 60000
+        );
+
+        return res.status(429).json({ success: false, message: `Too many attempts. Try again after sometime`, });
+      }
+
+      // Reset after 1 hour
+      client.mobileOTP.attempts = 0;
+      client.mobileOTP.lockedAt = null;
+      await client.save();
+    }
+
+    /** * OTP EXPIRY CHECK */
+    const otpCreatedAt = new Date(client.mobileOTP?.createdAt).getTime();
+
+    const isExpired = !otpCreatedAt || Date.now() - otpCreatedAt > OTP_EXPIRY;
+
+    const isValidOtp = !isExpired && String(client.mobileOTP?.otp) === String(otp);
+
+    /** * INVALID OTP */
+    if (!isValidOtp) {
+      const newAttempts = (client.mobileOTP?.attempts || 0) + 1;
+
+      client.mobileOTP.attempts = newAttempts;
+
+      if (newAttempts >= MAX_OTP_ATTEMPTS) {
+        client.mobileOTP.lockedAt = new Date();
+      }
+
+      await client.save();
+
+      return res.status(400).json({
+        success: false,
+        message: newAttempts >= MAX_OTP_ATTEMPTS
+          ? "Too many invalid attempts. Please try after sometime"
+          : "Invalid or expired OTP",
+      });
+    }
+
+    /** * RESET OTP DATA AFTER SUCCESS */
+    client.mobileOTP = {
+      otp: null,
+      attempts: 0,
+      createdAt: null,
+      lockedAt: null,
+    };
+
+    await client.save();
+
+    try {
+      const date = new Date();
+      const noOfClients = await Client.countDocuments();
+
+      const consultantCode = `${date.getFullYear()}` + `${String(date.getMonth() + 1).padStart(2, "0")}` +
+        `${date.getDate()}` + `${noOfClients + 1}`;
+
+      const updatedClient =
+        await Client.findByIdAndUpdate(
+          client._id,
+          {
+            $set: {
+              emailVerify: false,
+              mobileVerify: true,
+              acceptClientTls: true,
+              isActive: true,
+              isProfileCompleted: false,
+              lastLogin: date,
+              recentLogin: date,
+              tlsUrl: "",
+              "profile.profilePhoto": "",
+              "profile.consultantName": client.fullName,
+              "profile.consultantCode": consultantCode,
+              "profile.associateWithUs": date,
+              "profile.fatherName": "",
+              "profile.primaryEmail": client.email,
+              "profile.alternateEmail": "",
+              "profile.primaryMobileNo": client.mobileNo,
+              "profile.whatsupNo": "",
+              "profile.alternateMobileNo": "",
+              "profile.panNo": "",
+              "profile.aadhaarNo": "",
+              "profile.dob": "",
+              "profile.gender": "",
+              "profile.address": "",
+              "profile.state": "",
+              "profile.district": "",
+              "profile.city": "",
+              "profile.pinCode": "",
+              "profile.about": "",
+              "profile.kycPhoto": "",
+              "profile.kycAadhar": "",
+              "profile.kycAadhaarBack": "",
+              "profile.kycPan": "",
+            },
+          },
+          { new: true }
+        );
+
+      const token = await updatedClient.getAuth(true);
+
+      return res
+        .status(200)
+        .header("x-auth-token", token)
+        .header("Access-Control-Expose-Headers", "x-auth-token")
+        .json({ success: true, message: "Successfully signed up", });
+    } catch (err) {
+      console.error("mobile verify error:", err);
+      return res.status(400).json({ success: false, message: "Failed to complete verification", });
+    }
+  } catch (error) {
+    console.error("verifyClientMobileOtp error:", error);
+    return res.status(500).json({ success: false, message: "Something went wrong", error: error?.message });
+  }
+};
 
 
 export const acceptClientTerms_Conditions = async (req, res) => {
@@ -654,11 +977,19 @@ export const updateClientProfile = async (req, res, next) => {
 // add new case
 export const addNewClientCase = async (req, res) => {
   try {
-    const verify = await authClient(req, res)
-    if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
+    console.log("req--", req.user)
     const client = await Client.findById(req?.user?._id);
     if (!client) return res.status(404).json({ success: false, message: "Not register with us" })
     if (!client?.isActive) return res.status(400).json({ success: false, message: "Account is not active" })
+    if (!client?.emailVerify) {
+      return res.status(403).json({
+        success: false,
+        code: "EMAIL_NOT_VERIFIED",
+        email: client?.email,
+        message: "Please verify your email address"
+      });
+    }
+
     const { error } = validateAddClientCase(req.body);
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
     const { admin } = await Admin.find({ email: process.env.ADMIN_MAIL_ID })
@@ -1009,6 +1340,16 @@ export const clientAddCaseFile = async (req, res) => {
     const client = await Client.findById(req?.user?._id)
     if (!client) return res.status(401).json({ success: false, message: "Account not found" })
     if (!client?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
+
+    if (!client?.emailVerify) {
+      return res.status(403).json({
+        success: false,
+        code: "EMAIL_NOT_VERIFIED",
+        email: client?.email,
+        message: "Please verify your email address"
+      });
+    }
+
 
     const { _id } = req.query
     if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })

@@ -22,8 +22,12 @@ import { accountVerificationTemplate } from "../utils/emailTemplates/accountVeri
 import { accountTermConditionTemplate } from "../utils/emailTemplates/accountTermConditionTemplate.js";
 import { forgetPasswordTemplate } from "../utils/emailTemplates/forgotPasswordTemplate.js";
 import { editServiceAgreement } from "../utils/createPdf/serviceAgreement.js";
+import { sendOTPMsg } from "../services/messageService.js";
 
 
+const MAX_OTP_ATTEMPTS = 5;
+const LOCK_DURATION = 60 * 60 * 1000; // 1 hour
+const OTP_EXPIRY = 5 * 60 * 1000; // 5 min
 
 
 export const partnerAuthenticate = async (req, res) => {
@@ -63,81 +67,357 @@ export const partnerUploadAttachment = async (req, res) => {
 }
 
 
-
-//  for create new account
 export const signUp = async (req, res) => {
   try {
     const { error } = validateSignUp(req.body);
+
     if (error) {
-      return res.status(400).json({ success: false, message: error.details[0].message });
+      return res.status(400).json({
+        success: false,
+        message: error.details[0].message,
+      });
     }
 
-    const { fullName, email, mobileNo, workAssociation, areaOfOperation, partnerType, agreement, password } = req.body;
-    if (!agreement) {
-      return res.status(400).json({ success: false, message: "Must agree with our service agreement" });
-    }
-
-    const normalizedEmail = email?.trim()?.toLowerCase();
-    const otp = otp6Digit();
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    let partner = await Partner.findOne({ email: normalizedEmail });
-
-    // ✅ If partner exists and already verified
-    if (partner?.emailVerify || partner?.mobileVerify) {
-      return res.status(400).json({ success: false, message: "Email already registered with us" });
-    }
-
-    const partnerData = {
+    const {
       fullName,
-      email: normalizedEmail,
+      email,
       mobileNo,
       workAssociation,
       areaOfOperation,
       partnerType,
-      password: hashedPassword,
-      emailOTP: { otp, createAt: Date.now() },
-      acceptTnc: agreement,
-    };
+      agreement,
+      password,
+    } = req.body;
 
-    let partnerDoc;
-    if (!partner) {
-      // Create new partner
-      partnerDoc = new Partner(partnerData);
-      await partnerDoc.save();
-    } else {
-      // Update existing partner
-      partnerDoc = await Partner.findByIdAndUpdate(partner._id, { $set: partnerData }, { new: true });
+    if (!agreement) {
+      return res.status(400).json({
+        success: false,
+        message: "Must agree with our service agreement",
+      });
     }
 
-    // ✅ Generate auth token
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const existingPartnerByEmail = await Partner.findOne({email: normalizedEmail});
+
+    const existingPartnerByMobile = await Partner.findOne({mobileNo});
+
+    if (existingPartnerByEmail?.mobileVerify) {
+      return res.status(400).json({
+        success: false,
+        message: "Email already registered with us",
+      });
+    }
+
+    if (existingPartnerByMobile?.mobileVerify) {
+      return res.status(400).json({
+        success: false,
+        message: "Mobile number already registered with us",
+      });
+    }
+
+    const targetPartner = existingPartnerByEmail || existingPartnerByMobile;
+
+    /*** CHECK OTP LOCK */
+
+    if (targetPartner?.mobileOTP) {
+      const attempts = targetPartner.mobileOTP.attempts || 0;
+
+      const lockedAt = targetPartner.mobileOTP.lockedAt;
+
+      if (attempts >= MAX_OTP_ATTEMPTS && lockedAt) {
+        const lockExpiry = new Date(lockedAt).getTime() + LOCK_DURATION;
+
+        if (Date.now() < lockExpiry) {
+          const minutesLeft = Math.ceil((lockExpiry - Date.now()) / 60000);
+
+          return res.status(429).json({
+            success: false,
+            message: `Too many OTP requests. Try again after sometime`,
+          });
+        }
+
+        /*** RESET AFTER 1 HOUR*/
+        targetPartner.mobileOTP.attempts = 0;
+        targetPartner.mobileOTP.lockedAt = null;
+
+        await targetPartner.save();
+      }
+    }
+
+    const otp = otp6Digit();
+    const hashedPassword = await bcrypt.hash(password,10);
+
+    let partnerDoc;
+
+    /**
+     * NEW PARTNER
+     */
+    if (!targetPartner) {
+      partnerDoc = new Partner({
+        fullName,
+        email: normalizedEmail,
+        mobileNo,
+        workAssociation,
+        areaOfOperation,
+        partnerType,
+        password: hashedPassword,
+        acceptTnc: agreement,
+
+        mobileOTP: {
+          otp,
+          attempts: 1,
+          createdAt: new Date(),
+          lockedAt: null,
+        },
+      });
+
+      await partnerDoc.save();
+    } else {
+      /*** EXISTING UNVERIFIED PARTNER*/
+      const newAttempts = (targetPartner.mobileOTP?.attempts || 0) + 1;
+
+      partnerDoc = await Partner.findByIdAndUpdate(
+        targetPartner._id,
+        {
+          $set: {
+            fullName,
+            email: normalizedEmail,
+            mobileNo,
+            workAssociation,
+            areaOfOperation,
+            partnerType,
+            password: hashedPassword,
+            acceptTnc: agreement,
+
+            mobileOTP: {
+              otp,
+              attempts: newAttempts,
+              createdAt: new Date(),
+              lockedAt:newAttempts >= MAX_OTP_ATTEMPTS
+                  ? new Date()
+                  : null,
+            },
+          },
+        },
+        { new: true }
+      );
+    }
+
     const token = await partnerDoc.getAuth();
 
-    // ✅ Send OTP
     try {
-      await sendMail({
-        subject: "Claim Solution Partner Account Verification",
-        to: normalizedEmail,
-        html: accountVerificationTemplate({ name: fullName, otp, type: "Partner" }),
-      });
+      await sendOTPMsg({mobile: mobileNo,otp,});
+
       return res
         .status(201)
         .header("x-auth-token", token)
-        .header("Access-Control-Expose-Headers", "x-auth-token")
-        .json({ success: true, message: "Successfully sent OTP" });
-    } catch (mailErr) {
-      console.error("send OTP error:", mailErr);
-      return res.status(400).json({ success: false, message: "Failed to send OTP" });
+        .header( "Access-Control-Expose-Headers","x-auth-token" )
+        .json({ success: true, message: "Successfully sent OTP", });
+    } catch (otpError) {
+      console.error( "Partner OTP send error:", otpError  );
+
+      return res.status(400).json({
+        success: false,
+        message: "Failed to send OTP",
+      });
     }
   } catch (error) {
-    console.error("signup error:", error);
-    return res.status(500).json({ success: false, message: "Internal server error", error });
+    console.error("partner signup error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+      error:error?.message
+    });
   }
 };
 
 
-//  at time of signup
-export const partnerResendOtp = async (req, res) => {
+// verify mobile otp at time of signup
+export const verifyMobileOtp = async (req, res) => {
+  try {
+    const verify = await authPartner(req, res);
+
+    if (!verify.success) {
+      return res.status(401).json({
+        success: false,
+        message: verify.message,
+      });
+    }
+
+    const partner = await Partner.findById(req.user._id);
+
+    if (!partner) {
+      return res.status(401).json({
+        success: false,
+        message: "Not registered with us",
+      });
+    }
+
+    if (partner.mobileVerify) {
+      return res.status(400).json({
+        success: false,
+        message: "Account is already verified",
+      });
+    }
+
+    const { otp } = req.body;
+
+    if (!otp) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP is required",
+      });
+    }
+
+    /** * CHECK LOCK STATUS*/
+    const attempts = partner.mobileOTP?.attempts || 0;
+    const lockedAt = partner.mobileOTP?.lockedAt;
+
+    if (attempts >= MAX_OTP_ATTEMPTS && lockedAt) {
+      const lockExpiry = new Date(lockedAt).getTime() + LOCK_DURATION;
+
+      if (Date.now() < lockExpiry) {
+        const minutesLeft = Math.ceil((lockExpiry - Date.now()) / 60000);
+
+        return res.status(429).json({
+          success: false,
+          message: `Too many invalid attempts. Try again after sometime`,
+        });
+      }
+
+      // Reset after 1 hour
+      partner.mobileOTP.attempts = 0;
+      partner.mobileOTP.lockedAt = null;
+
+      await partner.save();
+    }
+
+    /*** OTP VALIDATION*/
+    const otpCreatedAt = new Date(partner.mobileOTP?.createdAt).getTime();
+
+    const isExpired = !otpCreatedAt || Date.now() - otpCreatedAt > OTP_EXPIRY;
+
+    const isValidOtp = !isExpired && String(partner.mobileOTP?.otp) === String(otp);
+
+    /*** INVALID OTP*/
+    if (!isValidOtp) {
+      const newAttempts = (partner.mobileOTP?.attempts || 0) + 1;
+
+      partner.mobileOTP.attempts = newAttempts;
+
+      if (newAttempts >= MAX_OTP_ATTEMPTS) {
+        partner.mobileOTP.lockedAt = new Date();
+      }
+
+      await partner.save();
+
+      return res.status(400).json({
+        success: false,
+        message: newAttempts >= MAX_OTP_ATTEMPTS
+            ? "Too many invalid attempts. Please try again after sometime."
+            : "Invalid or expired OTP",
+      });
+    }
+
+    /** * OTP VERIFIED* CLEAR OTP DATA*/
+    partner.mobileOTP = {
+      otp: null,
+      attempts: 0,
+      createdAt: null,
+      lockedAt: null,
+    };
+
+    await partner.save();
+
+    const date = new Date();
+
+    const noOfPartners = await Partner.countDocuments();
+
+    const consultantCode =
+      `${date.getFullYear()}` +
+      `${String(date.getMonth() + 1).padStart(2, "0")}` +
+      `${date.getDate()}` +
+      `${noOfPartners + 1}`;
+
+    const profileData = {
+      profilePhoto: "",
+      consultantName: partner.fullName,
+      consultantCode,
+      associateWithUs: date,
+      primaryEmail: partner.email,
+      alternateEmail: "",
+      primaryMobileNo: partner.mobileNo,
+      alternateMobileNo: "",
+      whatsupNo: "",
+      panNo: "",
+      aadhaarNo: "",
+      dob: null,
+      gender: "",
+      businessName: "",
+      companyName: "",
+      natureOfBusiness: "",
+      designation: "",
+      areaOfOperation: partner.areaOfOperation,
+      workAssociation: partner.workAssociation,
+      state: "",
+      district: "",
+      city: "",
+      pinCode: "",
+      about: "",
+      kycPhoto: "",
+      kycAadhaar: "",
+      kycAadhaarBack: "",
+      kycPan: "",
+    };
+
+    const bankingData = {
+      bankName: "",
+      bankAccountNo: "",
+      bankBranchName: "",
+      gstNo: "",
+      panNo: "",
+      cancelledChequeImg: "",
+      gstCopyImg: "",
+    };
+
+    const updatedPartner =
+      await Partner.findByIdAndUpdate(
+        partner._id,
+        {
+          $set: {
+            emailVerify: false,
+            mobileVerify: true,
+            isActive: true,
+            tlsUrl: `${process.env.FRONTEND_URL}/agreement/partner.pdf`,
+            profile: profileData,
+            bankingDetails: bankingData,
+          },
+        },
+        { new: true }
+      );
+
+    const token = await updatedPartner.getAuth(true);
+
+    return res
+      .status(200)
+      .header("x-auth-token", token)
+      .header("Access-Control-Expose-Headers", "x-auth-token")
+      .json({success: true, message: "Successfully signed up",});
+  } catch (error) {
+    console.error("verifyMobileOtp error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+      error:error?.message
+    });
+  }
+};
+
+//  at time of signup mobile resend otp
+export const partnerResendMobileOtp = async (req, res) => {
   try {
     const verify = await authPartner(req, res);
     if (!verify.success) {
@@ -153,37 +433,176 @@ export const partnerResendOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: "Account is already registered" });
     }
 
-    const otp = otp6Digit();
-    const updatedPartner = await Partner.findByIdAndUpdate(
-      partner._id,
-      { $set: { emailOTP: { otp, createAt: Date.now() } } },
-      { new: true }
-    );
+    /** * CHECK LOCK STATUS */
+    const attempts = partner.mobileOTP?.attempts || 0;
+    const lockedAt = partner.mobileOTP?.lockedAt;
 
-    if (!updatedPartner) {
-      return res.status(401).json({ success: false, message: "Not signed up with us" });
+    if (attempts >= MAX_OTP_ATTEMPTS && lockedAt) {
+      const lockExpiry = new Date(lockedAt).getTime() + LOCK_DURATION;
+
+      if (Date.now() < lockExpiry) {
+        const minutesLeft = Math.ceil((lockExpiry - Date.now()) / (1000 * 60));
+
+        return res.status(429).json({ success: false, message: `Too many OTP requests. Try again after sometime`, });
+      }
+
+      /*** RESET AFTER 1 HOUR */
+      partner.mobileOTP.attempts = 0;
+      partner.mobileOTP.lockedAt = null;
+
+      await partner.save();
     }
 
+    const otp = otp6Digit();
+
+    /** * SEND OTP FIRST */
     try {
-      await sendMail({
-        subject: "Account Verification - Resend OTP",
-        to: partner.email,
-        html: accountVerificationTemplate({ name: partner.fullName, otp, type: "Partner" }),
+      await sendOTPMsg({ mobile: partner.mobileNo, otp, });
+
+      const newAttempts = (partner.mobileOTP?.attempts || 0) + 1;
+
+      partner.mobileOTP = {
+        otp,
+        attempts: newAttempts,
+        createdAt: new Date(),
+        lockedAt: newAttempts >= MAX_OTP_ATTEMPTS
+          ? new Date()
+          : null,
+      };
+
+      await partner.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Successfully resent OTP"
       });
-      return res.status(200).json({ success: true, message: "OTP resent successfully" });
     } catch (err) {
-      console.error("Error sending OTP:", err);
-      return res.status(400).json({ success: false, message: "Failed to resend OTP" });
+      console.error("send otp error:", err);
+
+      return res.status(400).json({ success: false, message: "Failed to send OTP", });
     }
   } catch (error) {
-    console.error("partnerResendOtp error:", error);
-    return res.status(500).json({ success: false, message: "Internal server error", error });
+    console.error("resend otp error:", error);
+
+    return res.status(500).json({
+      success: false, message: "Something went wrong",
+    });
   }
 };
 
 
 //  for email verification check
-export const verifyEmailOtp = async (req, res) => {
+export const sendPartnerEmailOtp = async (req, res) => {
+  try {
+  const verify = await authPartner(req, res);
+
+    if (!verify.success) {
+      return res.status(401).json({
+        success: false,
+        message: verify.message,
+      });
+    }
+
+    const partner = await Partner.findById(req?.user?._id);
+
+    if (!partner) {
+      return res.status(404).json({
+        success: false,
+        message: "Account not regsitered with us",
+      });
+    }
+
+    if (partner.emailVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Email already verified",
+      });
+    }
+
+    const now = Date.now();
+
+    // Initialize if missing
+    if (!partner.emailOTP) {
+      partner.emailOTP = {
+        otp: "",
+        attempts: 0,
+        createdAt: null,
+        lockedAt: null,
+      };
+    }
+
+    /** * Check lock status */
+    if (partner.emailOTP.lockedAt) {
+      const lockTime = new Date(partner.emailOTP.lockedAt).getTime();
+      const lockExpired = now - lockTime >= LOCK_DURATION;
+
+      if (!lockExpired) {
+        const remainingMinutes = Math.ceil((LOCK_DURATION - (now - lockTime)) / (60 * 1000));
+
+        return res.status(429).json({
+          success: false,
+          message: `Maximum OTP limit reached. Please try again after sometime`,
+        });
+      }
+
+      // Lock expired → reset to initial state
+      partner.emailOTP = {
+        otp: "",
+        attempts: 0,
+        createdAt: null,
+        lockedAt: null,
+      };
+    }
+
+    /** * Check max OTP send attempts */
+    if (partner.emailOTP.attempts >= MAX_OTP_ATTEMPTS) {
+      partner.emailOTP.lockedAt = new Date();
+      await partner.save();
+
+      return res.status(429).json({
+        success: false,
+        message: "Maximum OTP limit reached. Please try again after sometime",
+      });
+    }
+
+    const otp = otp6Digit();
+
+    partner.emailOTP.otp = otp;
+    partner.emailOTP.createdAt = new Date();
+    partner.emailOTP.attempts += 1;
+
+    // Lock immediately after reaching max limit
+    if (partner.emailOTP.attempts >= MAX_OTP_ATTEMPTS) {
+      partner.emailOTP.lockedAt = new Date();
+    }
+
+    await partner.save();
+
+    await sendMail({
+      subject: "Claim Solution Partner Account Verification",
+      to: partner.email.trim().toLowerCase(),
+      html: accountVerificationTemplate({
+        name: partner.fullName,
+        otp,
+        type: "Partner",
+      }),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Verification OTP sent successfully",
+    });
+  } catch (error) {
+    console.error("sendClientEmailOtp:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send verification OTP",
+    });
+  }
+};
+
+export const verifyParnerEmailOtp = async (req, res) => {
   try {
     const verify = await authPartner(req, res);
     if (!verify.success) {
@@ -195,8 +614,18 @@ export const verifyEmailOtp = async (req, res) => {
       return res.status(401).json({ success: false, message: "Not registered with us" });
     }
 
-    if (partner.mobileVerify || partner.emailVerify) {
-      return res.status(400).json({ success: false, message: "Account is already verified" });
+    if (!partner.mobileVerify) {
+      return res.status(400).json({
+        success: false,
+        message: "Mobile number is not verified",
+      });
+    }
+
+    if (partner.emailVerify) {
+      return res.status(400).json({
+        success: false,
+        message: "Email already verified",
+      });
     }
 
     const { otp } = req.body;
@@ -204,12 +633,59 @@ export const verifyEmailOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: "OTP is required" });
     }
 
-    const otpValidFrom = Date.now() - 5 * 60 * 1000; // 5 minutes
-    const otpCreatedAt = new Date(partner.emailOTP?.createAt).getTime();
-    const isOtpValid = otpCreatedAt >= otpValidFrom && partner.emailOTP?.otp === otp;
+    /**
+     * CHECK LOCK STATUS
+     */
+    const attempts = partner.emailOTP?.attempts || 0;
+    const lockedAt = partner.emailOTP?.lockedAt;
 
-    if (!isOtpValid) {
-      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+    if (attempts >= MAX_OTP_ATTEMPTS && lockedAt) {
+      const lockExpiry =
+        new Date(lockedAt).getTime() + LOCK_DURATION;
+
+      if (Date.now() < lockExpiry) {
+        const minutesLeft = Math.ceil(
+          (lockExpiry - Date.now()) / 60000
+        );
+
+        return res.status(429).json({
+          success: false,
+          message: `Too many invalid attempts. Try again after sometime`,
+        });
+      }
+
+      // Reset after 1 hour
+      partner.emailOTP.attempts = 0;
+      partner.emailOTP.lockedAt = null;
+
+      await partner.save();
+    }
+
+    /*** OTP VALIDATION*/
+    const otpCreatedAt = new Date(partner.emailOTP?.createdAt).getTime();
+
+    const isExpired = !otpCreatedAt || Date.now() - otpCreatedAt > OTP_EXPIRY;
+
+    const isValidOtp = !isExpired && String(partner.emailOTP?.otp) === String(otp);
+
+    /*** INVALID OTP*/
+    if (!isValidOtp) {
+      const newAttempts = (partner.emailOTP?.attempts || 0) + 1;
+
+      partner.emailOTP.attempts = newAttempts;
+      if (newAttempts >= MAX_OTP_ATTEMPTS) {
+        partner.emailOTP.lockedAt = new Date();
+      }
+
+      await partner.save();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          newAttempts >= MAX_OTP_ATTEMPTS
+            ? "Too many invalid attempts. Please try after sometime."
+            : "Invalid or expired OTP",
+      });
     }
 
     try {
@@ -230,72 +706,20 @@ export const verifyEmailOtp = async (req, res) => {
         }]
       });
 
-      const noOfPartners = await Partner.countDocuments();
-      const consultantCode = `${date?.getFullYear()}${date?.getMonth() + 1 < 10 ? `0${date?.getMonth() + 1}` : date?.getMonth() + 1
-        }${date?.getDate()}${noOfPartners + 1}`;
-
-      const profileData = {
-        profilePhoto: "",
-        consultantName: partner.fullName,
-        consultantCode,
-        associateWithUs: date,
-        primaryEmail: partner.email,
-        alternateEmail: "",
-        primaryMobileNo: partner.mobileNo,
-        alternateMobileNo: "",
-        whatsupNo: "",
-        panNo: "",
-        aadhaarNo: "",
-        dob: null,
-        gender: "",
-        businessName: "",
-        companyName: "",
-        natureOfBusiness: "",
-        designation: "",
-        areaOfOperation: partner.areaOfOperation,
-        workAssociation: partner.workAssociation,
-        state: "",
-        district: "",
-        city: "",
-        pinCode: "",
-        about: "",
-        kycPhoto: "",
-        kycAadhaar: "",
-        kycAadhaarBack: "",
-        kycPan: "",
-      };
-
-      const bankingData = {
-        bankName: "",
-        bankAccountNo: "",
-        bankBranchName: "",
-        gstNo: "",
-        panNo: "",
-        cancelledChequeImg: "",
-        gstCopyImg: "",
-      };
-
-      const updatedPartner = await Partner.findByIdAndUpdate(
-        partner._id,
-        {
-          $set: {
-            emailVerify: true,
-            mobileVerify: true,
-            isActive: true,
-            tlsUrl: `${process.env.FRONTEND_URL}/agreement/partner.pdf`,
-            profile: profileData,
-            bankingDetails: bankingData,
-          },
+  await Partner.findByIdAndUpdate(partner._id, {
+      $set: {
+        emailVerify: true,
+        emailOTP: {
+          otp: null,
+          attempts: 0,
+          createdAt: null,
+          lockedAt: null,
         },
-        { new: true }
-      );
+      },
+    });
 
-      const token = await updatedPartner.getAuth(true);
-      return res
-        .status(200)
-        .header("x-auth-token", token)
-        .header("Access-Control-Expose-Headers", "x-auth-token")
-        .json({ success: true, message: "Successfully signed up" });
+    return res.status(200).json({ success: true, message: "Email verified successfully", });
+  
     } catch (err) {
       console.error("OTP verification error:", err);
       return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
@@ -306,51 +730,6 @@ export const verifyEmailOtp = async (req, res) => {
   }
 };
 
-
-
-export const partnerSendMobileOtpCode = async (req, res) => {
-  try {
-    const verify = await authPartner(req, res)
-    if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-    const partner = await Partner.findById(req?.user?._id);
-    if (!partner) return res.status(401).json({ success: false, message: "Not register with us" })
-    if (partner.acceptPartnerTls) return res.status(401).json({ success: false, message: "Account Already verified" })
-    if (!partner.emailVerify) return res.status(401).json({ success: false, message: "Account not verified with mail" })
-    const { mobileNo } = req.body
-    if (!mobileNo) return res.status(400).json({ success: false, message: "MobileNo. required" })
-    if (mobileNo !== partner.mobileNo) return res.status(400).json({ success: false, message: "MobileNo. not match with account" })
-    return res.status(200).json({ success: true, message: "Sending otp on mobile" })
-
-  } catch (error) {
-    console.log("partnerSendMobileOtpCode: ", error);
-    return res.status(500).json({ success: false, message: "Internal server error", error: error });
-  }
-}
-
-
-export const partnerMobileNoVerify = async (req, res) => {
-  try {
-    const verify = await authPartner(req, res)
-    if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-    const partner = await Partner.findById(req?.user?._id);
-    if (!partner) return res.status(401).json({ success: false, message: "Not register with us" })
-    if (partner.acceptPartnerTls) return res.status(401).json({ success: false, message: "Account Already verified" })
-    if (!partner.emailVerify) return res.status(400).json({ success: false, message: "Account not verified with mail" })
-    try {
-      const updatePartner = await Partner.findByIdAndUpdate(req?.user?._id, { $set: { mobileVerify: true } })
-      const admin = await Admin.find({}).select("-password")
-      const jwtToken = await jwt.sign({ _id: partner?._id, email: partner?.email }, process.env.PARTNER_SECRET_KEY, { expiresIn: '6h' })
-      res.status(200).json({ success: true, message: "Please check your mail" });
-    } catch (err) {
-      console.log("send forget password mail error", err);
-      return res.status(400).json({ success: false, message: "Failed to send mail to activate account" });
-    }
-  } catch (error) {
-    console.log("partnerMobileNoVerify: ", error);
-    return res.status(500).json({ success: false, message: "Internal server error", error: error });
-  }
-}
 
 export const acceptPartnerTerms_Conditions = async (req, res) => {
   try {
@@ -778,6 +1157,16 @@ export const addNewCase = async (req, res) => {
     const partner = await Partner.findById(req?.user?._id);
     if (!partner) return res.status(404).json({ success: false, message: "Not register with us" })
     if (!partner?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
+
+    if (!partner?.emailVerify) {
+      return res.status(403).json({
+        success: false,
+        code: "EMAIL_NOT_VERIFIED",
+        email: partner?.email,
+        message: "Please verify your email address"
+      });
+    }
+
     const { error } = validateAddCase(req.body);
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 

@@ -37,13 +37,17 @@ const clientSchema = new mongoose.Schema({
    emailOTP: {
       type: {
          otp:{type:String,default:""},
-         createAt:{type:Date,default:null}
+         attempts:{type:Number,default:0},
+         createdAt:{type:Date,default:null},
+         lockedAt:{type:Date,default:null},
       },
    },
    mobileOTP: {
       type: {
          otp:{type:String,default:""},
-         createAt:{type:Date,default:null}
+         attempts:{type:Number,default:0},
+         createdAt:{type:Date,default:null},
+         lockedAt:{type:Date,default:null},
       },
    },
    recentLogin:{type:String,default:new Date()},

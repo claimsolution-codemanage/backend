@@ -23,6 +23,7 @@ export const accountVerificationTemplate = ({ name, otp, type }) => {
           margin: 0 auto;
           background: #ffffff;
           border-radius: 12px;
+          border:1px solid #3b82f6;
           overflow: hidden;
           box-shadow: 0 4px 10px rgba(0,0,0,0.05);
         }
@@ -117,11 +118,10 @@ export const accountVerificationTemplate = ({ name, otp, type }) => {
           </div>
           <div class="body">
             <h2>Hello ${name},</h2>
-            <p>We’re excited to have you on board! To keep your <b>${type|| ""}</b> account secure, please verify your account using the code below:</p>
+            <p>To proceed with sending your <b>Service Agreement</b> and complete your account setup, please verify your email address using the code below:</p>
 
             <div class="otp-box">${otp}</div>
-
-            <p>This OTP is valid for the next <b>10 minutes</b>. For your security, please do not share it with anyone.</p>
+            <p>This OTP is valid for the next <b>5 minutes</b>. For your security, please do not share it with anyone.</p>
 
           </div>
           <div class="footer">

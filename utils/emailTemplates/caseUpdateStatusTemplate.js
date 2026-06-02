@@ -24,6 +24,7 @@ export function caseUpdateStatusTemplate({type,caseNumber,statusRemark,caseStatu
           max-width: 600px;
           margin: 0 auto;
           background: #ffffff;
+          border:1px solid #3b82f6;
           border-radius: 12px;
           overflow: hidden;
           box-shadow: 0 4px 10px rgba(0,0,0,0.05);

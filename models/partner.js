@@ -32,10 +32,20 @@ const partnerSchema = new mongoose.Schema({
       type:Boolean,
       default:false
    },
+   emailOTP: {
+      type: {
+         otp:{type:String,default:""},
+         attempts:{type:Number,default:0},
+         createdAt:{type:Date,default:null},
+         lockedAt:{type:Date,default:null},
+      },
+   },
    mobileOTP: {
       type: {
          otp:{type:String,default:""},
-         createAt:{type:Date,default:null}
+         attempts:{type:Number,default:0},
+         createdAt:{type:Date,default:null},
+         lockedAt:{type:Date,default:null},
       },
    },
    forgotPasswordOTP: {
@@ -56,12 +66,6 @@ const partnerSchema = new mongoose.Schema({
    acceptTnc:{
       type:Boolean,
       default:false
-   },
-   emailOTP: {
-      type: {
-         otp:{type:String,default:""},
-         createAt:{type:Date,default:null}
-      },
    },
    isActive:{
     type:Boolean,
