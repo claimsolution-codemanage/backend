@@ -18,12 +18,6 @@ export const sendOTPMsg = async ({ mobile, otp }) => {
       }
     );
 
-    console.log("MSG91 Response:", response?.data, {
-          template_id: TEMPLATE_ID,
-          mobile,
-          authkey: AUTH_KEY,
-        },);
-
     return response.data;
   } catch (error) {
     console.error("MSG91 Error:", error.response?.data || error.message );
