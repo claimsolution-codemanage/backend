@@ -147,7 +147,70 @@ export const allLeads = async (req, res) => {
           preserveNullAndEmptyArrays: true
         }
       },
-      ...(Object.keys(sort)?.length ? [{ $sort: sort }] : []),
+      ...(isExport == "true" ? [] : [
+        {
+          $addFields: {
+            leadStatusScore: {
+              $cond: [
+                {
+                  $eq: [
+                    {
+                      $toLower: {
+                        $trim: {
+                          input: {
+                            $ifNull: [
+                              { $getField: { field: "lead_status", input: "$data" } },
+                              ""
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "active"
+                  ]
+                },
+                1,
+                0
+              ]
+            },
+
+            nextFollowUpSort: {
+              $let: {
+                vars: {
+                  followUp: {
+                    $ifNull: [
+                      { $getField: { field: "next_follow_up_date", input: "$data" } },
+                      null
+                    ]
+                  }
+                },
+                in: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $ne: ["$$followUp", null] },
+                        { $ne: [{ $trim: { input: "$$followUp" } }, ""] }
+                      ]
+                    },
+                    "$$followUp",
+                    "9999-12-31"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]),
+      {
+        $sort: {
+          ...(isExport == "true" ? {} : {
+            leadStatusScore: -1,
+            nextFollowUpSort: 1,
+          }),
+          ...(Object.keys(sort)?.length ? sort : {}),
+          createdAt: -1
+        }
+      },
       {
         "$facet": {
           "data": isExport == "true" ? [] : [
