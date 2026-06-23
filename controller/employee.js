@@ -1,4 +1,4 @@
-import Employee from "../models/employee.js";
+import Employee from "../models/employee/employeeModel.js";
 import Partner from "../models/partner.js";
 import Client from "../models/client.js";
 import Case from "../models/case/case.js";
@@ -30,22 +30,26 @@ import { firebaseUpload, getAllInvoiceQuery, validateResetPassword } from "../ut
 import { validateAdminAddEmployeeToCase, validateAdminSharePartner } from "../utils/validateAdmin.js";
 import { createOrUpdateCaseStatusForm } from "../utils/dbFunction.js";
 import { Types } from "mongoose";
-import CaseMergeDetails from "../models/caseMergeDetails.js";
-import { caseUpdateStatusTemplate } from "../utils/emailTemplates/caseUpdateStatusTemplate.js";
+import EmployeePermission from "../models/employee/employeePermissionModel.js";
 
 export const employeeAuthenticate = async (req, res) => {
    try {
-      const verify = await authEmployee(req, res)
-      if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-      const employee = await Employee.findById(req?.user?._id)
-      if (!employee) return res.status(401).json({ success: false, message: "Account not found" })
+      const { employee } = req
+      const permission = await EmployeePermission.findOne({ empId: employee?._id })
 
-      if (!employee?.isActive) return res.status(401).json({ success: false, message: "Account is not active" })
-
-      return res.status(200).json({ success: true, message: "Authorized Client" })
+      const authDetails = {
+         _id: employee._id,
+         fullName: employee.fullName,
+         email: employee.email,
+         role: employee.type,
+         designation: employee.designation,
+         branchId: employee.branchId,
+         permissions: permission?.permissions || []
+      }
+      return res.status(200).json({ success: true, message: "Authorized employee", data: authDetails })
    } catch (error) {
       console.log("employee auth error:", error);
-      res.status(500).json({ success: false, message: "Internal server error", error: error });
+      res.status(500).json({ success: false, message: "Something went wrong", error: error });
 
    }
 }

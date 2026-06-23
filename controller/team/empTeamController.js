@@ -1,10 +1,10 @@
 import { validMongooseId } from "../../utils/helper.js";
-import Employee from "../../models/employee.js";
+import Employee from "../../models/employee/employeeModel.js";
 
 export const deleteTeamEmpAccount = async (req, res) => {
    try {
-    const { employee } = req
-    if (employee?.designation?.toLowerCase() != "manager" || employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
+      const { employee } = req
+      if (employee?.designation?.toLowerCase() != "manager" || employee?.type?.toLowerCase() != "operation") return res.status(400).json({ success: false, message: "Access Denied" })
 
       const { _id } = req.query
 

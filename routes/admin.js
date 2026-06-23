@@ -12,6 +12,7 @@ import adminLeadRoutes from "../routes/leads/adminLeadRoutes.js"
 // sub routes
 import adminCaseFormRoutes from "../routes/caseForm/adminCaseFormRoutes.js"
 import empCasePaymentRoutes from "../routes/casePayment/adminCasePaymentRoutes.js"
+import adminMailRoutes from "../routes/mail/adminMailRoutes.js"
 
 
 //  for admin 
@@ -166,6 +167,8 @@ router.put("/updateNotification", authAdmin, adminController.updateNotification)
 router.use("/caseForm", adminCaseFormRoutes)
 router.use("/lead", adminLeadRoutes)
 router.use("/case_payment", empCasePaymentRoutes)
+router.use("/mail", adminMailRoutes)
+
 
 
 

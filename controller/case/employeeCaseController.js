@@ -4,7 +4,7 @@ import { bucket } from "../../firebase/config.js";
 import { Types } from "mongoose";
 import Case from "../../models/case/case.js";
 import CaseDoc from "../../models/caseDoc.js";
-import Employee from "../../models/employee.js";
+import Employee from "../../models/employee/employeeModel.js";
 import { validateAddClientCase } from "../../utils/validateClient.js";
 import * as dbFunction from "../../utils/dbFunction.js"
 import { validateUpdateEmployeeCase } from "../../utils/validateEmployee.js";

@@ -12,12 +12,13 @@ import * as empTeamController from '../controller/team/empTeamController.js'
 import empLeadRoutes from "../routes/leads/empLeadRoutes.js"
 import caseFormRoutes from "../routes/caseForm/empCaseFormRoutes.js"
 import empCasePaymentRoutes from "./casePayment/empCasePaymentRoutes.js"
+import empMailRoutes from "./mail/empMailRoutes.js"
 
 
 
 
 router.post("/signin", employeeController.employeeSignin)
-router.get("/authenticate", employeeController.employeeAuthenticate)
+router.get("/authenticate", authEmployee, employeeController.employeeAuthenticate)
 router.get("/profile", authEmployee, employeeController.empProfile)
 router.post("/addSathiTeamAcc", authEmployee, employeeController.createSathiTeamAcc)
 router.post("/resetPassword", authEmployee, employeeController.employeeResetPassword)
@@ -141,6 +142,7 @@ router.put("/emp/updateNotification", authEmployee, employeeController.updateNot
 router.use("/caseForm", caseFormRoutes)
 router.use("/lead", empLeadRoutes)
 router.use("/case_payment", empCasePaymentRoutes)
+router.use("/mail", empMailRoutes)
 
 
 

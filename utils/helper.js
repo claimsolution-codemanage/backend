@@ -7,11 +7,11 @@ import { getStorage, getDownloadURL } from 'firebase-admin/storage';
 // import { bucket } from "../index.js";
 import { bucket } from "../firebase/config.js";
 import multer from "multer";
-import {exec} from 'child_process'
+import { exec } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { commonSendMail, sendMail } from "./sendMail.js";
-import Employee from "../models/employee.js";
+import Employee from "../models/employee/employeeModel.js";
 import Notification from "../models/notification.js";
 import Admin from "../models/admin.js";
 import Client from "../models/client.js";
@@ -49,8 +49,8 @@ export const getValidateDate = (date) => {
 }
 
 
-export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, partnerId, clientId, employeeId, type = true, empSaleId = false,branchId=false,isReject=false) => {
- console.log("status-----",statusType,branchId,employeeId);
+export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, partnerId, clientId, employeeId, type = true, empSaleId = false, branchId = false, isReject = false) => {
+  console.log("status-----", statusType, branchId, employeeId);
   if (startDate && endDate) {
     const validStartDate = getValidateDate(startDate)
     if (!validStartDate) return { success: false, message: "start date not formated" }
@@ -68,10 +68,10 @@ export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, par
       empSaleId ? { empSaleId: empSaleId } : {},
       { isPartnerReferenceCase: false },
       { isEmpSaleReferenceCase: false },
-      isReject ? { currentStatus: isReject } :{} ,
+      isReject ? { currentStatus: isReject } : {},
       { currentStatus: { $regex: statusType, $options: "i" } },
       { isActive: type },
-      branchId ?  { branchId: { $regex:branchId, $options: "i" }} : {},
+      branchId ? { branchId: { $regex: branchId, $options: "i" } } : {},
       {
         $or: [
           { name: { $regex: searchQuery, $options: "i" } },
@@ -99,37 +99,37 @@ export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, par
 }
 
 export const getAllCaseDocQuery = (searchQuery, startDate, endDate) => {
-   if (startDate && endDate) {
-     const validStartDate = getValidateDate(startDate)
-     if (!validStartDate) return { success: false, message: "start date not formated" }
-     const validEndDate = getValidateDate(endDate)
-     if (!validEndDate) return { success: false, message: "end date not formated" }
-   }
- 
-   let query = {
-     $and: [
-       { isActive: false },
-       {
-         $or: [
-           { name: { $regex: searchQuery, $options: "i" } },
-           { type: { $regex: searchQuery, $options: "i" } },
-           { format: { $regex: searchQuery, $options: "i" } },
-         ]
-       },
-       startDate && endDate ? {
-         createdAt: {
-           $gte: new Date(startDate).setHours(0, 0, 0, 0),
-           $lte: new Date(endDate).setHours(23, 59, 59, 999)
-         }
-       } : {}
-     ]
-   };
-   return { success: true, query: query }
- }
+  if (startDate && endDate) {
+    const validStartDate = getValidateDate(startDate)
+    if (!validStartDate) return { success: false, message: "start date not formated" }
+    const validEndDate = getValidateDate(endDate)
+    if (!validEndDate) return { success: false, message: "end date not formated" }
+  }
+
+  let query = {
+    $and: [
+      { isActive: false },
+      {
+        $or: [
+          { name: { $regex: searchQuery, $options: "i" } },
+          { type: { $regex: searchQuery, $options: "i" } },
+          { format: { $regex: searchQuery, $options: "i" } },
+        ]
+      },
+      startDate && endDate ? {
+        createdAt: {
+          $gte: new Date(startDate).setHours(0, 0, 0, 0),
+          $lte: new Date(endDate).setHours(23, 59, 59, 999)
+        }
+      } : {}
+    ]
+  };
+  return { success: true, query: query }
+}
 
 
-export const getAllPartnerSearchQuery = (searchQuery, type, empSaleId = false, startDate = "", endDate = "",branchId=false) => {
-  console.log("salesId", empSaleId, startDate, endDate,branchId);
+export const getAllPartnerSearchQuery = (searchQuery, type, empSaleId = false, startDate = "", endDate = "", branchId = false) => {
+  console.log("salesId", empSaleId, startDate, endDate, branchId);
   if (startDate && endDate) {
     const validStartDate = getValidateDate(startDate)
     if (!validStartDate) return { success: false, message: "start date not formated" }
@@ -140,7 +140,7 @@ export const getAllPartnerSearchQuery = (searchQuery, type, empSaleId = false, s
     $and: [
       empSaleId ? { shareEmployee: { $in: empSaleId } } : {},
       { isActive: type },
-      branchId ?  { branchId: { $regex:branchId, $options: "i" }} : {},
+      branchId ? { branchId: { $regex: branchId, $options: "i" } } : {},
       {
         $or: [
           { "profile.consultantName": { $regex: searchQuery, $options: "i" } },
@@ -164,7 +164,7 @@ export const getAllPartnerSearchQuery = (searchQuery, type, empSaleId = false, s
   return { success: true, query: query }
 }
 
-export const getAllClientSearchQuery = (searchQuery, type, startDate = "", endDate = "",branchId=false) => {
+export const getAllClientSearchQuery = (searchQuery, type, startDate = "", endDate = "", branchId = false) => {
   console.log("query", searchQuery, type, startDate, endDate);
 
   if (startDate && endDate) {
@@ -177,7 +177,7 @@ export const getAllClientSearchQuery = (searchQuery, type, startDate = "", endDa
   let query = {
     $and: [
       { isActive: type },
-      branchId ? {branchId:{ $regex: branchId, $options: "i" }} : {} ,
+      branchId ? { branchId: { $regex: branchId, $options: "i" } } : {},
       {
         $or: [
           { "profile.consultantName": { $regex: searchQuery, $options: "i" } },
@@ -204,14 +204,14 @@ export const getAllClientSearchQuery = (searchQuery, type, startDate = "", endDa
 export const getAllClientResult = async (req) => {
   try {
     const { employee, admin } = req
-    let { limit = 10, pageNo = 0, search = "", startDate = "", endDate = "",type } = req.query
+    let { limit = 10, pageNo = 0, search = "", startDate = "", endDate = "", type } = req.query
     pageNo = pageNo ? (pageNo - 1) * limit : 0
 
     const matchQuery = {
-      "isActive": type=="true" ? true :false,
+      "isActive": type == "true" ? true : false,
     }
-    
-    if(employee){
+
+    if (employee) {
       matchQuery.branchId = { $regex: employee?.branchId || "", $options: "i", }
     }
 
@@ -222,8 +222,8 @@ export const getAllClientResult = async (req) => {
       }
     }
 
-    if(employee && !["sales","branch","operation","finance"]?.includes(employee?.type?.toLowerCase())){
-    return { status: 0, data: null,error:"Access deined" }
+    if (employee && !["sales", "branch", "operation", "finance"]?.includes(employee?.type?.toLowerCase())) {
+      return { status: 0, data: null, error: "Access deined" }
     }
 
     if (employee && employee?.type?.toLowerCase() == "sales" && employee?.designation?.toLowerCase() == "executive") {
@@ -377,34 +377,34 @@ export const getAllClientResult = async (req) => {
     const result = await Client.aggregate(pipeline)
     return { status: 1, data: result?.[0]?.data, noOfClient: result?.[0]?.totalCount?.[0]?.count }
   } catch (error) {
-    console.log("getAllClientResult error",error);
-    return { status: 0, data: null,error }
+    console.log("getAllClientResult error", error);
+    return { status: 0, data: null, error }
   }
 }
 
-export const getAllPartnerResult = async (req,employee=null) => {
+export const getAllPartnerResult = async (req, employee = null) => {
   try {
-    let { limit = 10, pageNo = 0, search = "", startDate = "", endDate = "",empId="" } = req.query
+    let { limit = 10, pageNo = 0, search = "", startDate = "", endDate = "", empId = "" } = req.query
     pageNo = pageNo ? (pageNo - 1) * limit : 0
 
-    const matchQuery = { }
-    console.log(req?.query?.type,"type",req?.query?.type=="false");
-    
+    const matchQuery = {}
+    console.log(req?.query?.type, "type", req?.query?.type == "false");
+
 
     const caseAccess = ["operation", "finance", "branch"]
 
     //  for self employee and other employee
     let empDetails = employee
     if (empId && empId != "false") {
-      if (!validMongooseId(empId)) return { status: 400, data: null,message:"Not a valid employee Id" }
+      if (!validMongooseId(empId)) return { status: 400, data: null, message: "Not a valid employee Id" }
       empDetails = await Employee.findById(empId)
-      if (!empDetails)  return { status: 400, data: null,message:"Searching employee account not found" }
+      if (!empDetails) return { status: 400, data: null, message: "Searching employee account not found" }
     }
 
     let extactMatchQuery = []
-    
+
     // manage role wise other emp case details access
-    if(empDetails){
+    if (empDetails) {
       const { type, designation } = empDetails
       if (empDetails && (!caseAccess?.includes(type?.toLowerCase()) || (empId && empId != "false"))) {
         extactMatchQuery = [
@@ -414,12 +414,12 @@ export const getAllPartnerResult = async (req,employee=null) => {
           { managerId: empDetails?._id },
 
         ]
-  
+
         if (type?.toLowerCase() == "sales" && designation?.toLowerCase() == "manager") {
           extactMatchQuery.push({ type: { $regex: "sales", $options: "i" } })
           extactMatchQuery.push({ type: { $regex: "sathi team", $options: "i" } })
         }
-  
+
         // extract filter options 
         const filterPipeline = [
           {
@@ -501,9 +501,9 @@ export const getAllPartnerResult = async (req,employee=null) => {
             },
           },
         ]
-  
+
         const extactOptions = await Employee.aggregate(filterPipeline)
-        
+
         matchQuery['$and'] = [{
           $or: [
             { empObjId: { $in: extactOptions?.[0]?.empIds } },
@@ -512,7 +512,7 @@ export const getAllPartnerResult = async (req,employee=null) => {
         }]
       }
 
-        matchQuery.branchId = { $regex: empDetails?.branchId || "", $options: "i", }      
+      matchQuery.branchId = { $regex: empDetails?.branchId || "", $options: "i", }
     }
 
     if (startDate && endDate) {
@@ -522,8 +522,8 @@ export const getAllPartnerResult = async (req,employee=null) => {
       }
     }
 
-    matchQuery.isActive = req.query?.type=="false" ? false : true
-    
+    matchQuery.isActive = req.query?.type == "false" ? false : true
+
     const pipeline = [
       {
         "$match": {
@@ -566,7 +566,7 @@ export const getAllPartnerResult = async (req,employee=null) => {
                 "foreignField": "partnerId",
                 "as": "share",
                 "pipeline": [
-                  { "$match": { "isActive": true,"partnerId": { "$ne": null},} },
+                  { "$match": { "isActive": true, "partnerId": { "$ne": null }, } },
                   {
                     "$lookup": {
                       "from": "employees",
@@ -638,20 +638,20 @@ export const getAllPartnerResult = async (req,employee=null) => {
     ]
 
     const result = await Partner.aggregate(pipeline)
-    return { status: 200,message:"Fetch partner list", data: result?.[0]?.data, noOfPartner: result?.[0]?.totalCount?.[0]?.count }
+    return { status: 200, message: "Fetch partner list", data: result?.[0]?.data, noOfPartner: result?.[0]?.totalCount?.[0]?.count }
   } catch (error) {
     console.log("getAllPartnerResult error", error);
-    return { status: 500, data: null,message:"Something went wrong!", error }
+    return { status: 500, data: null, message: "Something went wrong!", error }
   }
 }
 
-export const getAllEmployeeSearchQuery = (searchQuery,type=true,department=false,exclude=false,branchId=false) => {
+export const getAllEmployeeSearchQuery = (searchQuery, type = true, department = false, exclude = false, branchId = false) => {
   let query = {
-    $and:[
-      {isActive:type},
-      department ? {type:{ $regex: department, $options: "i" }} :{},
-      exclude ? {_id:{$ne:exclude}} :{},
-      branchId ? {branchId:{ $regex: branchId, $options: "i" }} :{},
+    $and: [
+      { isActive: type },
+      department ? { type: { $regex: department, $options: "i" } } : {},
+      exclude ? { _id: { $ne: exclude } } : {},
+      branchId ? { branchId: { $regex: branchId, $options: "i" } } : {},
       {
         $or: [
           { fullName: { $regex: searchQuery, $options: "i" } },
@@ -667,12 +667,12 @@ export const getAllEmployeeSearchQuery = (searchQuery,type=true,department=false
   return query
 }
 
-export const getEmployeeByIdQuery = (searchQuery,department,branchId) => {
+export const getEmployeeByIdQuery = (searchQuery, department, branchId) => {
   let query = {
-    $and:[
-      {isActive:true},
-      department ? {type:{ $regex: department, $options: "i" }} :{},
-      branchId ? {branchId:{ $regex: branchId, $options: "i" }} :{},
+    $and: [
+      { isActive: true },
+      department ? { type: { $regex: department, $options: "i" } } : {},
+      branchId ? { branchId: { $regex: branchId, $options: "i" } } : {},
       {
         $or: [
           { fullName: { $regex: searchQuery, $options: "i" } },
@@ -722,8 +722,8 @@ export const validateAddComplaint = (body) => {
 }
 
 
-export const getAllInvoiceQuery = (searchQuery,startDate,endDate,clientId=false,type=true,branchId=false) => {
-  console.log("type",searchQuery,startDate,endDate,clientId,type);
+export const getAllInvoiceQuery = (searchQuery, startDate, endDate, clientId = false, type = true, branchId = false) => {
+  console.log("type", searchQuery, startDate, endDate, clientId, type);
   if (startDate && endDate) {
     const validStartDate = getValidateDate(startDate)
     if (!validStartDate) return { success: false, message: "start date not formated" }
@@ -733,7 +733,7 @@ export const getAllInvoiceQuery = (searchQuery,startDate,endDate,clientId=false,
 
   let query = {
     $and: [
-      { isActive: type},
+      { isActive: type },
       clientId ? { clientId: clientId } : {},
       branchId ? { branchId: { $regex: branchId, $options: "i" } } : {},
       {
@@ -796,7 +796,7 @@ export const partnerGetDownloadCaseExcel = async (getAllCase = []) => {
   // Populate Excel rows with data
   getAllCase.forEach((caseData, index) => {
     worksheet.addRow({
-      sNo: index+1 || "",
+      sNo: index + 1 || "",
       // branchId: caseData?.branchId,
       currentStatus: caseData?.currentStatus,
       date: caseData?.createdAt,
@@ -826,7 +826,7 @@ export const partnerGetDownloadCaseExcel = async (getAllCase = []) => {
 }
 
 
-export const getDownloadCaseExcel = async (getAllCase = [],_id) => {
+export const getDownloadCaseExcel = async (getAllCase = [], _id) => {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Cases');
   // Define Excel columns
@@ -836,7 +836,7 @@ export const getDownloadCaseExcel = async (getAllCase = [],_id) => {
     { header: 'Current Status', key: 'currentStatus', width: 30 },
     { header: 'Date', key: 'date', width: 20 },
     { header: 'Case From', key: 'caseFrom', width: 20 },
-    {header:"Team Added By",key:"addedBy",width:20},
+    { header: "Team Added By", key: "addedBy", width: 20 },
     { header: 'Partner Name', key: 'partnerName', width: 20 },
     { header: 'Case Name', key: 'name', width: 30 },
     { header: 'Mobile No', key: 'mobileNo', width: 30 },
@@ -859,7 +859,7 @@ export const getDownloadCaseExcel = async (getAllCase = [],_id) => {
   // Populate Excel rows with data
   getAllCase.forEach((caseData, index) => {
     worksheet.addRow({
-      sNo: index+1 || "",
+      sNo: index + 1 || "",
       branchId: caseData?.branchId,
       currentStatus: caseData?.currentStatus,
       date: caseData?.createdAt,
@@ -891,7 +891,7 @@ export const getDownloadCaseExcel = async (getAllCase = [],_id) => {
   return await workbook.xlsx.writeBuffer();
 }
 
-export const commonDownloadCaseExcel = async (getAllCase = [],_id) => {
+export const commonDownloadCaseExcel = async (getAllCase = [], _id) => {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Cases');
   // Define Excel columns
@@ -903,7 +903,7 @@ export const commonDownloadCaseExcel = async (getAllCase = [],_id) => {
     { header: 'Status Remark', key: 'statusRemark', width: 20 },
     { header: 'Date', key: 'date', width: 20 },
     { header: 'Case From', key: 'caseFrom', width: 20 },
-    {header:"Team Added By",key:"addedBy",width:20},
+    { header: "Team Added By", key: "addedBy", width: 20 },
     { header: 'Partner Name', key: 'partnerName', width: 20 },
     { header: 'Case Name', key: 'name', width: 30 },
     { header: 'Mobile No', key: 'mobileNo', width: 30 },
@@ -933,42 +933,42 @@ export const commonDownloadCaseExcel = async (getAllCase = [],_id) => {
 
   // Populate Excel rows with data
   getAllCase.forEach((caseData, index) => {
-    const paymentDetails = caseData?.paymentDetails?.length>0 ? caseData?.paymentDetails : [{}];
-    paymentDetails?.forEach((payment,ind)=>{
+    const paymentDetails = caseData?.paymentDetails?.length > 0 ? caseData?.paymentDetails : [{}];
+    paymentDetails?.forEach((payment, ind) => {
       worksheet.addRow({
-        sNo: (index+1 || ""),
-        branchId:caseData?.branchId || "",
+        sNo: (index + 1 || ""),
+        branchId: caseData?.branchId || "",
         currentStatus: caseData?.currentStatus || "",
-        statusDate: ind==0 ? (caseData?.latestCaseStatus?.date || caseData?.latestCaseStatus?.createdAt || "-") :"" ,
-        statusRemark: ind == 0 ? (caseData?.latestCaseStatus?.remark || "-").replace(/<\/?[^>]+>/g, ""): "",
-        date: ind==0 ? (caseData?.createdAt || "") :"" ,
-        caseFrom: ind==0 ? (caseData?.caseFrom || "") :"" ,
-        addedBy: ind==0 ?( caseData?.employeeDetails?.fullName ? `${caseData?.employeeDetails?.fullName} | ${caseData?.employeeDetails?.type} | ${caseData?.employeeDetails?.designation}` : "-") :"" ,
-        partnerName: ind==0 ? (caseData?.partnerDetails?.fullName || "-") :"" ,
-        name: ind==0 ? (caseData.name ||"") :"" ,
-        mobileNo: ind==0 ?( caseData?.mobileNo ||"") :"" ,
-        email: ind==0 ? (caseData?.email ||"") :"" ,
-        claimAmount: ind==0 ?( caseData?.claimAmount ||"") :"" ,
-        policyNo: ind==0 ? (caseData?.policyNo ||"") :"" ,
-        fileNo: caseData?.fileNo ||"" ,
-        policyType: ind==0 ? (caseData?.policyType ||"") :"" ,
-        complaintType: ind==0 ? (caseData?.complaintType ||"") :"" ,
-        fatherName: ind==0 ? (caseData?.fatherName ||""):"" ,
-        insuranceCompanyName: ind==0 ? (caseData?.insuranceCompanyName || "") :"" ,
-        address: ind==0 ? (caseData?.address ||"") :"" ,
-        DOB: ind==0 ? ( caseData?.DOB ||"") :"" ,
-        pinCode: ind==0 ? (caseData?.pinCode || "") :"" ,
-        city: ind==0 ?( caseData?.city || "") :"" ,
-        state: ind==0 ? (caseData?.state ||"") :"" ,
-        problemStatement: ind==0 ? (caseData?.problemStatement ||"") :"" ,
-        paymentMode:payment?.paymentMode ||"-",
-        dateOfPayment:payment?.dateOfPayment || "-",
-        bankName:payment?.bankName ||"-",
-        chequeNumber:payment?.chequeNumber || "-",
-        amount:payment?.amount || "-",
-        chequeDate:payment?.chequeDate || "-",
-        utrNumber:payment?.utrNumber || "-",
-        transactionDate:payment?.transactionDate || "-",
+        statusDate: ind == 0 ? (caseData?.latestCaseStatus?.date || caseData?.latestCaseStatus?.createdAt || "-") : "",
+        statusRemark: ind == 0 ? (caseData?.latestCaseStatus?.remark || "-").replace(/<\/?[^>]+>/g, "") : "",
+        date: ind == 0 ? (caseData?.createdAt || "") : "",
+        caseFrom: ind == 0 ? (caseData?.caseFrom || "") : "",
+        addedBy: ind == 0 ? (caseData?.employeeDetails?.fullName ? `${caseData?.employeeDetails?.fullName} | ${caseData?.employeeDetails?.type} | ${caseData?.employeeDetails?.designation}` : "-") : "",
+        partnerName: ind == 0 ? (caseData?.partnerDetails?.fullName || "-") : "",
+        name: ind == 0 ? (caseData.name || "") : "",
+        mobileNo: ind == 0 ? (caseData?.mobileNo || "") : "",
+        email: ind == 0 ? (caseData?.email || "") : "",
+        claimAmount: ind == 0 ? (caseData?.claimAmount || "") : "",
+        policyNo: ind == 0 ? (caseData?.policyNo || "") : "",
+        fileNo: caseData?.fileNo || "",
+        policyType: ind == 0 ? (caseData?.policyType || "") : "",
+        complaintType: ind == 0 ? (caseData?.complaintType || "") : "",
+        fatherName: ind == 0 ? (caseData?.fatherName || "") : "",
+        insuranceCompanyName: ind == 0 ? (caseData?.insuranceCompanyName || "") : "",
+        address: ind == 0 ? (caseData?.address || "") : "",
+        DOB: ind == 0 ? (caseData?.DOB || "") : "",
+        pinCode: ind == 0 ? (caseData?.pinCode || "") : "",
+        city: ind == 0 ? (caseData?.city || "") : "",
+        state: ind == 0 ? (caseData?.state || "") : "",
+        problemStatement: ind == 0 ? (caseData?.problemStatement || "") : "",
+        paymentMode: payment?.paymentMode || "-",
+        dateOfPayment: payment?.dateOfPayment || "-",
+        bankName: payment?.bankName || "-",
+        chequeNumber: payment?.chequeNumber || "-",
+        amount: payment?.amount || "-",
+        chequeDate: payment?.chequeDate || "-",
+        utrNumber: payment?.utrNumber || "-",
+        transactionDate: payment?.transactionDate || "-",
       });
     })
   });
@@ -1016,9 +1016,9 @@ export const getAllPartnerDownloadExcel = async (getAllPartner = [], _id) => {
   // Populate Excel rows with data
   getAllPartner.forEach((partnerData, index) => {
     worksheet.addRow({
-      sNo: index+1 || "",
+      sNo: index + 1 || "",
       branchId: partnerData?.branchId,
-      addedBy:(partnerData?.salesId?.type && partnerData?.salesId?.fullName) ? `${partnerData?.salesId?.fullName} | ${partnerData?.salesId?.type} | ${partnerData?.salesId?.designation}` : "-",
+      addedBy: (partnerData?.salesId?.type && partnerData?.salesId?.fullName) ? `${partnerData?.salesId?.fullName} | ${partnerData?.salesId?.type} | ${partnerData?.salesId?.designation}` : "-",
       consultantName: partnerData?.profile?.consultantName,
       primaryMobileNo: partnerData?.profile?.primaryMobileNo,
       primaryEmail: partnerData?.profile?.primaryEmail,
@@ -1075,16 +1075,16 @@ export const getAllSathiDownloadExcel = async (getAllSathi = [], _id) => {
   // Populate Excel rows with data
   getAllSathi.forEach((sathi, index) => {
     worksheet.addRow({
-      sNo: index+1 || "-",
-      branchId:sathi?.branchId,
-      date:new Date(sathi?.createdAt).toLocaleDateString(),
-      addedBy:(sathi?.referEmpId?.fullName && sathi?.referEmpId?.type) ? `${sathi?.referEmpId?.fullName} | ${sathi?.referEmpId?.type} | ${sathi?.referEmpId?.designation}` : "-",
-      fullName:sathi?.fullName,
-      empId:sathi?.empId,
-      mobileNo:sathi?.mobileNo,
-      email:sathi?.email,
-      type:sathi?.type,
-      designation:sathi?.designation,
+      sNo: index + 1 || "-",
+      branchId: sathi?.branchId,
+      date: new Date(sathi?.createdAt).toLocaleDateString(),
+      addedBy: (sathi?.referEmpId?.fullName && sathi?.referEmpId?.type) ? `${sathi?.referEmpId?.fullName} | ${sathi?.referEmpId?.type} | ${sathi?.referEmpId?.designation}` : "-",
+      fullName: sathi?.fullName,
+      empId: sathi?.empId,
+      mobileNo: sathi?.mobileNo,
+      email: sathi?.email,
+      type: sathi?.type,
+      designation: sathi?.designation,
     });
   });
 
@@ -1120,7 +1120,7 @@ export const getAllClientDownloadExcel = async (getAllClient = []) => {
   let rowData =
     getAllClient.forEach((clientData, index) => {
       worksheet.addRow({
-        sNo: index+1 || "",
+        sNo: index + 1 || "",
         branchId: clientData?.branchId || "-",
         associateWithUs: clientData?.profile?.associateWithUs,
         consultantName: clientData?.profile?.consultantName,
@@ -1193,7 +1193,7 @@ export const firebaseUpload = async (req, res, folderPath) => {
       });
 
       blobStream.on('error', (error) => {
-        console.log("error",error);
+        console.log("error", error);
         return res.status(400).json({ success: false, message: "Failed to upload file" });
       });
 
@@ -1317,11 +1317,11 @@ export const commonInvoiceDownloadExcel = async (getAllInvoice = []) => {
   return buffer;
 };
 
-export const sendNotificationAndMail = async (caseId, message, branchId="", userId, notificationUrl, notificationAdminUrl) => {
+export const sendNotificationAndMail = async (caseId, message, branchId = "", userId, notificationUrl, notificationAdminUrl) => {
   try {
     let mailList = []
 
-    if(branchId){
+    if (branchId) {
       const getAllEmp = await Employee.find({
         branchId: { $regex: branchId, $options: "i" },
         isActive: true,
@@ -1331,7 +1331,7 @@ export const sendNotificationAndMail = async (caseId, message, branchId="", user
         ],
       }).select("email");
 
-     mailList = getAllEmp?.map(ele => ele?.email)
+      mailList = getAllEmp?.map(ele => ele?.email)
     }
 
     const findAdmin = await Admin.find({}).select("email")
@@ -1342,8 +1342,8 @@ export const sendNotificationAndMail = async (caseId, message, branchId="", user
 
 
     if (caseId) {
-      let empIds =[]
-      if(userId){
+      let empIds = []
+      if (userId) {
         empIds = [userId]
       }
       const addNotification = new Notification({
@@ -1366,11 +1366,11 @@ export const sendNotificationAndMail = async (caseId, message, branchId="", user
     //   mailList?.filter(ele=>ele && ele!=mailTo)
     // )
     await sendMail({
-      subject:"Claimsolution latest notification",
-      to:mailTo,
-      bcc:[],
-      cc:mailList?.filter(ele=>ele && ele!=mailTo),
-      html:notificationTemplate(message, empUrl, adminUrl),
+      subject: "Claimsolution latest notification",
+      to: mailTo,
+      bcc: [],
+      cc: mailList?.filter(ele => ele && ele != mailTo),
+      html: notificationTemplate(message, empUrl, adminUrl),
     })
   } catch (error) {
     console.log("sendNotificationAndMail", error);

@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken'
 import jwtDecode from 'jwt-decode'
-import Employee from '../models/employee.js'
+import Employee from '../models/employee/employeeModel.js'
 import { Messages } from '../utils/constant.js'
 import Admin from '../models/admin.js'
 import Client from '../models/client.js'

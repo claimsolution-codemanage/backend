@@ -31,7 +31,7 @@ import { firebaseUpload } from "../utils/helper.js";
 import { validateInvoice } from "../utils/validateEmployee.js";
 
 // model
-import Employee from "../models/employee.js";
+import Employee from "../models/employee/employeeModel.js";
 import Case from "../models/case/case.js";
 import Partner from "../models/partner.js";
 import Client from '../models/client.js'
@@ -51,6 +51,7 @@ import CaseOmbudsmanStatus from "../models/ombudsmanStatus.js";
 import ShareSection from "../models/shareSection.js";
 import * as dbFunction from "../utils/dbFunction.js"
 import CaseMergeDetails from "../models/caseMergeDetails.js";
+import EmployeePermission from "../models/employee/employeePermissionModel.js";
 
 
 export const adminAuthenticate = async (req, res) => {
@@ -504,14 +505,6 @@ export const createEmployeeAccount = async (req, res) => {
 
 export const adminEmployeeProfile = async (req, res) => {
    try {
-      const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
       const { _id } = req.query;
       if (!validMongooseId(_id)) return res.status(400).json({ status: false, message: "Not a valid Id" })
 
@@ -598,6 +591,37 @@ export const adminEmployeeProfile = async (req, res) => {
                   }
                ]
             }
+         },
+         {
+            $lookup: {
+               "from": "employee_permissions",
+               "localField": "_id",
+               "foreignField": "empId",
+               "as": "permission",
+               "pipeline": [
+                  {
+                     "$project": {
+                        "permissions": 1,
+                     }
+                  }
+               ]
+            }
+         },
+         {
+            "$unwind": {
+               "path": "$permissions",
+               "preserveNullAndEmptyArrays": true
+            }
+         },
+         {
+            $addFields: {
+               permissions: "$permission.permissions"
+            }
+         },
+         {
+            $project: {
+               permission: 0
+            }
          }
       ]
 
@@ -619,7 +643,7 @@ export const adminUpdateEmployeeAccount = async (req, res) => {
    try {
       const { admin } = req
       const { _id } = req.query
-      const { docs } = req.body
+      const { docs, permissions } = req.body
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
       const updateKeys = ["fullName", "type", "branchId", "designation", "bankName", "bankBranchName", "bankAccountNo", "panNo", "address",
@@ -654,6 +678,8 @@ export const adminUpdateEmployeeAccount = async (req, res) => {
 
       selectedDocs?.length && await EmpDoc.insertMany(selectedDocs)
       await isExist.save()
+
+      await EmployeePermission.updateOne({ empId: isExist?._id?.toString() }, { $set: { permissions } }, { upsert: true })
       return res.status(200).json({ success: true, message: "Successfully update Employee" });
    } catch (error) {
       console.log("updateEmployeeAccount in error:", error);
