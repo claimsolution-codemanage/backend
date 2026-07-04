@@ -655,18 +655,6 @@ export const updateCaseById = async (req, res) => {
 
       bulkOps?.length && await CaseDoc.bulkWrite(bulkOps)
 
-      // send notification through email and db notification
-      const notificationEmpUrl = `/employee/view case/${updateCase?._id?.toString()}`
-      const notificationAdminUrl = `/admin/view case/${updateCase?._id?.toString()}`
-
-      sendNotificationAndMail(
-         updateCase?._id?.toString(),
-         `Update on  Case file No.  ${updateCase?.fileNo}`,
-         employee?.branchId,
-         req?.user?._id,
-         notificationEmpUrl,
-         notificationAdminUrl
-      )
       return res.status(200).json({ success: true, message: "Successfully update case", });
 
    } catch (error) {
@@ -732,17 +720,6 @@ export const updateCaseStatus = async (req, res) => {
 
       // send notification through email and db notification
       const caseNumber = updateCase.fileNo
-      const notificationEmpUrl = `/employee/view case/${req.body._id}`
-      const notificationAdminUrl = `/admin/view case/${req.body._id}`
-
-      sendNotificationAndMail(
-         req.body._id,
-         `Case file No. ${updateCase.fileNo} status mark as ${req.body.status}`,
-         employee?.branchId,
-         req?.user?._id,
-         notificationEmpUrl,
-         notificationAdminUrl
-      )
 
       const subject = "Update on Your Case – Status Changed"
       // client
@@ -986,18 +963,7 @@ export const addOrUpdateCasePayment = async (req, res) => {
       })
 
       await isExist.save()
-      // send notification through email and db notification
-      const notificationEmpUrl = `/employee/view case/${caseId}`
-      const notificationAdminUrl = `/admin/view case/${caseId}`
 
-      sendNotificationAndMail(
-         caseId,
-         `Payment details update on  Case file No.  ${findCase?.fileNo}`,
-         employee?.branchId,
-         req?.user?._id,
-         notificationEmpUrl,
-         notificationAdminUrl
-      )
       return res.status(200).json({ success: true, message: "Success" });
    } catch (error) {
       console.log("addOrUpdateCasePayment in error:", error);

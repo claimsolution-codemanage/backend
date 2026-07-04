@@ -13,6 +13,8 @@ import adminLeadRoutes from "../routes/leads/adminLeadRoutes.js"
 import adminCaseFormRoutes from "../routes/caseForm/adminCaseFormRoutes.js"
 import empCasePaymentRoutes from "../routes/casePayment/adminCasePaymentRoutes.js"
 import adminMailRoutes from "../routes/mail/adminMailRoutes.js"
+import adminInvoiceRoutes from "../routes/invoice/adminInvoiceRoutes.js"
+import adminStatementRoutes from "../routes/statement/adminStatementRoutes.js"
 
 
 //  for admin 
@@ -112,17 +114,6 @@ router.get("/viewAllComplaint", authAdmin, viewAllAdminComplaint)
 router.delete("/adminRemoveComplaintById", authAdmin, adminRemoveComplaintById)
 
 
-// for invoice
-router.post("/createInvoice", authAdmin, adminController.adminCreateInvoice)
-router.get("/viewAllInvoice", authAdmin, adminController.adminViewAllInvoice)
-router.get("/adminDownloadAllInvoice", authAdmin, adminController.adminDownloadAllInvoice)
-router.get("/viewInvoiceById", authAdmin, adminController.adminViewInvoiceById)
-router.put("/editInvoiceById", authAdmin, adminController.adminEditInvoice)
-router.put("/editInvoiceNo", authAdmin, adminController.adminEditInvoiceNo)
-router.put("/paidInvoiceById", authAdmin, adminController.adminPaidInvoice)
-router.put("/unActiveInvoiceById", authAdmin, adminController.adminUnActiveInvoice)
-router.delete("/deleteInvoice", authAdmin, adminController.adminRemoveInvoice)
-
 // for report
 router.get("/adminViewPartnerReport", authAdmin, adminController.adminViewPartnerReport)
 router.get("/adminViewEmpSaleReport", authAdmin, adminController.adminViewEmpSaleReport)
@@ -151,12 +142,7 @@ router.get("/download/empSathi", authAdmin, adminController.adminDownloadEmpSath
 
 
 // for statement
-router.post("/createOrUpdateStatement", authAdmin, adminController.bulkCreateOrUpdateStatement)
-router.get("/getAllStatement", authAdmin, adminController.getStatement)
-router.get("/getStatements", authAdmin, adminController.getAllStatement)
-router.get("/download/downloadAllStatement", authAdmin, adminController.adminDownloadAllStatement)
 router.get("/adminFindCaseByFileNo", authAdmin, adminController.adminFindCaseByFileNo)
-router.put("/adminChangeStatementStatus", authAdmin, adminController.adminChangeStatementStatus)
 
 // notification
 router.get("/getAllNotification", authAdmin, adminController.getAllNotification)
@@ -168,6 +154,9 @@ router.use("/caseForm", adminCaseFormRoutes)
 router.use("/lead", adminLeadRoutes)
 router.use("/case_payment", empCasePaymentRoutes)
 router.use("/mail", adminMailRoutes)
+router.use("/invoice", adminInvoiceRoutes)
+router.use("/statement", adminStatementRoutes)
+
 
 
 

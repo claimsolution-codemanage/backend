@@ -1,5 +1,5 @@
 export const massMailTemplate = (content) => {
-    return `
+  return `
   <!DOCTYPE html>
   <html lang="en">
     <head>
@@ -49,7 +49,6 @@ export const massMailTemplate = (content) => {
         }
         .body {
           padding: 30px 25px;
-          text-align: center;
         }
         .body h2 {
           font-size: 20px;
@@ -61,6 +60,23 @@ export const massMailTemplate = (content) => {
           color: #4b5563;
           margin: 8px 0;
           line-height: 1.5;
+        }
+
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 16px 0;
+        }
+
+        table td,
+        table th {
+          border: 1px solid #d1d5db;
+          padding: 10px;
+          text-align: left;
+        }
+
+        table th {
+          background: #f3f4f6;
         }
 
         .footer {

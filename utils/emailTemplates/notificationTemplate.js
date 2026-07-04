@@ -50,7 +50,6 @@ export function notificationTemplate(customMessage, notificationUrl, notificatio
         }
         .body {
           padding: 30px 25px;
-          text-align: center;
         }
         .body h2 {
           font-size: 20px;

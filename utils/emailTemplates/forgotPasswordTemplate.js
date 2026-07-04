@@ -1,4 +1,4 @@
-export const forgetPasswordTemplate = ({email,name="", link}) => {
+export const forgetPasswordTemplate = ({ email, name = "", link }) => {
   return `
   <!DOCTYPE html>
   <html lang="en">
@@ -50,7 +50,6 @@ export const forgetPasswordTemplate = ({email,name="", link}) => {
         .body {
           padding: 30px 25px;
           line-height: 1.6;
-          text-align: center;
         }
         .body p {
           font-size: 15px;

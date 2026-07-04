@@ -49,7 +49,7 @@ const sendServiceAgreement = async ({ payload }) => {
         await sendMail({
             subject: `${as} Service Agreement`,
             to: mailTo,
-            cc:[process.env.CC_MAIL_ID],
+            cc: [process.env.CC_MAIL_ID],
             html: revisedAgreementTemplate({ as, name: fullName, claimType }),
             attachments: [{
                 filename: 'revised_service_agreement.pdf',
@@ -152,7 +152,7 @@ export const handleCaseFinance = async ({
             };
             bill.subAmt = subAmt;
             bill.gstAmt = gstAmt;
-            bill.totalAmt = totalAmt;            
+            bill.totalAmt = totalAmt;
             await bill.save();
         }
 
@@ -198,7 +198,7 @@ export const handleCaseFinance = async ({
             assignAllowedFields(statement, statementDefaults, Object.keys(statementDefaults));
             await statement.save();
             caseForm.statementId = statement._id;
-            if(specialCase){
+            if (specialCase) {
                 sendServiceAgreement({
                     payload: {
                         mailTo: findCase?.partnerObjId?.profile?.primaryEmail,
@@ -251,8 +251,8 @@ export const createOrUpdateCaseForm = async (req, res, next) => {
         // 🔹 Update allowed fields on CaseForm
         const caseFormFields = [
             "partnerFee", "consultantFee", "filingDate", "isSettelment",
-            "approved", "approvedAmount", "approvalDate",
-            "approvalLetter", "approvalLetterPrivate", "specialCase","isPaymentStatement"
+            "approved", "approvedAmount", "approvalDate", "complaintNumber",
+            "approvalLetter", "approvalLetterPrivate", "specialCase", "isPaymentStatement"
         ];
         caseFormFields.forEach(field => {
             if (req.body[field] !== undefined) caseForm[field] = req.body[field];
@@ -319,7 +319,7 @@ export const createOrUpdateCaseForm = async (req, res, next) => {
             }
         }
 
-        await handleCaseFinance({ caseForm, findCase, req, findClient,specialCase:caseForm?.specialCase })
+        await handleCaseFinance({ caseForm, findCase, req, findClient, specialCase: caseForm?.specialCase })
 
         return res.status(200).json({
             status: 1,

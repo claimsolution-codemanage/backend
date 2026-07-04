@@ -5,7 +5,6 @@ import { authEmployee } from '../middleware/authentication.js';
 import * as employeeCaseController from '../controller/case/employeeCaseController.js'
 import * as empPartnerController from '../controller/partner/empPartnerController.js'
 import * as empClientController from '../controller/client/empClientController.js'
-import * as empInvoiceController from '../controller/invoice/empInvoiceController.js'
 import * as empTeamController from '../controller/team/empTeamController.js'
 
 // other routes
@@ -13,6 +12,8 @@ import empLeadRoutes from "../routes/leads/empLeadRoutes.js"
 import caseFormRoutes from "../routes/caseForm/empCaseFormRoutes.js"
 import empCasePaymentRoutes from "./casePayment/empCasePaymentRoutes.js"
 import empMailRoutes from "./mail/empMailRoutes.js"
+import empInvoiceRoutes from "./invoice/empInvoiceRoutes.js"
+import empStatementRoutes from "./statement/empStatmentRoutes.js"
 
 
 
@@ -80,18 +81,7 @@ router.delete("/partner/deletePartnerById", authEmployee, empPartnerController.d
 
 
 
-// for finance employee
-router.post("/finance/createInvoice", authEmployee, employeeController.employeeCreateInvoice)
-router.get("/finance/viewAllInvoice", authEmployee, employeeController.employeeViewAllInvoice)
-router.get("/finance/viewInvoiceById", authEmployee, employeeController.employeeViewInvoiceById)
-router.put("/finance/editInvoiceById", authEmployee, employeeController.employeeEditInvoice)
-router.put("/finance/editInvoiceNo", authEmployee, employeeController.employeeEditInvoiceNo)
-router.put("/finance/paidInvoiceById", authEmployee, employeeController.empOpPaidInvoice)
-router.get("/emp/empDownloadAllInvoice", authEmployee, employeeController.empDownloadAllInvoice)
-router.put("/finance/unActiveInvoiceById", authEmployee, employeeController.employeeUnActiveInvoice)
-router.get("/finance/downloadInvoiceById", authEmployee, employeeController.employeeDownloadInvoiceById)
-router.delete("/finance/removeInvoiceById", authEmployee, employeeController.employeeRemoveInvoice)
-router.delete("/invoice/deleteInvoiceById", authEmployee, empInvoiceController.deleteInvoiceById)
+
 
 
 // for sales employee
@@ -127,12 +117,6 @@ router.put("/setIsActiveEmployee", authEmployee, employeeController.empSetIsActi
 // change branch
 router.put("/operation/change-branch", authEmployee, employeeController.empChangeBranch)
 
-// for statement
-router.post("/emp/createOrUpdateStatement", authEmployee, employeeController.bulkCreateOrUpdateStatement)
-router.get("/emp/getAllStatement", authEmployee, employeeController.getStatement)
-router.get("/emp/download/empDownloadAllStatement", authEmployee, employeeController.empDownloadAllStatement)
-router.get("/emp/getStatements", authEmployee, employeeController.getAllStatement)
-router.put("/emp/empOpChangeStatementStatus", authEmployee, employeeController.empOpChangeStatementStatus)
 
 // notification section
 router.get("/emp/getAllNotification", authEmployee, employeeController.getAllNotification)
@@ -143,6 +127,9 @@ router.use("/caseForm", caseFormRoutes)
 router.use("/lead", empLeadRoutes)
 router.use("/case_payment", empCasePaymentRoutes)
 router.use("/mail", empMailRoutes)
+router.use("/invoice", empInvoiceRoutes)
+router.use("/statement", empStatementRoutes)
+
 
 
 

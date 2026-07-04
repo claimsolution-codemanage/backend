@@ -1358,13 +1358,6 @@ export const sendNotificationAndMail = async (caseId, message, branchId = "", us
     const empUrl = process.env.PANEL_FRONTEND_URL + notificationUrl
     const adminUrl = process.env.PANEL_FRONTEND_URL + notificationAdminUrl
 
-    // await commonSendMail(
-    //   generateNotificationTemplate(message, empUrl, adminUrl),
-    //   "Claimsolution latest notification",
-    //   mailTo,
-    //   [],
-    //   mailList?.filter(ele=>ele && ele!=mailTo)
-    // )
     await sendMail({
       subject: "Claimsolution latest notification",
       to: mailTo,

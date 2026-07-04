@@ -1,6 +1,6 @@
 
-export function caseUpdateStatusTemplate({type,caseNumber,statusRemark,caseStatus, caseUrl}) {
-    return `
+export function caseUpdateStatusTemplate({ type, caseNumber, statusRemark, caseStatus, caseUrl }) {
+  return `
   
     <!DOCTYPE html>
   <html lang="en">
@@ -51,7 +51,6 @@ export function caseUpdateStatusTemplate({type,caseNumber,statusRemark,caseStatu
         }
         .body {
           padding: 30px 25px;
-          text-align: center;
         }
         .body h2 {
           font-size: 20px;
