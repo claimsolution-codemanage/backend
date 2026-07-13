@@ -1,126 +1,128 @@
 import Joi from "joi"
 
-export const validateAdminSignUp =(body)=>{
+export const validateAdminSignUp = (body) => {
   const bodySchema = Joi.object({
-   fullName: Joi.string().required(),
-   email: Joi.string().email().required(),
-   mobileNo: Joi.string().min(10).max(10).required(),
-  //  key:Joi.string().required()
+    fullName: Joi.string().required(),
+    email: Joi.string().email().required(),
+    mobileNo: Joi.string().min(10).max(10).required(),
+    //  key:Joi.string().required()
   })
 
   return bodySchema.validate(body)
 }
 
-export const validateAdminSignIn =(body)=>{
+export const validateAdminSignIn = (body) => {
   const bodySchema = Joi.object({
     email: Joi.string().email().required(),
     password: Joi.string().required(),
-   
-   })
- 
-   return bodySchema.validate(body)
+
+  })
+
+  return bodySchema.validate(body)
 }
 
-export const validateAdminResetPassword =(body)=>{
+export const validateAdminResetPassword = (body) => {
   const bodySchema = Joi.object({
     password: Joi.string().required(),
     confirmPassword: Joi.string().required(),
-   })
- 
-   return bodySchema.validate(body)
+  })
+
+  return bodySchema.validate(body)
 }
 
-export const validateUpdateAdminCase =(body)=>{
+export const validateUpdateAdminCase = (body) => {
   const bodySchema = Joi.object({
     _id: Joi.string().required(),
     status: Joi.string().required(),
     remark: Joi.string().required(),
-    mailMethod:Joi.string().allow('').optional(),
-    nextFollowUp:Joi.string().allow('').optional(),
-   })
- 
-   return bodySchema.validate(body)
+    mailMethod: Joi.string().allow('').optional(),
+    nextFollowUp: Joi.string().allow('').optional(),
+  })
+
+  return bodySchema.validate(body)
 }
 
-export const validateEditAdminCaseStatus =(body)=>{
+export const validateEditAdminCaseStatus = (body) => {
   const bodySchema = Joi.object({
     caseId: Joi.string().required(),
     status: Joi.string().required(),
     remark: Joi.string().required(),
-    processId:Joi.string().required(),
-    isCurrentStatus:Joi.bool().required(),
-   })
- 
-   return bodySchema.validate(body)
+    processId: Joi.string().required(),
+    isCurrentStatus: Joi.bool().required(),
+    nextFollowUp: Joi.string().required(),
+    otherDetails: Joi.object().optional(),
+  })
+
+  return bodySchema.validate(body)
 }
 
-export const validateAdminSettingDetails =(body)=>{
+export const validateAdminSettingDetails = (body) => {
   const bodySchema = Joi.object({
-    fullName:Joi.string().required(),
-    email:Joi.string().email().required(),
-    mobileNo:Joi.string().min(10).max(10).required(),
+    fullName: Joi.string().required(),
+    email: Joi.string().email().required(),
+    mobileNo: Joi.string().min(10).max(10).required(),
     consultantFee: Joi.number().required(),
-   })
- 
-   return bodySchema.validate(body)
+  })
+
+  return bodySchema.validate(body)
 }
 
-export const validateAdminAddCaseFee =(body)=>{
+export const validateAdminAddCaseFee = (body) => {
   const bodySchema = Joi.object({
     typeFees: Joi.string().required(),
     caseFees: Joi.string().required(),
 
-   })
- 
-   return bodySchema.validate(body)
+  })
+
+  return bodySchema.validate(body)
 }
 
-export const validateAdminUpdateCasePayment =(body)=>{
+export const validateAdminUpdateCasePayment = (body) => {
   const bodySchema = Joi.object({
     _id: Joi.string().required(),
     paymentId: Joi.string().required(),
     paymentMode: Joi.string().required(),
 
-   })
- 
-   return bodySchema.validate(body)
+  })
+
+  return bodySchema.validate(body)
 }
 
-export const validateAdminAddEmployeeToCase =(body)=>{
+export const validateAdminAddEmployeeToCase = (body) => {
   const bodySchema = Joi.object({
     shareEmployee: Joi.array().items(Joi.any()).min(1).required(),
     shareCase: Joi.array().items(Joi.any()).min(1).required(),
-   })
- 
-   return bodySchema.validate(body)
+  })
+
+  return bodySchema.validate(body)
 }
 
-export const validateAdminSharePartner =(body)=>{
+export const validateAdminSharePartner = (body) => {
   const bodySchema = Joi.object({
     shareEmployee: Joi.array().items(Joi.any()).min(1).required(),
     sharePartners: Joi.array().items(Joi.any()).min(1).required(),
-   })
- 
-   return bodySchema.validate(body)
+  })
+
+  return bodySchema.validate(body)
 }
 
-export const validateAdminRemovePartner =(body)=>{
+export const validateAdminRemovePartner = (body) => {
   const bodySchema = Joi.object({
     removePartners: Joi.array().items(Joi.any()).min(1).required(),
-   })
- 
-   return bodySchema.validate(body)
+  })
+
+  return bodySchema.validate(body)
 }
 
 
-export const validateAdminAddJob =(body)=>{
+export const validateAdminAddJob = (body) => {
   const bodySchema = Joi.object({
-    title:Joi.string().required(),
-    experience:Joi.string().required(),
-    qualification:Joi.string().required(),
-    about:Joi.string().required(),
-    requirements:Joi.string().required()
-   })
- 
-   return bodySchema.validate(body)
+    title: Joi.string().required(),
+    experience: Joi.string().required(),
+    qualification: Joi.string().required(),
+    about: Joi.string().required(),
+    requirements: Joi.string().required()
+  })
+
+  return bodySchema.validate(body)
 }

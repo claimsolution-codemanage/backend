@@ -977,7 +977,6 @@ export const updateClientProfile = async (req, res, next) => {
 // add new case
 export const addNewClientCase = async (req, res) => {
   try {
-    console.log("req--", req.user)
     const client = await Client.findById(req?.user?._id);
     if (!client) return res.status(404).json({ success: false, message: "Not register with us" })
     if (!client?.isActive) return res.status(400).json({ success: false, message: "Account is not active" })
@@ -993,21 +992,20 @@ export const addNewClientCase = async (req, res) => {
     const { error } = validateAddClientCase(req.body);
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
     const { admin } = await Admin.find({ email: process.env.ADMIN_MAIL_ID })
-    // console.log("admin",admin);
-    const caseFees = admin?.length > 0 ? (admin[0]?.consultantFee ? admin[0].consultantFee : 2000) : 2000
     req.body.consultantCode = client?.profile?.consultantCode
     req.body.clientId = client?._id
     req.body.clientObjId = client?._id
     req.body.caseFrom = "client"
-    // req.body.acceptPayment = true
-    // req.body.pendingPayment = true
     req.body.processSteps = []
     const newAddCase = new Case({ ...req.body, caseDocs: [], branchId: client?.branchId })
     const noOfCase = await Case.count()
     newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
+    newAddCase.lastStatusDate = new Date()
+
     await newAddCase.save()
     const defaultStatus = new CaseStatus({
-      caseId: newAddCase?._id?.toString()
+      caseId: newAddCase?._id?.toString(),
+      date: new Date()
     })
     await defaultStatus.save()
 

@@ -50,7 +50,6 @@ export const getValidateDate = (date) => {
 
 
 export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, partnerId, clientId, employeeId, type = true, empSaleId = false, branchId = false, isReject = false) => {
-  console.log("status-----", statusType, branchId, employeeId);
   if (startDate && endDate) {
     const validStartDate = getValidateDate(startDate)
     if (!validStartDate) return { success: false, message: "start date not formated" }
@@ -60,8 +59,6 @@ export const getAllCaseQuery = (statusType, searchQuery, startDate, endDate, par
 
   let query = {
     $and: [
-      // partnerId ? { partnerId: partnerId } : {},
-      // clientId ? { clientId: clientId } : {},
       partnerId ? { partnerObjId: partnerId } : {},
       clientId ? { clientObjId: clientId } : {},
       !empSaleId && employeeId ? { addEmployee: { $in: employeeId } } : {},

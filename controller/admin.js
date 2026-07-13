@@ -1066,13 +1066,6 @@ export const changeStatusAdminCase = async (req, res) => {
 export const adminEditCaseStatus = async (req, res) => {
    try {
       const { admin } = req
-      // const verify = await authAdmin(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
-
 
       const { error } = validateEditAdminCaseStatus(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
@@ -1081,7 +1074,7 @@ export const adminEditCaseStatus = async (req, res) => {
 
       const updateCase = await Case.findByIdAndUpdate(req.body.caseId, {
          $set: {
-            ...(req.body.isCurrentStatus ? { currentStatus: req.body.status } : {}),
+            ...(req.body.isCurrentStatus ? { currentStatus: req.body.status, nextFollowUp: req.body.nextFollowUp || null } : {}),
          }
       },
          { new: true },)
@@ -1090,6 +1083,8 @@ export const adminEditCaseStatus = async (req, res) => {
          $set: {
             status: req.body.status,
             remark: req.body.remark,
+            nextFollowUp: req.body.nextFollowUp || null,
+            otherDetails: req.body.otherDetails || {},
             consultant: admin?.fullName,
             adminId: req?.user?._id
          }

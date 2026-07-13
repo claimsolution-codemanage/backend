@@ -10,5 +10,6 @@ router.get('/detail/:_id', adminCasePaymentDetailController.getCasePaymentById)
 router.put('/update/detail/:_id', adminCasePaymentDetailController.updateCasePaymentDetails)
 router.post('/schedule/payment', adminCasePaymentDetailController.payCasePaymentSchedule)
 router.post('/schedule/add-payment/:_id', adminCasePaymentDetailController.addPaymentSchedule)
+router.delete('/delete/:_id', adminCasePaymentDetailController.deleteCasePayment)
 
 export default router

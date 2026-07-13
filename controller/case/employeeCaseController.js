@@ -694,7 +694,7 @@ export const updateCaseStatus = async (req, res) => {
          return res.status(400).json({ success: false, message: "You don't have the permission" })
       }
 
-      const { mailMethod = "", nextFollowUp = "" } = req.body
+      const { mailMethod = "", nextFollowUp = "", otherDetails = {} } = req.body
 
       const { error } = validateUpdateEmployeeCase(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
@@ -714,7 +714,8 @@ export const updateCaseStatus = async (req, res) => {
          status: caseStatus,
          consultant: employee?.fullName,
          employeeId: req?.user?._id,
-         caseId: req.body._id
+         caseId: req.body._id,
+         otherDetails
       })
       await addNewStatus.save()
 

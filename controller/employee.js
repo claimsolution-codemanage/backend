@@ -1903,10 +1903,12 @@ export const saleEmployeeAddCase = async (req, res) => {
       const newAddCase = new Case({ ...req.body, branchId: employee?.branchId?.toLowerCase(), caseDocs: [] })
       const noOfCase = await Case.count()
       newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
+      newAddCase.lastStatusDate = new Date()
       await newAddCase.save()
 
       const defaultStatus = new CaseStatus({
-         caseId: newAddCase?._id?.toString()
+         caseId: newAddCase?._id?.toString(),
+         date: new Date()
       })
       await defaultStatus.save()
       //  add case doc
@@ -1950,17 +1952,6 @@ export const saleEmployeeAddCase = async (req, res) => {
 
 export const saleEmpViewPartnerReport = async (req, res) => {
    try {
-      const { employee } = req
-      // const verify = await authEmployee(req, res)
-      // if (!verify.success) return res.status(401).json({ success: false, message: verify.message })
-
-      // const employee = await Employee.findById(req?.user?._id)
-      // if (!employee) return res.status(401).json({ success: false, message: "Account account not found" })
-      // if (!employee?.isActive) return res.status(401).json({ success: false, message: "Employee account not active" })
-      // if(employee?.type?.toLowerCase()!="sales"){
-      //    return res.status(400).json({success: false, message:"Access denied"})
-      // }
-
       if (!validMongooseId(req.query.partnerId)) return res.status(400).json({ success: false, message: "Not a valid partnerId" })
       const partner = await Partner.findById(req.query.partnerId).select({
          "branchId": 1, "salesId": 1, "isActive": 1,
@@ -1977,26 +1968,6 @@ export const saleEmpViewPartnerReport = async (req, res) => {
       const startDate = req.query.startDate ? req.query.startDate : "";
       const endDate = req.query.endDate ? req.query.endDate : "";
       const type = req?.query?.type ? req.query.type : true
-
-      // const query = getAllCaseQuery(statusType, searchQuery, startDate, endDate, req.query.partnerId, false, false, type)
-      // if (!query.success) return res.status(400).json({ success: false, message: query.message })
-      // const aggregationPipeline = [
-      //    { $match: query?.query }, // Match the documents based on the query
-      //    {
-      //       $group: {
-      //          _id: null,
-      //          totalAmtSum: { $sum: "$claimAmount" }, // Calculate the sum of totalAmt
-      //          totalResolvedAmt: {
-      //             $sum: { $cond: [{ $eq: ["$currentStatus", "Resolve"] }, "$claimAmount", 0] } // Calculate the sum of claimAmount for resolved cases
-      //          }
-      //       }
-      //    }
-      // ];
-
-
-      // const getAllCase = await Case.find(query?.query).skip(pageNo).limit(pageItemLimit).sort({ createdAt: -1 });
-      // const noOfCase = await Case.find(query?.query).count()
-      // const aggregateResult = await Case.aggregate(aggregationPipeline);
 
       const matchQuery = []
 

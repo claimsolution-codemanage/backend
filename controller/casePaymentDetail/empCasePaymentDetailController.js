@@ -737,3 +737,46 @@ export const addPaymentSchedule = async (req, res) => {
         });
     }
 };
+
+
+// delete case payment
+export const deleteCasePayment = async (req, res) => {
+    try {
+        const { _id } = req.params;
+        const { employee } = req
+        const caseAccess = ["operation", "finance"]
+        if (!caseAccess.includes(employee?.type?.toLowerCase())) {
+            return res.status(400).json({ success: false, message: "Access denied" })
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(_id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid payment id',
+            });
+        }
+
+        const paymentDetail = await CasePaymentInfo.findById(_id);
+        if (!paymentDetail) {
+            return res.status(404).json({
+                success: false,
+                message: 'Payment detail not found',
+            });
+        }
+
+        await paymentDetail.deleteOne();
+        await CasePaymentScheduleDetail.deleteMany({ casePaymentDetailId: _id });
+
+        return res.status(200).json({
+            success: true,
+            message: 'Payment deleted successfully',
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: "Something went wrong",
+            error: error.message,
+        });
+    }
+};

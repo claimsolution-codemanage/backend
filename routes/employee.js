@@ -14,6 +14,7 @@ import empCasePaymentRoutes from "./casePayment/empCasePaymentRoutes.js"
 import empMailRoutes from "./mail/empMailRoutes.js"
 import empInvoiceRoutes from "./invoice/empInvoiceRoutes.js"
 import empStatementRoutes from "./statement/empStatmentRoutes.js"
+import empCaseRoutes from "./case/empCaseRoutes.js"
 
 
 
@@ -37,19 +38,6 @@ router.delete("/team/deleteTeamEmpAccount", authEmployee, empTeamController.dele
 router.get("/all/dashboard", authEmployee, employeeController.allEmployeeDashboard)
 
 // case
-router.get("/case/viewAllCase", authEmployee, employeeCaseController.viewAllCase)
-router.get("/case/viewCaseById", authEmployee, employeeCaseController.viewCaseById)
-router.put("/case/updateCaseById", authEmployee, employeeCaseController.updateCaseById)
-router.put("/case/changeCaseIsActive", authEmployee, employeeCaseController.changeCaseIsActive)
-router.post("/case/addCaseFile", authEmployee, employeeCaseController.addCaseFile)
-router.get("/case/findCaseByFileNo", authEmployee, employeeCaseController.empFindCaseByFileNo)
-router.put("/case/updateCaseStatus", authEmployee, employeeCaseController.updateCaseStatus)
-router.put("/case/add_or_update_case_comment", authEmployee, employeeCaseController.empAddOrUpdateCaseComment)
-router.put("/case/addReferenceCaseAndMarge", authEmployee, employeeCaseController.addReferenceCaseAndMarge)
-router.put("/case/removeCaseReference", authEmployee, employeeCaseController.removeCaseReference)
-router.post("/case/addOrUpdateCasePayment", authEmployee, employeeCaseController.addOrUpdateCasePayment)
-router.delete("/case/deleteCaseById", authEmployee, employeeCaseController.deleteCaseById)
-router.put("/case/renameCaseDocFolder", authEmployee, employeeCaseController.renameCaseDocFolder)
 // router.post('/opeation/empOpCreateOrUpdateCaseForm',authEmployee,employeeCaseFormController.empOpCreateOrUpdateCaseForm)
 // router.get('/opeation/empOpGetCaseFormById/:formId/:caseId',authEmployee,employeeCaseFormController.empOpGetCaseFormById)
 
@@ -122,7 +110,7 @@ router.put("/operation/change-branch", authEmployee, employeeController.empChang
 router.get("/emp/getAllNotification", authEmployee, employeeController.getAllNotification)
 router.put("/emp/updateNotification", authEmployee, employeeController.updateNotification)
 
-
+router.use("/case", empCaseRoutes)
 router.use("/caseForm", caseFormRoutes)
 router.use("/lead", empLeadRoutes)
 router.use("/case_payment", empCasePaymentRoutes)

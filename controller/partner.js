@@ -98,9 +98,9 @@ export const signUp = async (req, res) => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    const existingPartnerByEmail = await Partner.findOne({email: normalizedEmail});
+    const existingPartnerByEmail = await Partner.findOne({ email: normalizedEmail });
 
-    const existingPartnerByMobile = await Partner.findOne({mobileNo});
+    const existingPartnerByMobile = await Partner.findOne({ mobileNo });
 
     if (existingPartnerByEmail?.mobileVerify) {
       return res.status(400).json({
@@ -146,7 +146,7 @@ export const signUp = async (req, res) => {
     }
 
     const otp = otp6Digit();
-    const hashedPassword = await bcrypt.hash(password,10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     let partnerDoc;
 
@@ -194,9 +194,9 @@ export const signUp = async (req, res) => {
               otp,
               attempts: newAttempts,
               createdAt: new Date(),
-              lockedAt:newAttempts >= MAX_OTP_ATTEMPTS
-                  ? new Date()
-                  : null,
+              lockedAt: newAttempts >= MAX_OTP_ATTEMPTS
+                ? new Date()
+                : null,
             },
           },
         },
@@ -207,15 +207,15 @@ export const signUp = async (req, res) => {
     const token = await partnerDoc.getAuth();
 
     try {
-      await sendOTPMsg({mobile: mobileNo,otp,});
+      await sendOTPMsg({ mobile: mobileNo, otp, });
 
       return res
         .status(201)
         .header("x-auth-token", token)
-        .header( "Access-Control-Expose-Headers","x-auth-token" )
+        .header("Access-Control-Expose-Headers", "x-auth-token")
         .json({ success: true, message: "Successfully sent OTP", });
     } catch (otpError) {
-      console.error( "Partner OTP send error:", otpError  );
+      console.error("Partner OTP send error:", otpError);
 
       return res.status(400).json({
         success: false,
@@ -228,7 +228,7 @@ export const signUp = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Something went wrong",
-      error:error?.message
+      error: error?.message
     });
   }
 };
@@ -316,8 +316,8 @@ export const verifyMobileOtp = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: newAttempts >= MAX_OTP_ATTEMPTS
-            ? "Too many invalid attempts. Please try again after sometime."
-            : "Invalid or expired OTP",
+          ? "Too many invalid attempts. Please try again after sometime."
+          : "Invalid or expired OTP",
       });
     }
 
@@ -404,14 +404,14 @@ export const verifyMobileOtp = async (req, res) => {
       .status(200)
       .header("x-auth-token", token)
       .header("Access-Control-Expose-Headers", "x-auth-token")
-      .json({success: true, message: "Successfully signed up",});
+      .json({ success: true, message: "Successfully signed up", });
   } catch (error) {
     console.error("verifyMobileOtp error:", error);
 
     return res.status(500).json({
       success: false,
       message: "Something went wrong",
-      error:error?.message
+      error: error?.message
     });
   }
 };
@@ -494,7 +494,7 @@ export const partnerResendMobileOtp = async (req, res) => {
 //  for email verification check
 export const sendPartnerEmailOtp = async (req, res) => {
   try {
-  const verify = await authPartner(req, res);
+    const verify = await authPartner(req, res);
 
     if (!verify.success) {
       return res.status(401).json({
@@ -706,20 +706,20 @@ export const verifyParnerEmailOtp = async (req, res) => {
         }]
       });
 
-  await Partner.findByIdAndUpdate(partner._id, {
-      $set: {
-        emailVerify: true,
-        emailOTP: {
-          otp: null,
-          attempts: 0,
-          createdAt: null,
-          lockedAt: null,
+      await Partner.findByIdAndUpdate(partner._id, {
+        $set: {
+          emailVerify: true,
+          emailOTP: {
+            otp: null,
+            attempts: 0,
+            createdAt: null,
+            lockedAt: null,
+          },
         },
-      },
-    });
+      });
 
-    return res.status(200).json({ success: true, message: "Email verified successfully", });
-  
+      return res.status(200).json({ success: true, message: "Email verified successfully", });
+
     } catch (err) {
       console.error("OTP verification error:", err);
       return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
@@ -1182,10 +1182,12 @@ export const addNewCase = async (req, res) => {
     const newAddCase = new Case({ ...req.body, caseDocs: [], branchId: partner?.branchId })
     const noOfCase = await Case.count()
     newAddCase.fileNo = `${new Date().getFullYear()}${new Date().getMonth() + 1 < 10 ? `0${new Date().getMonth() + 1}` : new Date().getMonth() + 1}${new Date().getDate()}${noOfCase + 1}`
+    newAddCase.lastStatusDate = new Date()
     await newAddCase.save()
 
     const defaultStatus = new CaseStatus({
-      caseId: newAddCase?._id?.toString()
+      caseId: newAddCase?._id?.toString(),
+      date: new Date()
     })
     await defaultStatus.save()
 
