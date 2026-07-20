@@ -2,7 +2,7 @@ import Employee from "../../models/employee/employeeModel.js";
 import Partner from "../../models/partner.js";
 import Statement from "../../models/statement.js"
 import { getAllStatementDownloadExcel, getValidateDate, validMongooseId } from "../../utils/helper.js"
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 
 export const getStatement = async (req, res) => {
     try {
