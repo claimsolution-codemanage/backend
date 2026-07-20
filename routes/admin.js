@@ -4,12 +4,12 @@ import { adminAddJob, adminDeleteJob } from '../controller/job.js';
 import { viewAllAdminComplaint, adminRemoveComplaintById } from '../controller/complaint.js';
 import { authAdmin } from '../middleware/authentication.js';
 import * as adminController from '../controller/admin.js'
-import * as adminCaseController from '../controller/case/adminCaseController.js'
 import adminLeadRoutes from "../routes/leads/adminLeadRoutes.js"
 
 
 
 // sub routes
+import adminCaseRoutes from "../routes/case/adminCaseRoutes.js"
 import adminCaseFormRoutes from "../routes/caseForm/adminCaseFormRoutes.js"
 import empCasePaymentRoutes from "../routes/casePayment/adminCasePaymentRoutes.js"
 import adminMailRoutes from "../routes/mail/adminMailRoutes.js"
@@ -66,22 +66,6 @@ router.delete("/deleteClientById", authAdmin, adminController.adminDeleteClientB
 
 
 // for case
-router.get("/viewAllCase", authAdmin, adminController.viewAllAdminCase)
-router.put("/changeCaseStatus", authAdmin, adminController.changeStatusAdminCase)
-router.get("/viewCaseById", authAdmin, adminController.viewCaseByIdByAdmin)
-router.post("/adminAddCaseFile", authAdmin, adminController.adminAddCaseFile)
-router.post("/updateCaseById", authAdmin, adminController.adminUpdateCaseById)
-router.post("/addOrUpdatePayment", authAdmin, adminController.adminAddOrUpdatePayment)
-router.put("/editCaseProcessById", authAdmin, adminController.adminEditCaseStatus)
-router.put("/addCaseFeeClient", authAdmin, adminController.adminAddCaseFeeClient)
-router.put("/updateClientCaseFee", authAdmin, adminController.adminUpdateClientCaseFee)
-router.put("/changeCaseIsActive", authAdmin, adminController.adminSetIsActiveCase)
-router.put("/addReferenceCaseAndMarge", authAdmin, adminController.adminAddReferenceCaseAndMarge)
-router.put("/removeReferenceCase", authAdmin, adminController.adminRemoveReferenceCase)
-router.delete("/deleteCaseById", authAdmin, adminController.adminDeleteCaseById)
-router.delete("/deleteCaseDocId", authAdmin, adminController.adminDeleteCaseDocById)
-router.post("/adminCreateOrUpdateCaseForm", authAdmin, adminController.adminCreateOrUpdateCaseForm)
-router.put("/case/renameCaseDocFolder", authAdmin, adminCaseController.renameCaseDocFolder)
 
 
 // case doc
@@ -150,6 +134,7 @@ router.put("/updateNotification", authAdmin, adminController.updateNotification)
 
 
 // use sub-routes 
+router.use("/case", adminCaseRoutes)
 router.use("/caseForm", adminCaseFormRoutes)
 router.use("/lead", adminLeadRoutes)
 router.use("/case_payment", empCasePaymentRoutes)

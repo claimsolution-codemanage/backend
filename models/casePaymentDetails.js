@@ -1,36 +1,40 @@
 import mongoose from "mongoose";
 
 const casePaymentSchema = new mongoose.Schema({
-    caseId:{
-        type:mongoose.Schema.ObjectId,
-        ref:"Case"
+    caseId: {
+        type: mongoose.Schema.ObjectId,
+        ref: "Case"
     },
-    paymentMode:{
-        type:String,
+    paymentMode: {
+        type: String,
     },
-    dateOfPayment:{
-        type:Date,
+    dateOfPayment: {
+        type: Date,
     },
-    utrNumber:{
-        type:String,
+    utrNumber: {
+        type: String,
     },
-    bankName:{
-        type:String,
+    bankName: {
+        type: String,
     },
-    chequeNumber:{
-        type:String,
+    chequeNumber: {
+        type: String,
     },
-    chequeDate:{
-        type:Date,
+    chequeDate: {
+        type: Date,
     },
-    amount:{
-        type:Number,
+    amount: {
+        type: Number,
     },
-    transactionDate:{
-        type:Date,
+    transactionDate: {
+        type: Date,
     },
-    isActive:{type:Boolean,default:true},
-},{timestamps:true});
+    attachments: {
+        type: [String],
+        default: []
+    },
+    isActive: { type: Boolean, default: true },
+}, { timestamps: true });
 
 
 const CasePaymentDetails = mongoose.model("CasePaymentDetails", casePaymentSchema);

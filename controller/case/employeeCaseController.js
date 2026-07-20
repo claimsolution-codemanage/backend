@@ -954,7 +954,7 @@ export const addOrUpdateCasePayment = async (req, res) => {
 
       const updateKey = [
          "dateOfPayment", "utrNumber", "bankName", "chequeNumber",
-         "chequeDate", "amount", "transactionDate", "paymentMode"
+         "chequeDate", "amount", "transactionDate", "paymentMode", "attachments"
       ]
 
       updateKey.forEach(ele => {

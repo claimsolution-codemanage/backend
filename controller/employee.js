@@ -1991,14 +1991,19 @@ export const saleEmpViewPartnerReport = async (req, res) => {
          });
       }
 
+      if (statusType) {
+         matchQuery.push(
+            { currentStatus: { $regex: statusType, $options: "i" } }
+         )
+      }
+
       const pipeline = [
          {
             $match: {
                $and: [
                   { isPartnerReferenceCase: false },
                   { isEmpSaleReferenceCase: false },
-                  { currentStatus: { $regex: statusType, $options: "i" } },
-                  { partnerId: req.query.partnerId },
+                  { partnerObjId: new Types.ObjectId(req.query.partnerId) },
                   ...matchQuery,
                ]
             }

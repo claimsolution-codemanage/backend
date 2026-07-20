@@ -280,7 +280,64 @@ export const getCasePaymentList = async (req, res) => {
 
             {
                 $facet: {
-                    data: [{ $skip: skip }, { $limit: Number(limit), },],
+                    data: [
+                        { $skip: skip },
+                        { $limit: Number(limit), },
+                        {
+                            $lookup: {
+                                from: "case_payment_schedule_details",
+                                localField: "_id",
+                                foreignField: "casePaymentDetailId",
+                                as: "nextScheduleDetails",
+                                pipeline: [
+                                    {
+                                        $match: {
+                                            status: "Pending",
+                                            dueDate: {
+                                                $gte: new Date(
+                                                    new Date().setHours(0, 0, 0, 0)
+                                                ),
+                                            }
+                                        }
+                                    },
+                                    {
+                                        $sort: {
+                                            dueDate: 1
+                                        }
+                                    },
+                                    {
+                                        $limit: 1
+                                    },
+                                    {
+                                        $project: {
+                                            dueDate: 1
+                                        }
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            $unwind: {
+                                path: '$nextScheduleDetails',
+                                preserveNullAndEmptyArrays: true,
+                            },
+                        },
+                        {
+                            $addFields: {
+                                nextDueDate: {
+                                    $ifNull: [
+                                        '$nextScheduleDetails.dueDate',
+                                        ''
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            $unset: [
+                                'nextScheduleDetails',
+                            ]
+                        }
+                    ],
                     totalCount: [{ $count: 'count', },],
                 },
             },
