@@ -28,6 +28,7 @@ const caseStatusSchema = new mongoose.Schema({
     },
     date: { type: Date, default: Date.now() },
     isActive: { type: Boolean, default: true, required: true },
+    attachments: { type: [String], default: [] },
     otherDetails: { type: mongoose.Schema.Types.Mixed, default: {} },
 
 

@@ -715,6 +715,7 @@ export const updateCaseStatus = async (req, res) => {
          consultant: employee?.fullName,
          employeeId: req?.user?._id,
          caseId: req.body._id,
+         attachments: req.body.attachments || [],
          otherDetails
       })
       await addNewStatus.save()

@@ -3887,12 +3887,6 @@ export const adminAllClientDownload = async (req, res) => {
 export const adminChangeBranch = async (req, res) => {
    try {
       const { admin } = req
-      // const verify =  await authAdmin(req,res)
-      // if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       const { _id, branchId, type } = req.body;
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
@@ -3903,7 +3897,7 @@ export const adminChangeBranch = async (req, res) => {
          if (!getClient) return res.status(400).json({ success: false, message: "Client account not found" })
 
          await Client.findByIdAndUpdate(_id, { branchId: branchId?.trim() })
-         await Case.updateMany({ clientId: _id }, { branchId: branchId?.trim() })
+         await Case.updateMany({ clientObjId: _id }, { branchId: branchId?.trim() })
          await Bill.updateMany({ clientId: _id }, { branchId: branchId?.trim() })
          return res.status(200).json({ success: true, message: `Successfully Change Branch` });
       } else {
@@ -3911,7 +3905,7 @@ export const adminChangeBranch = async (req, res) => {
          if (!getPartner) return res.status(400).json({ success: false, message: "Partner account not found" })
 
          await Partner.findByIdAndUpdate(_id, { branchId: branchId?.trim() })
-         await Case.updateMany({ partnerId: _id }, { branchId: branchId?.trim() })
+         await Case.updateMany({ partnerObjId: _id }, { branchId: branchId?.trim() })
          return res.status(200).json({ success: true, message: `Successfully Change Branch` });
       }
 
@@ -3924,12 +3918,6 @@ export const adminChangeBranch = async (req, res) => {
 export const adminViewEmpSathiEmployee = async (req, res) => {
    try {
       const { admin } = req
-      // const verify =  await authAdmin(req,res)
-      // if(!verify.success) return  res.status(401).json({success: false, message: verify.message})
-
-      // const admin = await Admin.findById(req?.user?._id)
-      // if (!admin) return res.status(401).json({ success: false, message: "Admin account not found" })
-      // if (!admin?.isActive) return res.status(401).json({ success: false, message: "Admin account not active" })
 
       const searchQuery = req.query.search ? req.query.search : "";
       const pageItemLimit = req.query.limit ? req.query.limit : 10;

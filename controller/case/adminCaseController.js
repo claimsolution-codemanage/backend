@@ -243,6 +243,8 @@ export const changeStatusAdminCase = async (req, res) => {
             status: caseStatus,
             consultant: admin?.fullName,
             adminId: req?.user?._id,
+            attachments: req.body.attachments || [],
+            otherDetails: req.body.otherDetails || {},
             caseId: req.body._id
         })
         await addNewStatus.save()
@@ -741,7 +743,7 @@ export const adminAddReferenceCaseAndMarge = async (req, res) => {
                         mergeCaseId: isExistMergeTo?._id,
                         caseId: getClientCase?._id,
                         partnerId: isExistMergeTo?.partnerObjId,
-                        byEmpId: employee?._id
+                        // byEmpId: employee?._id
                     }
                 }
             })
@@ -755,7 +757,7 @@ export const adminAddReferenceCaseAndMarge = async (req, res) => {
                         mergeCaseId: isExistMergeTo?._id,
                         caseId: getClientCase?._id,
                         empId: isExistMergeTo?.empObjId,
-                        byEmpId: employee?._id
+                        // byEmpId: employee?._id
                     }
                 }
             })

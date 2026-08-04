@@ -69,7 +69,8 @@ export const validateUpdateEmployeeCase = (body) => {
     remark: Joi.string().required(),
     mailMethod: Joi.string().allow('').optional(),
     nextFollowUp: Joi.string().allow('').optional(),
-    otherDetails: Joi.object().allow('').optional(),
+    attachments: Joi.array().items(Joi.string()).optional(),
+    otherDetails: Joi.object().optional(),
   })
 
   return bodySchema.validate(body)

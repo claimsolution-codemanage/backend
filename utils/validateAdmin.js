@@ -37,6 +37,7 @@ export const validateUpdateAdminCase = (body) => {
     remark: Joi.string().required(),
     mailMethod: Joi.string().allow('').optional(),
     nextFollowUp: Joi.string().allow('').optional(),
+    attachments: Joi.array().items(Joi.string()).optional(),
     otherDetails: Joi.object().optional(),
   })
 
@@ -50,7 +51,9 @@ export const validateEditAdminCaseStatus = (body) => {
     remark: Joi.string().required(),
     processId: Joi.string().required(),
     isCurrentStatus: Joi.bool().required(),
-    nextFollowUp: Joi.string().required(),
+    mailMethod: Joi.string().allow('').optional(),
+    nextFollowUp: Joi.string().allow('').optional(),
+    attachments: Joi.array().items(Joi.string()).optional(),
     otherDetails: Joi.object().optional(),
   })
 
