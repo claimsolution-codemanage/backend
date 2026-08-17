@@ -353,7 +353,6 @@ export const viewCaseById = async (req, res) => {
    try {
       const { employee } = req;
       const isOperation = employee?.type?.toLowerCase() === "operation";
-      const employeeId = employee?._id;
       const { _id } = req.query;
 
       if (!validMongooseId(_id)) {
@@ -361,9 +360,7 @@ export const viewCaseById = async (req, res) => {
       }
 
       const caseAccess = ["advocate", "surveyor", "doctor"]
-      const isStatusAccess = !caseAccess.includes(employee?.type?.toLowerCase())
       const isPaymentAccess = !caseAccess.includes(employee?.type?.toLowerCase())
-      const isDocAccess = true
       const isCaseFormAccess = !caseAccess.includes(employee?.type?.toLowerCase())
 
 
@@ -423,80 +420,6 @@ export const viewCaseById = async (req, res) => {
             }
          },
          { $unwind: { path: "$clientDetails", preserveNullAndEmptyArrays: true } },
-         ...(isDocAccess ? [{
-            $lookup: {
-               from: "casedocs",
-               let: {
-                  id: "$_id",
-                  employeeId: employeeId
-               },
-               pipeline: [
-                  {
-                     $match: {
-                        $expr: {
-                           $and: [
-                              { $eq: ["$isActive", true] },
-                              {
-                                 $or: [
-                                    { $eq: ["$caseId", "$$id"] },
-                                    { $eq: ["$caseMargeId", { $toString: "$$id" }] }
-                                 ]
-                              },
-
-                              // access control
-                              ...(isOperation
-                                 ? [] // operation user → NO restriction
-                                 : [
-                                    {
-                                       $or: [
-                                          // non-private docs
-                                          { $ne: ["$isPrivate", true] },
-
-                                          // private docs only if employee matches
-                                          {
-                                             $and: [
-                                                { $eq: ["$isPrivate", true] },
-                                                { $eq: ["$employeeId", "$$employeeId"] }
-                                             ]
-                                          }
-                                       ]
-                                    }
-                                 ])
-                           ]
-                        }
-                     }
-                  },
-                  { $project: { adminId: 0 } }
-               ],
-               as: "caseDocs"
-            }
-         }] : []),
-         ...(isStatusAccess ? [{
-            $lookup: {
-               from: "casestatuses",
-               let: { id: "$_id" },
-               pipeline: [
-                  {
-                     $match: {
-                        $expr: {
-                           $and: [
-                              { $eq: ["$isActive", true] },
-                              {
-                                 $or: [
-                                    { $eq: ["$caseId", "$$id"] },
-                                    { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
-                                 ]
-                              }
-                           ]
-                        }
-                     }
-                  },
-                  { $project: { adminId: 0 } },
-                  { $sort: { createdAt: -1 } },
-               ],
-               as: "processSteps"
-            }
-         }] : []),
 
          ...(isPaymentAccess ? [{
             $lookup: {
@@ -578,6 +501,87 @@ export const viewCaseById = async (req, res) => {
 
    } catch (error) {
       console.error("ViewCaseById error:", error);
+      return res.status(500).json({ success: false, message: "Something went wrong", error });
+   }
+};
+
+export const viewCaseDocsById = async (req, res) => {
+   try {
+      const { employee } = req;
+      const isOperation = employee?.type?.toLowerCase() === "operation";
+      const employeeId = employee?._id;
+      const { _id } = req.params;
+
+      if (!validMongooseId(_id)) {
+         return res.status(400).json({ success: false, message: "Not a valid id" });
+      }
+
+      const caseId = new Types.ObjectId(_id);
+
+      const query = {
+         isActive: true,
+         $or: [
+            { caseId: caseId },
+            { caseMargeId: _id.toString() }
+         ]
+      };
+
+      if (!isOperation) {
+         query.$and = [
+            {
+               $or: [
+                  { isPrivate: { $ne: true } },
+                  {
+                     $and: [
+                        { isPrivate: true },
+                        { employeeId: employeeId }
+                     ]
+                  }
+               ]
+            }
+         ];
+      }
+
+      const docs = await CaseDoc.find(query).select("name type format url date isPrivate createdAt");
+
+      return res.status(200).json({ success: true, message: "get case docs data", data: docs });
+   } catch (error) {
+      console.error("viewCaseDocsById error:", error);
+      return res.status(500).json({ success: false, message: "Something went wrong", error });
+   }
+};
+
+export const viewCaseProcessStepsById = async (req, res) => {
+   try {
+      const { employee } = req;
+      const { _id } = req.params;
+
+      if (!validMongooseId(_id)) {
+         return res.status(400).json({ success: false, message: "Not a valid id" });
+      }
+
+      const caseId = new Types.ObjectId(_id);
+
+      const caseAccess = ["advocate", "surveyor", "doctor"];
+      const isStatusAccess = !caseAccess.includes(employee?.type?.toLowerCase());
+
+      if (!isStatusAccess) {
+         return res.status(403).json({ success: false, message: "Access denied" });
+      }
+
+      const query = {
+         isActive: true,
+         $or: [
+            { caseId: caseId },
+            { caseMargeId: _id.toString() }
+         ]
+      };
+
+      const steps = await CaseStatus.find(query).select("status createdAt remark date attachments otherDetails").sort({ createdAt: -1 });
+
+      return res.status(200).json({ success: true, message: "get case process steps data", data: steps });
+   } catch (error) {
+      console.error("viewCaseProcessStepsById error:", error);
       return res.status(500).json({ success: false, message: "Something went wrong", error });
    }
 };

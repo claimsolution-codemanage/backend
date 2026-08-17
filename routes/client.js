@@ -1,16 +1,16 @@
 import express from 'express';
 const router = express.Router();
 import {
-    verifyClientEmailOtp, updateClientProfile, getClientProfile,
-    addNewClientCase, viewClientCaseById, viewClientAllCase, clientForgetPassword, clientResetPassword,
-    clientAuthenticate, clientAddCaseFile, clientTls,
-    acceptClientTerms_Conditions, clientDashboard, clientUpdateCaseById, clientResendOtp, clientViewAllInvoice, clientViewInvoiceById,
-    clientPayInvoiceById, clientUploadImage, clientUploadAttachment, signUpWithRequest
+    updateClientProfile, getClientProfile,
+    clientAuthenticate, clientTls,
+    acceptClientTerms_Conditions, clientDashboard, clientViewAllInvoice, clientViewInvoiceById,
+    clientPayInvoiceById, clientUploadImage, clientUploadAttachment,
 } from '../controller/client.js';
 
 import * as clientContoller from "../controller/client.js"
 
 import caseFormRoutes from "../routes/caseForm/clientCaseFormRoutes.js"
+import clientCaseRoutes from "../routes/case/clientCaseRoutes.js"
 import clientCasePaymentRoutes from "../routes/casePayment/clientCasePaymentRoutes.js"
 import { authClientNext } from '../middleware/authentication.js';
 
@@ -20,8 +20,8 @@ router.post("/signup", clientContoller.clientSignUp)
 router.get("/authenticate", clientAuthenticate)
 
 // email otp
-router.post("/send-email-otp",authClientNext, clientContoller.sendClientEmailOtp)
-router.post("/verifyEmail",authClientNext, clientContoller.verifyClientEmailOtp)
+router.post("/send-email-otp", authClientNext, clientContoller.sendClientEmailOtp)
+router.post("/verifyEmail", authClientNext, clientContoller.verifyClientEmailOtp)
 
 router.post("/clientMobileNoVerify", clientContoller.verifyClientMobileOtp)
 router.post("/clientResendOtp", clientContoller.clientResendOtp)
@@ -37,11 +37,7 @@ router.get("/getClientProfile", getClientProfile)
 router.post("/updateClientProfile", updateClientProfile)
 
 // case
-router.post("/addNewClientCase",authClientNext, clientContoller.addNewClientCase)
-router.post("/addCaseFile", clientAddCaseFile)
-router.post("/updateCaseById", clientUpdateCaseById)
-router.get("/viewClientCaseById", viewClientCaseById)
-router.get("/viewClientAllCase", viewClientAllCase)
+
 
 
 router.get("/getTls", clientTls)
@@ -56,6 +52,7 @@ router.post("/clientPayInvoiceById", clientPayInvoiceById)
 router.post("/upload/image", clientUploadImage)
 router.post("/upload/attachment", clientUploadAttachment)
 
+router.use("/case", clientCaseRoutes)
 router.use("/caseForm", caseFormRoutes)
 router.use("/case_payment", clientCasePaymentRoutes)
 

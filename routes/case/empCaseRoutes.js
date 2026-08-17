@@ -8,6 +8,8 @@ import { authEmployee } from '../../middleware/authentication.js';
 router.use(authEmployee)
 router.get("/viewAllCase", employeeCaseController.viewAllCase)
 router.get("/viewCaseById", employeeCaseController.viewCaseById)
+router.get("/viewCaseDocsById/:_id", employeeCaseController.viewCaseDocsById)
+router.get("/viewCaseProcessStepsById/:_id", employeeCaseController.viewCaseProcessStepsById)
 router.put("/updateCaseById", employeeCaseController.updateCaseById)
 router.put("/changeCaseIsActive", employeeCaseController.changeCaseIsActive)
 router.post("/addCaseFile", employeeCaseController.addCaseFile)

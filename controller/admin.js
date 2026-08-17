@@ -463,7 +463,7 @@ export const createEmployeeAccount = async (req, res) => {
       const { fullName = "", email = "", mobileNo = "", type = "", designation = "", empId = "", branchId = "", headEmpId = "", managerId = "" } = req.body
 
       const existEmployee = await Employee.findOne({ $or: [{ email: { $regex: email, $options: "i" } }, { empId: { $regex: empId, $options: "i" } }] })
-      if (existEmployee) return res.status(401).json({ success: false, message: "Employee account/empId already exists" })
+      if (existEmployee) return res.status(400).json({ success: false, message: "Employee account/empId already exists" })
 
       const systemPassword = generatePassword()
       const bcryptPassword = await bcrypt.hash(systemPassword, 10)
@@ -483,7 +483,7 @@ export const createEmployeeAccount = async (req, res) => {
 
       try {
          await sendEmployeeSigninMail(req.body.email, systemPassword);
-         // console.log(systemPassword,"systemPassword---------");
+         // console.log(systemPassword, "systemPassword---------");
          await newEmployee.save()
          return res.status(200).json({ success: true, message: "Successfully create new Employee", });
       } catch (err) {
