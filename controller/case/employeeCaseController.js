@@ -15,6 +15,8 @@ import Partner from "../../models/partner.js";
 import CaseMergeDetails from "../../models/caseMergeDetails.js";
 import CasePaymentDetails from "../../models/casePaymentDetails.js";
 import { caseUpdateStatusTemplate } from "../../utils/emailTemplates/caseUpdateStatusTemplate.js";
+import ShareSection from "../../models/shareSection.js";
+import { validateAdminAddEmployeeToCase } from "../../utils/validateAdmin.js";
 
 export const viewAllCase = async (req, res) => {
    try {
@@ -360,7 +362,6 @@ export const viewCaseById = async (req, res) => {
 
       const caseAccess = ["advocate", "surveyor", "doctor"]
       const isStatusAccess = !caseAccess.includes(employee?.type?.toLowerCase())
-      const isCommentAccess = !caseAccess.includes(employee?.type?.toLowerCase())
       const isPaymentAccess = !caseAccess.includes(employee?.type?.toLowerCase())
       const isDocAccess = true
       const isCaseFormAccess = !caseAccess.includes(employee?.type?.toLowerCase())
@@ -496,40 +497,7 @@ export const viewCaseById = async (req, res) => {
                as: "processSteps"
             }
          }] : []),
-         ...(isCommentAccess ? [{
-            $lookup: {
-               from: "casecomments",
-               let: { id: "$_id" },
-               pipeline: [
-                  {
-                     $match: {
-                        $expr: {
-                           $and: [
-                              { $eq: ["$isActive", true] },
-                              ...(!isOperation
-                                 ? [
-                                    {
-                                       $or: [
-                                          { $eq: ["$isPrivate", false] },
-                                          { $eq: [{ $ifNull: ["$isPrivate", false] }, false] }
-                                       ]
-                                    }
-                                 ]
-                                 : []),
-                              {
-                                 $or: [
-                                    { $eq: ["$caseId", "$$id"] },
-                                    { $eq: ["$caseMargeId", { "$toString": "$$id" }] }
-                                 ]
-                              }
-                           ]
-                        }
-                     }
-                  }
-               ],
-               as: "caseCommit"
-            }
-         }] : []),
+
          ...(isPaymentAccess ? [{
             $lookup: {
                from: "casepaymentdetails",
@@ -611,6 +579,189 @@ export const viewCaseById = async (req, res) => {
    } catch (error) {
       console.error("ViewCaseById error:", error);
       return res.status(500).json({ success: false, message: "Something went wrong", error });
+   }
+};
+
+export const viewCaseCommentsById = async (req, res) => {
+   try {
+      const { employee } = req;
+      const isOperation =
+         employee?.type?.toLowerCase() === "operation";
+
+      const { _id } = req.query;
+
+      if (!validMongooseId(_id)) {
+         return res.status(400).json({
+            success: false,
+            message: "Not a valid id"
+         });
+      }
+
+      const caseObjectId = new Types.ObjectId(_id);
+
+      const matchStage = {
+         isActive: true,
+         $or: [
+            {
+               caseId: caseObjectId
+            },
+            {
+               caseMargeId: _id.toString()
+            }
+         ]
+      };
+
+      // Non-operation users cannot see private comments
+      if (!isOperation) {
+         matchStage.$and = [
+            {
+               $or: [
+                  { isPrivate: false },
+                  { isPrivate: { $exists: false } },
+                  { isPrivate: null }
+               ]
+            },
+            {
+               $or: [
+                  {
+                     tagEmployeeIds: {
+                        $in: [new Types.ObjectId(employee?._id)]
+                     }
+                  },
+                  { employeeId: new Types.ObjectId(employee?._id) }
+               ]
+            }
+         ];
+      }
+
+
+      const pipeline = [
+         {
+            $match: matchStage
+         },
+         {
+            $lookup: {
+               from: "employees",
+               localField: "employeeId",
+               foreignField: "_id",
+               pipeline: [
+                  {
+                     $project: {
+                        _id: 1,
+                        fullName: 1,
+                        type: 1
+                     }
+                  }
+               ],
+               as: "employee"
+            }
+         },
+         {
+            $lookup: {
+               from: "admins",
+               localField: "adminId",
+               foreignField: "_id",
+               pipeline: [
+                  {
+                     $project: {
+                        _id: 1,
+                        fullName: 1
+                     }
+                  }
+               ],
+               as: "admin"
+            }
+         },
+
+         // ---------------------------------------------------
+         // 4. Get tagged employees
+         // ---------------------------------------------------
+         {
+            $lookup: {
+               from: "employees",
+               let: {
+                  tagEmployeeIds: "$tagEmployeeIds"
+               },
+               pipeline: [
+                  {
+                     $match: {
+                        $expr: {
+                           $in: [
+                              "$_id",
+                              {
+                                 $ifNull: ["$$tagEmployeeIds", []]
+                              }
+                           ]
+                        }
+                     }
+                  },
+                  {
+                     $project: {
+                        _id: 1,
+                        fullName: 1,
+                        type: 1
+                     }
+                  }
+               ],
+               as: "tagEmployees"
+            }
+         },
+
+         // ---------------------------------------------------
+         // 5. Convert lookup arrays to objects
+         // ---------------------------------------------------
+         {
+            $set: {
+               name: {
+                  $ifNull: [
+                     { $arrayElemAt: ["$employee.fullName", 0] },
+                     { $arrayElemAt: ["$admin.fullName", 0] }
+                  ]
+               }
+            }
+         },
+         {
+            $project: {
+               _id: 1,
+               name: 1,
+               role: 1,
+               message: 1,
+               employeeId: 1,
+               adminId: 1,
+               tagEmployees: 1,
+               attachments: 1,
+               isPrivate: 1,
+               createdAt: 1,
+
+            }
+         },
+
+         // ---------------------------------------------------
+         // 6. Sort comments
+         // ---------------------------------------------------
+         {
+            $sort: {
+               createdAt: 1
+            }
+         }
+      ];
+
+      const comments = await CaseComment.aggregate(pipeline);
+
+      return res.status(200).json({
+         success: true,
+         message: "get case comments data",
+         data: comments
+      });
+
+   } catch (error) {
+      console.error("viewCaseCommentsById error:", error);
+
+      return res.status(500).json({
+         success: false,
+         message: "Something went wrong",
+         error
+      });
    }
 };
 
@@ -752,12 +903,19 @@ export const updateCaseStatus = async (req, res) => {
 export const empAddOrUpdateCaseComment = async (req, res) => {
    try {
       const { employee } = req
-      const { comment, caseCommentId, isPrivate, attachments } = req.body
+      const { comment, caseCommentId, isPrivate, attachments, tagEmployeeIds = [] } = req.body
 
       if (!comment) return res.status(400).json({ success: false, message: "Case Comment required" })
       if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
       if (caseCommentId && !validMongooseId(caseCommentId)) return res.status(400).json({ success: false, message: "Not a valid comment ID" })
+
+      if (!Array.isArray(tagEmployeeIds)) return res.status(400).json({ success: false, message: "Not a valid tag employee ID" })
+      if (tagEmployeeIds?.length) {
+         await Promise.all(tagEmployeeIds?.map(async (tagEmployeeId) => {
+            if (!validMongooseId(tagEmployeeId)) return res.status(400).json({ success: false, message: "Not a valid tag employee ID" })
+         }))
+      }
 
 
       const getCase = await Case.findById(req.body._id)
@@ -769,7 +927,8 @@ export const empAddOrUpdateCaseComment = async (req, res) => {
                message: comment?.trim(),
                isPrivate: isPrivate ?? false,
                employeeId: req?.user?._id,
-               attachments: attachments
+               attachments: attachments,
+               tagEmployeeIds: tagEmployeeIds || []
             }
          })
          return res.status(200).json({ success: true, message: "Successfully updated case comment" });
@@ -783,6 +942,7 @@ export const empAddOrUpdateCaseComment = async (req, res) => {
          isPrivate: isPrivate ?? false,
          caseId: getCase?._id?.toString(),
          employeeId: req?.user?._id,
+         tagEmployeeIds: tagEmployeeIds || [],
          attachments: attachments
 
       })
@@ -1189,3 +1349,208 @@ export const renameCaseDocFolder = async (req, res) => {
       return res.status(500).json({ success: false, message: "Something went wrong", error: error });
    }
 }
+
+// case share controller
+export const empOptShareCaseToEmployee = async (req, res) => {
+   try {
+      const { error } = validateAdminAddEmployeeToCase(req.body)
+      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+      const { shareCase = [], shareEmployee = [] } = req.body
+      let bulkOps = []
+      for (const toEmployeeId of shareEmployee) {
+         const exists = await ShareSection.find({ toEmployeeId, caseId: { $in: shareCase } }, { caseId: 1 })
+         let filter = shareCase?.filter(caseId => !exists?.map(ele => ele?.caseId?.toString())?.includes(caseId))
+         filter?.forEach(caseId => {
+            bulkOps.push({
+               insertOne: {
+                  document: {
+                     caseId,
+                     toEmployeeId
+                  }
+               }
+            })
+         })
+      }
+      await ShareSection.bulkWrite(bulkOps)
+      return res.status(200).json({ success: true, message: "Successfully employee add to case" });
+   } catch (error) {
+      console.log("empOptShareCaseToEmployee  in error:", error);
+      return res.status(500).json({ success: false, message: "Internal server error", error: error });
+   }
+}
+
+export const getCaseEmployeeList = async (req, res) => {
+   try {
+      const { employee } = req
+      if (!["operation", "branch", "finance"].includes(employee?.type?.toLowerCase())) return res.status(400).json({ success: false, message: "Access Denied" })
+
+      const { caseId } = req?.params
+      if (!caseId) return res.status(400).json({ success: false, message: "caseId required" })
+      if (!validMongooseId(caseId)) return res.status(400).json({ success: false, message: "Not a valid caseId" })
+
+      const caseObjId = new Types.ObjectId(caseId)
+
+      const empListPipeline = [
+         // Find the case
+         {
+            $match: {
+               _id: caseObjId
+            }
+         },
+
+         // Find employees working on this case
+         {
+            $lookup: {
+               from: "employees",
+               let: {
+                  empObjId: "$empObjId",
+                  branchId: "$branchId"
+               },
+               pipeline: [
+                  {
+                     $match: {
+                        $expr: {
+                           $and: [
+                              // Don't include logged-in employee
+                              {
+                                 $ne: [
+                                    "$_id",
+                                    employee._id
+                                 ]
+                              },
+
+                              // employee._id == case.empObjId
+                              // OR
+                              // employee.branchId == case.branchId
+                              // AND employee.type is allowed
+                              {
+                                 $or: [
+                                    {
+                                       $eq: [
+                                          "$_id",
+                                          "$$empObjId"
+                                       ]
+                                    },
+                                    {
+                                       $and: [
+                                          {
+                                             $eq: [
+                                                "$branchId",
+                                                "$$branchId"
+                                             ]
+                                          },
+                                          {
+                                             $in: [
+                                                {
+                                                   $toLower: "$type"
+                                                },
+                                                [
+                                                   "operation",
+                                                   "branch",
+                                                   "finance"
+                                                ]
+                                             ]
+                                          }
+                                       ]
+                                    }
+                                 ]
+                              }
+                           ]
+                        }
+                     }
+                  },
+
+                  {
+                     $project: {
+                        _id: 1,
+                        fullName: 1,
+                        type: 1
+                     }
+                  }
+               ],
+               as: "employees"
+            }
+         },
+
+         // Convert employees array into individual documents
+         {
+            $unwind: "$employees"
+         },
+
+         // Return only employee information
+         {
+            $replaceRoot: {
+               newRoot: "$employees"
+            }
+         },
+
+         // Remove duplicate employees
+         {
+            $group: {
+               _id: "$_id",
+               fullName: { $first: "$fullName" },
+               type: { $first: "$type" }
+            }
+         },
+
+         // Final response shape
+         {
+            $project: {
+               _id: 1,
+               fullName: 1,
+               type: 1
+            }
+         }
+      ];
+
+      const caseEmployeeList = await Case.aggregate(empListPipeline);
+
+      const pipeline = [
+         {
+            $match: {
+               caseId: { $exists: true }, toEmployeeId: { $exists: true },
+               caseId: caseObjId
+            }
+         },
+         { $project: { toEmployeeId: 1 } },
+         {
+            $lookup: {
+               from: "employees",
+               localField: "toEmployeeId",
+               foreignField: "_id",
+               as: "employee",
+               pipeline: [
+                  { $project: { fullName: 1, type: 1 } }
+               ]
+            }
+         },
+         { $unwind: "$employee" },
+         {
+            $replaceRoot: {
+               newRoot: "$employee"
+            }
+         }
+      ]
+      const getShareSection = await ShareSection.aggregate(pipeline)
+
+      const combinedEmployees = [
+         ...caseEmployeeList,
+         ...getShareSection
+      ];
+
+      const uniqueEmployees = Array.from(
+         new Map(
+            combinedEmployees.map(emp => [
+               emp._id.toString(),
+               emp
+            ])
+         ).values()
+      );
+      return res.status(200).json({ success: true, message: "Successfully case employee list", data: uniqueEmployees });
+   } catch (error) {
+      console.log("getCaseEmployeeList in error:", error);
+      return res.status(500).json({ success: false, message: "Something went wrong", error: error });
+   }
+}
+

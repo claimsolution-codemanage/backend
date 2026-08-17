@@ -73,10 +73,6 @@ router.put("/unActiveDoc", authAdmin, adminController.adminUnactiveCaseDoc)
 router.get("/allUnactiveCaseDoc", authAdmin, adminController.adminAllUnactiveCaseDoc)
 
 
-// share case
-router.put("/addEmployeeToCase", authAdmin, adminController.adminShareCaseToEmployee)
-router.put("/add_or_update_case_comment", authAdmin, adminController.adminAddOrUpdateCaseComment)
-
 
 // share partner
 router.put("/addSharePartner", authAdmin, adminController.adminSharePartnerToSaleEmp)

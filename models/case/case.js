@@ -1,22 +1,14 @@
 import mongoose from "mongoose";
 
 const caseSchema = new mongoose.Schema({
-   // consultantCode: { type: String },
-   // partnerId:{type:String},
-   // partnerCode:{type:String},
-   // partnerName:{type:String},
    partnerObjId: {
       type: mongoose.Schema.ObjectId,
       ref: "Partner"
    },
-   // clientId:{type:String},
    clientObjId: {
       type: mongoose.Schema.ObjectId,
       ref: "Client"
    },
-   // empSaleId:{type:String},
-   // empSaleName:{type:String},
-   // empId: { type: String },
    empObjId: {
       type: mongoose.Schema.ObjectId,
       ref: "Employee"

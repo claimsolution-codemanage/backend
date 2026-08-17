@@ -1,12 +1,12 @@
 import axios from "axios";
 import mongoose, { Types } from "mongoose";
 import CaseDoc from "../../models/caseDoc.js";
-import { getValidateDate, validMongooseId } from "../../utils/helper.js";
+import { getValidateDate, sendNotificationAndMail, validMongooseId } from "../../utils/helper.js";
 import Case from "../../models/case/case.js";
 import { caseUpdateStatusTemplate } from "../../utils/emailTemplates/caseUpdateStatusTemplate.js";
 import { sendMail } from "../../utils/sendMail.js";
 import CaseStatus from "../../models/caseStatus.js";
-import { validateAdminAddCaseFee, validateAdminUpdateCasePayment, validateEditAdminCaseStatus, validateUpdateAdminCase } from "../../utils/validateAdmin.js";
+import { validateAdminAddCaseFee, validateAdminAddEmployeeToCase, validateAdminUpdateCasePayment, validateEditAdminCaseStatus, validateUpdateAdminCase } from "../../utils/validateAdmin.js";
 import * as dbFunction from "../../utils/dbFunction.js"
 import { validateAddClientCase } from "../../utils/validateClient.js";
 import CasePaymentDetails from "../../models/casePaymentDetails.js";
@@ -14,6 +14,7 @@ import CaseMergeDetails from "../../models/caseMergeDetails.js";
 import CaseComment from "../../models/caseComment.js";
 import Partner from "../../models/partner.js";
 import Employee from "../../models/employee/employeeModel.js";
+import ShareSection from "../../models/shareSection.js";
 
 
 export const viewAllAdminCase = async (req, res) => {
@@ -907,5 +908,424 @@ export const renameCaseDocFolder = async (req, res) => {
     } catch (error) {
         console.log("renameCaseDocFolder in error:", error);
         return res.status(500).json({ success: false, message: "Something went wrong", error: error });
+    }
+}
+
+
+// comment
+export const viewCaseCommentsById = async (req, res) => {
+    try {
+        const { caseId } = req.params;
+
+        if (!validMongooseId(caseId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Not a valid id"
+            });
+        }
+
+        const caseObjectId = new Types.ObjectId(caseId);
+
+        const matchStage = {
+            isActive: true,
+            $or: [
+                {
+                    caseId: caseObjectId
+                },
+                {
+                    caseMargeId: caseId.toString()
+                }
+            ]
+        };
+
+
+        const pipeline = [
+            {
+                $match: matchStage
+            },
+            {
+                $lookup: {
+                    from: "employees",
+                    localField: "employeeId",
+                    foreignField: "_id",
+                    pipeline: [
+                        {
+                            $project: {
+                                _id: 1,
+                                fullName: 1,
+                                type: 1
+                            }
+                        }
+                    ],
+                    as: "employee"
+                }
+            },
+            {
+                $lookup: {
+                    from: "admins",
+                    localField: "adminId",
+                    foreignField: "_id",
+                    pipeline: [
+                        {
+                            $project: {
+                                _id: 1,
+                                fullName: 1
+                            }
+                        }
+                    ],
+                    as: "admin"
+                }
+            },
+
+            // ---------------------------------------------------
+            // 4. Get tagged employees
+            // ---------------------------------------------------
+            {
+                $lookup: {
+                    from: "employees",
+                    let: {
+                        tagEmployeeIds: "$tagEmployeeIds"
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $in: [
+                                        "$_id",
+                                        {
+                                            $ifNull: ["$$tagEmployeeIds", []]
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                fullName: 1,
+                                type: 1
+                            }
+                        }
+                    ],
+                    as: "tagEmployees"
+                }
+            },
+
+            // ---------------------------------------------------
+            // 5. Convert lookup arrays to objects
+            // ---------------------------------------------------
+            {
+                $set: {
+                    name: {
+                        $ifNull: [
+                            { $arrayElemAt: ["$employee.fullName", 0] },
+                            { $arrayElemAt: ["$admin.fullName", 0] }
+                        ]
+                    }
+                }
+            },
+            {
+                $project: {
+                    _id: 1,
+                    name: 1,
+                    role: 1,
+                    message: 1,
+                    employeeId: 1,
+                    adminId: 1,
+                    tagEmployees: 1,
+                    attachments: 1,
+                    isPrivate: 1,
+                    createdAt: 1,
+
+                }
+            },
+
+            // ---------------------------------------------------
+            // 6. Sort comments
+            // ---------------------------------------------------
+            {
+                $sort: {
+                    createdAt: 1
+                }
+            }
+        ];
+
+        const comments = await CaseComment.aggregate(pipeline);
+
+        return res.status(200).json({
+            success: true,
+            message: "get case comments data",
+            data: comments
+        });
+
+    } catch (error) {
+        console.error("viewCaseCommentsById error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Something went wrong",
+            error
+        });
+    }
+};
+
+export const adminAddOrUpdateCaseComment = async (req, res) => {
+    try {
+        const { admin } = req
+        const { comment, caseCommentId, isPrivate, attachments, tagEmployeeIds = [] } = req.body
+        if (!comment?.trim()) return res.status(400).json({ success: false, message: "Case Comment required" })
+        if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
+        if (caseCommentId && !validMongooseId(caseCommentId)) return res.status(400).json({ success: false, message: "Not a valid comment ID" })
+
+        if (!Array.isArray(tagEmployeeIds)) return res.status(400).json({ success: false, message: "Not a valid tag employee ID" })
+        if (tagEmployeeIds?.length) {
+            await Promise.all(tagEmployeeIds?.map(async (tagEmployeeId) => {
+                if (!validMongooseId(tagEmployeeId)) return res.status(400).json({ success: false, message: "Not a valid tag employee ID" })
+            }))
+        }
+
+        const getCase = await Case.findById(req.body._id,)
+        if (!getCase) return res.status(400).json({ success: false, message: "Case not found" })
+
+        if (caseCommentId) {
+            await CaseComment.findByIdAndUpdate(caseCommentId, {
+                $set: {
+                    message: comment?.trim(),
+                    isPrivate: isPrivate ?? false,
+                    adminId: req?.user?._id,
+                    attachments: attachments,
+                    tagEmployeeIds: tagEmployeeIds || []
+                }
+            })
+            return res.status(200).json({ success: true, message: "Successfully updated case comment" });
+        }
+
+        const newComment = new CaseComment({
+            role: req?.user?.role,
+            name: req?.user?.fullName,
+            type: req?.user?.empType,
+            message: comment?.trim(),
+            isPrivate: isPrivate ?? false,
+            caseId: getCase?._id?.toString(),
+            adminId: req?.user?._id,
+            tagEmployeeIds: tagEmployeeIds || [],
+            attachments: attachments,
+        })
+        await newComment.save()
+
+
+
+        // send notification through email and db notification
+        const notificationEmpUrl = `/employee/view case/${getCase?._id?.toString()}`
+        const notificationAdminUrl = `/admin/view case/${getCase?._id?.toString()}`
+
+        sendNotificationAndMail(
+            getCase?._id?.toString(),
+            `New comment added on Case file No. ${getCase?.fileNo}`,
+            getCase?.branchId || "",
+            req?.user?._id,
+            notificationEmpUrl,
+            notificationAdminUrl
+        )
+
+        return res.status(200).json({ success: true, message: "Successfully add case commit" });
+    } catch (error) {
+        console.log("adminAddCaseCommit in error:", error);
+        return res.status(500).json({ success: false, message: "Internal server error", error: error });
+    }
+}
+// comment
+
+
+export const getCaseEmployeeList = async (req, res) => {
+    try {
+        const { caseId } = req?.params
+        if (!caseId) return res.status(400).json({ success: false, message: "caseId required" })
+        if (!validMongooseId(caseId)) return res.status(400).json({ success: false, message: "Not a valid caseId" })
+
+        const caseObjId = new Types.ObjectId(caseId)
+
+        const empListPipeline = [
+            // Find the case
+            {
+                $match: {
+                    _id: caseObjId
+                }
+            },
+
+            // Find employees working on this case
+            {
+                $lookup: {
+                    from: "employees",
+                    let: {
+                        empObjId: "$empObjId",
+                        branchId: "$branchId"
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        // OR
+                                        // employee.branchId == case.branchId
+                                        // AND employee.type is allowed
+                                        {
+                                            $or: [
+                                                {
+                                                    $eq: [
+                                                        "$_id",
+                                                        "$$empObjId"
+                                                    ]
+                                                },
+                                                {
+                                                    $and: [
+                                                        {
+                                                            $eq: [
+                                                                "$branchId",
+                                                                "$$branchId"
+                                                            ]
+                                                        },
+                                                        {
+                                                            $in: [
+                                                                {
+                                                                    $toLower: "$type"
+                                                                },
+                                                                [
+                                                                    "operation",
+                                                                    "branch",
+                                                                    "finance"
+                                                                ]
+                                                            ]
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+
+                        {
+                            $project: {
+                                _id: 1,
+                                fullName: 1,
+                                type: 1
+                            }
+                        }
+                    ],
+                    as: "employees"
+                }
+            },
+
+            // Convert employees array into individual documents
+            {
+                $unwind: "$employees"
+            },
+
+            // Return only employee information
+            {
+                $replaceRoot: {
+                    newRoot: "$employees"
+                }
+            },
+
+            // Remove duplicate employees
+            {
+                $group: {
+                    _id: "$_id",
+                    fullName: { $first: "$fullName" },
+                    type: { $first: "$type" }
+                }
+            },
+
+            // Final response shape
+            {
+                $project: {
+                    _id: 1,
+                    fullName: 1,
+                    type: 1
+                }
+            }
+        ];
+
+        const caseEmployeeList = await Case.aggregate(empListPipeline);
+
+        const pipeline = [
+            {
+                $match: {
+                    caseId: { $exists: true }, toEmployeeId: { $exists: true },
+                    caseId: caseObjId
+                }
+            },
+            { $project: { toEmployeeId: 1 } },
+            {
+                $lookup: {
+                    from: "employees",
+                    localField: "toEmployeeId",
+                    foreignField: "_id",
+                    as: "employee",
+                    pipeline: [
+                        { $project: { fullName: 1, type: 1 } }
+                    ]
+                }
+            },
+            { $unwind: "$employee" },
+            {
+                $replaceRoot: {
+                    newRoot: "$employee"
+                }
+            }
+        ]
+        const getShareSection = await ShareSection.aggregate(pipeline)
+
+        const combinedEmployees = [
+            ...caseEmployeeList,
+            ...getShareSection
+        ];
+
+        const uniqueEmployees = Array.from(
+            new Map(
+                combinedEmployees.map(emp => [
+                    emp._id.toString(),
+                    emp
+                ])
+            ).values()
+        );
+        return res.status(200).json({ success: true, message: "Successfully case employee list", data: uniqueEmployees });
+    } catch (error) {
+        console.log("getCaseEmployeeList in error:", error);
+        return res.status(500).json({ success: false, message: "Something went wrong", error: error });
+    }
+}
+
+
+// share case to employee
+// new version
+export const adminShareCaseToEmployee = async (req, res) => {
+    try {
+        const { error } = validateAdminAddEmployeeToCase(req.body)
+        if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+        const { shareCase = [], shareEmployee = [] } = req.body
+        let bulkOps = []
+        for (const toEmployeeId of shareEmployee) {
+            const exists = await ShareSection.find({ toEmployeeId, caseId: { $in: shareCase } }, { caseId: 1 })
+            let filter = shareCase?.filter(caseId => !exists?.map(ele => ele?.caseId?.toString())?.includes(caseId))
+            filter?.forEach(caseId => {
+                bulkOps.push({
+                    insertOne: {
+                        document: {
+                            caseId,
+                            toEmployeeId
+                        }
+                    }
+                })
+            })
+        }
+        await ShareSection.bulkWrite(bulkOps)
+        return res.status(200).json({ success: true, message: "Successfully employee add to case" });
+    } catch (error) {
+        console.log("empOptShareCaseToEmployee  in error:", error);
+        return res.status(500).json({ success: false, message: "Internal server error", error: error });
     }
 }

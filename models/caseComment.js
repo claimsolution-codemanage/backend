@@ -31,7 +31,13 @@ const caseCommentSchema = new mongoose.Schema({
         type: [{ fileName: String, url: String, fileType: String, fileSize: Number }],
         default: [],
     },
-    date: { type: Date, default: new Date() },
+    tagEmployeeIds: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Employee"
+        }
+    ],
+    date: { type: Date, default: Date.now },
     isPrivate: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true, required: true },
 

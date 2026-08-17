@@ -84,7 +84,6 @@ router.post("/upload/image", authEmployee, employeeController.employeeUploadImag
 router.post("/upload/attachment", authEmployee, employeeController.employeeUploadAttachment)
 
 // for share
-router.put("/operation/shareCase", authEmployee, employeeController.empOptShareCaseToEmployee)
 router.put("/operation/addSharePartner", authEmployee, employeeController.empOpSharePartnerToSaleEmp)
 router.put("/operation/shareClient", authEmployee, employeeController.empOpShareClientToSaleEmp)
 

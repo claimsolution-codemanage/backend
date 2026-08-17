@@ -22,4 +22,14 @@ router.delete("/deleteCaseById", adminCaseController.adminDeleteCaseById)
 router.delete("/deleteCaseDocId", adminCaseController.adminDeleteCaseDocById)
 router.put("/renameCaseDocFolder", adminCaseController.renameCaseDocFolder)
 
+// comment
+router.get("/viewCaseCommentsById/:caseId", adminCaseController.viewCaseCommentsById)
+router.put("/add_or_update_case_comment", adminCaseController.adminAddOrUpdateCaseComment)
+router.get("/getCaseEmployeeList/:caseId", adminCaseController.getCaseEmployeeList)
+// comment
+
+// share case to employee
+router.put("/addEmployeeToCase", adminCaseController.adminShareCaseToEmployee)
+
+
 export default router

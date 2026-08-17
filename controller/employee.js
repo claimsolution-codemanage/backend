@@ -3265,40 +3265,6 @@ export const empOptGetNormalEmployee = async (req, res) => {
    }
 }
 
-export const empOptShareCaseToEmployee = async (req, res) => {
-   try {
-      const { employee } = req
-      const { error } = validateAdminAddEmployeeToCase(req.body)
-      if (error) return res.status(400).json({ success: false, message: error.details[0].message })
-
-      // const updateCase = req.body?.shareCase?.map(caseShare => Case.findByIdAndUpdate(caseShare, { $push: { addEmployee: { $each: req?.body?.shareEmployee } } }, { new: true }))
-      // console.log("updateCase", updateCase);
-      // const allUpdateCase = await Promise.all(updateCase)
-
-      const { shareCase = [], shareEmployee = [] } = req.body
-      let bulkOps = []
-      for (const toEmployeeId of shareEmployee) {
-         const exists = await ShareSection.find({ toEmployeeId, caseId: { $in: shareCase } }, { caseId: 1 })
-         let filter = shareCase?.filter(caseId => !exists?.map(ele => ele?.caseId?.toString())?.includes(caseId))
-         filter?.forEach(caseId => {
-            bulkOps.push({
-               insertOne: {
-                  document: {
-                     caseId,
-                     toEmployeeId
-                  }
-               }
-            })
-         })
-      }
-      await ShareSection.bulkWrite(bulkOps)
-      return res.status(200).json({ success: true, message: "Successfully employee add to case" });
-   } catch (error) {
-      console.log("empOptShareCaseToEmployee  in error:", error);
-      return res.status(500).json({ success: false, message: "Internal server error", error: error });
-   }
-}
-
 //  notification section
 export const getAllNotification = async (req, res) => {
    try {
