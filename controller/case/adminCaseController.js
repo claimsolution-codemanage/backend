@@ -1,4 +1,5 @@
 import axios from "axios";
+import path from 'path'
 import mongoose, { Types } from "mongoose";
 import CaseDoc from "../../models/caseDoc.js";
 import { getValidateDate, sendNotificationAndMail, validMongooseId } from "../../utils/helper.js";
@@ -226,7 +227,7 @@ export const changeStatusAdminCase = async (req, res) => {
         const { error } = validateUpdateAdminCase(req.body)
         if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-        const { mailMethod = "", nextFollowUp = "" } = req.body
+        const { notify = "", nextFollowUp = "", otherDetails = {} } = req.body
 
         if (!validMongooseId(req.body._id)) return res.status(400).json({ success: false, message: "Not a valid id" })
         const statusRemark = req.body.remark
@@ -245,26 +246,46 @@ export const changeStatusAdminCase = async (req, res) => {
             consultant: admin?.fullName,
             adminId: req?.user?._id,
             attachments: req.body.attachments || [],
-            otherDetails: req.body.otherDetails || {},
+            otherDetails: otherDetails ? { ...otherDetails, nextFollowUp: nextFollowUp || "" } : {},
+            notify: req.body.notify || "",
             caseId: req.body._id
         })
         await addNewStatus.save()
 
+        let formattedAttachments = []
+        if (req.body.attachments && req.body.attachments.length > 0) {
+            const attachmentArray = req.body.attachments
+            if (Array.isArray(attachmentArray)) {
+                for (let attachment of attachmentArray) {
+                    let filename = path.basename(attachment)?.split("?")?.[0]?.split("_")?.[1]
+                    if (!filename) {
+                        filename = `Attachment_${updateCase.fileNo}_${attachmentArray.indexOf(attachment) + 1}`
+                    }
+                    formattedAttachments.push({
+                        filename: filename,
+                        path: attachment,
+                    })
+                }
+            }
+        }
+
         const subject = "Update on Your Case – Status Changed"
         // client
-        if (updateCase?.clientObjId?.profile?.primaryEmail && (["client", "both"]?.includes(mailMethod?.toLowerCase()))) {
+        if (updateCase?.clientObjId?.profile?.primaryEmail && (["client", "both"]?.includes(notify?.toLowerCase()))) {
             sendMail({
                 to: updateCase?.clientObjId?.profile?.primaryEmail,
                 subject,
-                html: caseUpdateStatusTemplate({ type: "Client", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/client/view case/${req.body._id}` })
+                html: caseUpdateStatusTemplate({ type: "Client", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/client/view case/${req.body._id}` }),
+                ...(formattedAttachments?.length > 0 && { attachments: formattedAttachments })
             })
         }
         // partner
-        if (updateCase?.partnerObjId?.profile?.primaryEmail && (["partner", "both"]?.includes(mailMethod?.toLowerCase()))) {
+        if (updateCase?.partnerObjId?.profile?.primaryEmail && (["partner", "both"]?.includes(notify?.toLowerCase()))) {
             sendMail({
                 to: updateCase?.partnerObjId?.profile?.primaryEmail,
                 subject,
-                html: caseUpdateStatusTemplate({ type: "Partner", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/partner/view case/${req.body._id}` })
+                html: caseUpdateStatusTemplate({ type: "Partner", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/partner/view case/${req.body._id}` }),
+                ...(formattedAttachments?.length > 0 && { attachments: formattedAttachments })
             })
         }
         return res.status(200).json({ success: true, message: `Case status change to ${req.body.status}` });
@@ -477,7 +498,7 @@ export const viewCaseProcessStepsById = async (req, res) => {
             ]
         };
 
-        const steps = await CaseStatus.find(query).select("status createdAt remark date attachments otherDetails").sort({ createdAt: -1 });
+        const steps = await CaseStatus.find(query).select("status createdAt remark date attachments notify otherDetails").sort({ createdAt: -1 });
 
         return res.status(200).json({ success: true, message: "get case process steps data", data: steps });
     } catch (error) {
@@ -497,38 +518,14 @@ export const adminAddCaseFile = async (req, res) => {
 
 export const adminUpdateCaseById = async (req, res) => {
     try {
-        const { admin } = req
         const { _id } = req.query
         if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
-
-        const mycase = await Case.find({ _id: _id })
-        if (mycase.length == 0) return res.status(404).json({ success: false, message: "Case not found" })
 
         const { error } = validateAddClientCase(req.body);
         if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-
-        const newDoc = req?.body?.caseDocs?.filter(doc => doc?.new)
-
-        const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body, caseDocs: [] } }, { new: true })
-
-        let bulkOps = [];
-        newDoc?.forEach((doc) => {
-            bulkOps.push({
-                insertOne: {
-                    document: {
-                        name: doc?.docName,
-                        type: doc?.docType,
-                        format: doc?.docFormat,
-                        url: doc?.docURL,
-                        employeeId: req?.user?._id,
-                        isPrivate: doc?.isPrivate,
-                        caseId: updateCase?._id?.toString(),
-                    }
-                }
-            });
-        });
-        bulkOps?.length && await CaseDoc.bulkWrite(bulkOps)
+        const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body } }, { new: true })
+        if (!updateCase) return res.status(404).json({ success: false, message: "Case not found" })
 
         return res.status(200).json({ success: true, message: "Successfully update case", data: updateCase });
 
@@ -601,7 +598,8 @@ export const adminEditCaseStatus = async (req, res) => {
                 status: req.body.status,
                 remark: req.body.remark,
                 nextFollowUp: req.body.nextFollowUp || null,
-                otherDetails: req.body.otherDetails || {},
+                otherDetails: req.body.otherDetails ? { ...req.body.otherDetails, nextFollowUp: req.body.nextFollowUp || "" } : {},
+                notify: req.body.notify || "",
                 consultant: admin?.fullName,
                 adminId: req?.user?._id
             }

@@ -6,7 +6,6 @@ import Admin from '../models/admin.js'
 import Client from '../models/client.js'
 
 export const authPartner = async (req, res) => {
-   // console.log("header",req.headers);
    if (!req.headers["x-auth-token"]) return { success: false, message: "UnAuth token" }
 
    const token = req.headers["x-auth-token"]
@@ -14,7 +13,6 @@ export const authPartner = async (req, res) => {
       await jwt.verify(token, process.env.PARTNER_SECRET_KEY)
       const decode = await jwtDecode(token)
       req.user = decode
-      console.log("decode", decode);
       return { success: true, message: "auth token verified" }
    } catch (error) {
       return { success: false, message: "Access Denied" }
@@ -38,7 +36,6 @@ export const authAdmin = async (req, res, next) => {
       if (!admin?.isActive) return res.status(401).json({ success: false, message: Messages?.account_not_active })
       req.admin = admin
       req.user = { _id }
-      console.log(payload);
       next()
    } catch (error) {
       console.log("error", error);
@@ -68,7 +65,6 @@ export const authEmployee = async (req, res, next) => {
 }
 
 export const authClient = async (req, res) => {
-   // console.log("header",req.headers);
    if (!req.headers["x-auth-token"]) return { success: false, message: "UnAuth token" }
 
    const token = req.headers["x-auth-token"]

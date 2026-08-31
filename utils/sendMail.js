@@ -65,7 +65,7 @@ export async function sendMail({ to, cc = [], bcc = [], subject, html, attachmen
 			bcc,
 			subject,
 			html,
-			attachments,
+			...(attachments && attachments.length > 0 ? { attachments } : {}),
 		});
 		console.log("mail sent", to, info);
 

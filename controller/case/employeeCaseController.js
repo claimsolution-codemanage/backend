@@ -1,4 +1,5 @@
 import axios from "axios";
+import path from 'path'
 import { getValidateDate, sendNotificationAndMail, validMongooseId } from "../../utils/helper.js";
 import { bucket } from "../../firebase/config.js";
 import { Types } from "mongoose";
@@ -577,7 +578,7 @@ export const viewCaseProcessStepsById = async (req, res) => {
          ]
       };
 
-      const steps = await CaseStatus.find(query).select("status createdAt remark date attachments otherDetails").sort({ createdAt: -1 });
+      const steps = await CaseStatus.find(query).select("status createdAt remark date attachments notify otherDetails").sort({ createdAt: -1 });
 
       return res.status(200).json({ success: true, message: "get case process steps data", data: steps });
    } catch (error) {
@@ -779,38 +780,12 @@ export const updateCaseById = async (req, res) => {
       const { _id } = req.query
       if (!validMongooseId(_id)) return res.status(400).json({ success: false, message: "Not a valid id" })
 
-      const mycase = await Case.findById(_id)
-      if (!mycase) return res.status(404).json({ success: false, message: "Case not found" })
-
       const { error } = validateAddClientCase(req.body);
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
-      const newDoc = req?.body?.caseDocs?.filter(doc => doc?.new)
-
-      const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body, caseDocs: [] } }, { new: true })
-      if (!updateCase) return res.status(404).json({ success: true, message: "Case not found" });
-
-      let bulkOps = [];
-
-      newDoc?.forEach((doc) => {
-         bulkOps.push({
-            insertOne: {
-               document: {
-                  name: doc?.docName,
-                  type: doc?.docType,
-                  format: doc?.docFormat,
-                  url: doc?.docURL,
-                  employeeId: req?.user?._id,
-                  isPrivate: doc?.isPrivate,
-                  caseId: updateCase?._id?.toString(),
-               }
-            }
-         });
-      });
-
-      bulkOps?.length && await CaseDoc.bulkWrite(bulkOps)
-
-      return res.status(200).json({ success: true, message: "Successfully update case", });
+      const updateCase = await Case.findByIdAndUpdate(_id, { $set: { ...req.body } }, { new: true })
+      if (!updateCase) return res.status(404).json({ success: false, message: "Case not found" });
+      return res.status(200).json({ success: true, message: "Successfully update case", data: updateCase });
 
    } catch (error) {
       console.log("updateCaseById in error:", error);
@@ -837,7 +812,6 @@ export const changeCaseIsActive = async (req, res) => {
       return res.status(500).json({ success: false, message: "Something went wrong", error: error });
    }
 }
-
 export const updateCaseStatus = async (req, res) => {
    try {
       const { employee } = req
@@ -849,7 +823,7 @@ export const updateCaseStatus = async (req, res) => {
          return res.status(400).json({ success: false, message: "You don't have the permission" })
       }
 
-      const { mailMethod = "", nextFollowUp = "", otherDetails = {} } = req.body
+      const { notify = "", nextFollowUp = "", otherDetails = {} } = req.body
 
       const { error } = validateUpdateEmployeeCase(req.body)
       if (error) return res.status(400).json({ success: false, message: error.details[0].message })
@@ -871,28 +845,49 @@ export const updateCaseStatus = async (req, res) => {
          employeeId: req?.user?._id,
          caseId: req.body._id,
          attachments: req.body.attachments || [],
-         otherDetails
+         notify: req.body.notify || "",
+         otherDetails: otherDetails ? { ...otherDetails, nextFollowUp: nextFollowUp || "" } : {},
       })
       await addNewStatus.save()
+
+      let formattedAttachments = []
+      if (req.body.attachments && req.body.attachments.length > 0) {
+         const attachmentArray = req.body.attachments
+         if (Array.isArray(attachmentArray)) {
+            for (let attachment of attachmentArray) {
+               let filename = path.basename(attachment)?.split("?")?.[0]?.split("_")?.[1]
+               if (!filename) {
+                  filename = `Attachment_${updateCase.fileNo}_${attachmentArray.indexOf(attachment) + 1}`
+               }
+               formattedAttachments.push({
+                  filename: filename,
+                  path: attachment,
+               })
+            }
+         }
+      }
+
 
       // send notification through email and db notification
       const caseNumber = updateCase.fileNo
 
       const subject = "Update on Your Case – Status Changed"
       // client
-      if (updateCase?.clientObjId?.profile?.primaryEmail && (["client", "both"]?.includes(mailMethod?.toLowerCase()))) {
+      if (updateCase?.clientObjId?.profile?.primaryEmail && (["client", "both"]?.includes(notify?.toLowerCase()))) {
          sendMail({
             to: updateCase?.clientObjId?.profile?.primaryEmail,
             subject,
-            html: caseUpdateStatusTemplate({ type: "Client", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/client/view case/${req.body._id}` })
+            html: caseUpdateStatusTemplate({ type: "Client", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/client/view case/${req.body._id}` }),
+            ...(formattedAttachments?.length > 0 && { attachments: formattedAttachments })
          })
       }
       // partner
-      if (updateCase?.partnerObjId?.profile?.primaryEmail && (["partner", "both"]?.includes(mailMethod?.toLowerCase()))) {
+      if (updateCase?.partnerObjId?.profile?.primaryEmail && (["partner", "both"]?.includes(notify?.toLowerCase()))) {
          sendMail({
             to: updateCase?.partnerObjId?.profile?.primaryEmail,
             subject,
-            html: caseUpdateStatusTemplate({ type: "Partner", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/partner/view case/${req.body._id}` })
+            html: caseUpdateStatusTemplate({ type: "Partner", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/partner/view case/${req.body._id}` }),
+            ...(formattedAttachments?.length > 0 && { attachments: formattedAttachments })
          })
       }
       return res.status(200).json({ success: true, message: `Case status change to ${req.body.status}` });

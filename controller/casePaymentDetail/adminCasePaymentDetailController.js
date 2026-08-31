@@ -45,12 +45,12 @@ export const createCasePayment = async (req, res) => {
             });
         }
 
-        const caseData = await Case.findById(caseId).select('clientId');
+        const caseData = await Case.findById(caseId).select('clientObjId');
 
-        if (!caseData || !caseData.clientId) {
+        if (!caseData || !caseData.clientObjId) {
             return res.status(404).json({
                 success: false,
-                message: !caseData ? 'case not found' : 'clientId not found',
+                message: !caseData ? 'Case not found' : 'Client ID not found',
             });
         }
 
@@ -62,7 +62,7 @@ export const createCasePayment = async (req, res) => {
             });
         }
 
-        const clientId = caseData.clientId;
+        const clientId = caseData.clientObjId;
 
         if (!totalProcessingFee) {
             return res.status(400).json({

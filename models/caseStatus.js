@@ -30,6 +30,7 @@ const caseStatusSchema = new mongoose.Schema({
     isActive: { type: Boolean, default: true, required: true },
     attachments: { type: [String], default: [] },
     otherDetails: { type: mongoose.Schema.Types.Mixed, default: {} },
+    notify: { type: String, default: "", },
 
 
 }, { timestamps: true });
