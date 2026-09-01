@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
 
 const leadColumnSchema = new mongoose.Schema({
-  key: { type: String, required: true, unique: true }, 
-  label: { type: String, required: true }, 
+  key: { type: String, required: true, unique: true },
+  label: { type: String, required: true },
   type: {
     type: String,
     enum: ["text", "number", "date", "select"],
@@ -10,6 +10,7 @@ const leadColumnSchema = new mongoose.Schema({
   },
   options: [String],
   isDefault: { type: Boolean, default: false },
+  isTableColumnVisible: { type: Boolean, default: false },
   isActive: { type: Boolean, default: true },
   order: { type: Number, default: 0 },
 }, { timestamps: true });

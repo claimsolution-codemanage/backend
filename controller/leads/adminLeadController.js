@@ -3,6 +3,7 @@ import LeadRowModel from "../../models/leads/leadRow.js";
 import LeadColumnModel from "../../models/leads/leadColumn.js";
 import { validateLeadData } from "../../utils/validator/leads/validateLeadData.js";
 import LeadFollowUp from "../../models/leads/leadFollowUpModel.js";
+import { defaultColumns } from "../../utils/constant.js"
 
 const generateKey = (label) =>
   label
@@ -90,11 +91,15 @@ export const allLeadColumns = async (req, res) => {
 export const addNewLead = async (req, res) => {
   try {
     const { admin } = req
-    const { assignedTo, followUpDate } = req.body
+    const { assignedTo, followUpDate, name, mobileNo } = req.body
+    if (!name?.trim() || !mobileNo?.trim()) return res.status(400).json({ success: false, message: "Name and mobile number are required", });
+
     const { error } = validateLeadData(req.body?.data)
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
+    const defaultColValues = defaultColumns?.reduce((acc, key) => { acc[key] = req?.body[key] || ""; return acc; }, {})
     const newLead = new LeadRowModel({
+      ...defaultColValues,
       data: req?.body?.data,
       ...(assignedTo ? { assignedTo } : {}),
       ...(followUpDate ? { followUpDate } : {}),
@@ -147,7 +152,7 @@ export const allLeads = async (req, res) => {
           preserveNullAndEmptyArrays: true
         }
       },
-      ...(isExport == "true" ? [] : [
+      ...(isExport == "true" && !Object.keys(sort)?.includes("nextFollowUpSort") ? [] : [
         {
           $addFields: {
             leadStatusScore: {
@@ -158,10 +163,7 @@ export const allLeads = async (req, res) => {
                       $toLower: {
                         $trim: {
                           input: {
-                            $ifNull: [
-                              { $getField: { field: "lead_status", input: "$data" } },
-                              ""
-                            ]
+                            $ifNull: ["$status", ""]
                           }
                         }
                       }
@@ -173,42 +175,25 @@ export const allLeads = async (req, res) => {
                 0
               ]
             },
-
             nextFollowUpSort: {
-              $let: {
-                vars: {
-                  followUp: {
-                    $ifNull: [
-                      { $getField: { field: "next_follow_up_date", input: "$data" } },
-                      null
-                    ]
-                  }
-                },
-                in: {
-                  $cond: [
-                    {
-                      $and: [
-                        { $ne: ["$$followUp", null] },
-                        { $ne: [{ $trim: { input: "$$followUp" } }, ""] }
-                      ]
-                    },
-                    "$$followUp",
-                    "9999-12-31"
+              $cond: [
+                {
+                  $and: [
+                    { $ne: ["$followUpDate", null] },
+                    { $ne: ["$followUpDate", ""] }
                   ]
-                }
-              }
+                },
+                "$followUpDate",
+                new Date("9999-12-31")
+              ]
             }
+
           }
         }
       ]),
       {
         $sort: {
-          ...(isExport == "true" ? {} : {
-            leadStatusScore: -1,
-            nextFollowUpSort: 1,
-          }),
           ...(Object.keys(sort)?.length ? sort : {}),
-          createdAt: -1
         }
       },
       {
@@ -238,10 +223,13 @@ export const updateLead = async (req, res) => {
   try {
     const { admin } = req
     const { _id } = req.body
-    const { assignedTo, followUpDate } = req.body
+    const { assignedTo, followUpDate, name, mobileNo } = req.body
 
+    if (!name?.trim() || !mobileNo?.trim()) return res.status(400).json({ success: false, message: "Name and mobile number are required", });
     const { error } = validateLeadData(req.body?.data)
     if (error) return res.status(400).json({ success: false, message: error.details[0].message })
+
+    const defaultColValues = defaultColumns?.reduce((acc, key) => { acc[key] = req?.body[key] || ""; return acc; }, {})
 
 
     const isExist = await LeadRowModel.findById(_id)
@@ -251,6 +239,7 @@ export const updateLead = async (req, res) => {
     isExist.order = req.body?.order ?? 1
     isExist.assignedTo = assignedTo ?? null
     isExist.followUpDate = followUpDate ?? null
+    Object.assign(isExist, { ...defaultColValues, ...req?.body?.data })
 
     const result = await isExist.save()
     return res.status(200).json({ success: true, message: "Successfully updated lead", data: result });
@@ -267,17 +256,18 @@ export const addOrUpdateLead = async (req, res) => {
 
     const updateOperations = [];
     const insertDocuments = [];
+    let lastLeadId = 0
+
+    if (payload?.length > 0 && payload?.some(item => !item?._id)) {
+      const lastLead = await LeadRowModel.findOne().sort({ createdAt: -1 })
+      lastLeadId = lastLead?.leadId ? lastLead?.leadId?.split("-")?.[1] : 0
+    }
 
     for (let item of payload) {
       const { _id, assignedTo, followUpDate, data, order } = item;
+      if (!item?.name || !item?.mobileNo) return res.status(400).json({ success: false, message: "Name and mobile number are required", });
+      const defaultColValues = defaultColumns?.reduce((acc, key) => { acc[key] = item[key] || ""; return acc; }, {})
 
-      // const { error } = validateLeadData(data);
-      // if (error) {
-      //   return res.status(400).json({
-      //     success: false,
-      //     message: error.details[0].message,
-      //   });
-      // }
 
       if (_id) {
         // UPDATE
@@ -286,6 +276,7 @@ export const addOrUpdateLead = async (req, res) => {
             filter: { _id },
             update: {
               $set: {
+                ...defaultColValues,
                 data,
                 assignedTo: assignedTo || null,
                 followUpDate: followUpDate || null,
@@ -299,6 +290,8 @@ export const addOrUpdateLead = async (req, res) => {
       } else {
         // INSERT
         insertDocuments.push({
+          ...defaultColValues,
+          leadId: `CMSOL-${++lastLeadId}`,
           data,
           assignedTo: assignedTo || null,
           followUpDate: followUpDate || null,
@@ -363,10 +356,10 @@ export const addOrUpdateLeadFollowUp = async (req, res) => {
     const { lead = {}, followup = {} } = payload;
 
     // ---------------- VALIDATION ----------------
-    if (!followup.mode || !followup.summary || !followup.nextFollowUpDate) {
+    if (!followup.mode || !followup.summary) {
       return res.status(400).json({
         success: false,
-        message: "Required: mode, summary, nextFollowUpDate"
+        message: "Required: mode & summary"
       });
     }
 
@@ -380,7 +373,7 @@ export const addOrUpdateLeadFollowUp = async (req, res) => {
         leadRowId,
         {
           $set: {
-            "data.next_follow_up_date": followup.nextFollowUpDate,
+            followUpDate: followup.nextFollowUpDate || null,
             updatedBy: admin?._id,
             updatedByModel: "Admin"
           }
@@ -388,20 +381,20 @@ export const addOrUpdateLeadFollowUp = async (req, res) => {
         { new: true }
       );
     } else {
-      if (!lead?.data) {
+      if (!lead?.name?.trim() || !lead?.mobileNo?.trim()) {
         return res.status(400).json({
           success: false,
-          message: "Lead data required for new lead"
+          message: "Lead name and mobile number are required for new lead"
         });
       }
+      const defaultColValues = defaultColumns?.reduce((acc, key) => { acc[key] = lead[key] || ""; return acc; }, {})
+
 
       leadData = await LeadRowModel.create({
-        data: {
-          ...lead.data,
-          next_follow_up_date: followup.nextFollowUpDate
-        },
+        ...defaultColValues,
+        data: lead?.data,
         assignedTo: lead.assignedTo || null,
-        followUpDate: lead?.followUpDate || null,
+        followUpDate: followup?.nextFollowUpDate || null,
         order: lead?.order || 1,
         createdBy: admin?._id,
         createdByModel: "Admin",

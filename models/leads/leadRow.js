@@ -3,8 +3,8 @@ import mongoose from "mongoose";
 const leadRowSchema = new mongoose.Schema({
   leadId: { type: String, required: true, unique: true },
   name: { type: String, required: true, },
-  mobile: { type: String, required: true },
-  alternativeMobile: { type: String },
+  mobileNo: { type: String, required: true },
+  alternativeNo: { type: String },
   email: { type: String },
   city: { type: String },
   state: { type: String },
@@ -13,7 +13,8 @@ const leadRowSchema = new mongoose.Schema({
   claimAmount: { type: String },
   claimStatus: { type: String },
   leadSource: { type: String },
-  leadStatus: { type: String },
+  leadStatus: { type: String, default: 'New' },
+  status: { type: String, default: "Active" },
   followUpDate: { type: Date, default: null },
   branchId: { type: String },
   data: { type: mongoose.Schema.Types.Mixed, default: {}, },
@@ -27,5 +28,20 @@ const leadRowSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
+leadRowSchema.pre("save", async function (next) {
+  if (!this.leadId) {
+    const lastLead = await LeadRows.findOne().sort({ createdAt: -1 });
+
+    const lastLeadId = lastLead
+      ? parseInt(lastLead.leadId.split("-")[1])
+      : 0;
+
+    this.leadId = `CMSOL-${lastLeadId + 1}`;
+  }
+
+  next();
+});
+
 const LeadRows = mongoose.model("lead_rows", leadRowSchema);
+
 export default LeadRows

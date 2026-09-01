@@ -1,8 +1,9 @@
 import moment from "moment";
 import mongoose, { Types } from "mongoose";
+import LeadColumns from "../models/leads/leadColumn.js";
 
 
-export default function leadQueryParser(req, res, next) {
+export default async function leadQueryParser(req, res, next) {
     const query = req.query;
 
     const where = {};
@@ -17,17 +18,23 @@ export default function leadQueryParser(req, res, next) {
     pagination.limit = limit;
     pagination.skip = (pageNo - 1) * limit;
 
-
+    const columns = await LeadColumns.find({ isDefault: true }, { key: 1 })
+    const defaultColumns = columns?.map(col => col?.key)
     // ✅ Sorting
     if (query.sortBy) {
         const direction = query.orderBy === "desc" ? -1 : 1;
 
         // If sorting nested field inside data
-        if (query.sortBy !== "followUpDate" && query.sortBy !== "assignedTo") {
-            sort[`data.${query.sortBy}`] = direction;
-        } else {
+        if (query.sortBy == "followUpDate") {
+            sort.leadStatusScore = -1;
+            sort[`nextFollowUpSort`] = direction;
+        } else if (defaultColumns?.includes(query.sortBy)) {
             sort[query.sortBy] = direction;
+        } else {
+            sort[`data.${query.sortBy}`] = direction;
         }
+    } else {
+        sort.createdAt = -1;
     }
 
 
@@ -35,7 +42,7 @@ export default function leadQueryParser(req, res, next) {
     Object.keys(query).forEach((key) => {
         // Skip reserved keys
         if (
-            ["pageNo", "limit", "sortBy", "orderBy","isExport"].includes(key)
+            ["pageNo", "limit", "sortBy", "orderBy", "isExport"].includes(key)
         ) {
             return;
         }
@@ -46,7 +53,7 @@ export default function leadQueryParser(req, res, next) {
 
             if (!where[field]) where[field] = {};
             const startDate = moment(query[key]).startOf("day").toDate();
-            if (field === "followUpDate") {
+            if (defaultColumns?.includes(field)) {
                 where[field].$gte = startDate
             } else {
                 where[`data.${field}`].$gte = startDate
@@ -59,7 +66,7 @@ export default function leadQueryParser(req, res, next) {
 
             if (!where[field]) where[field] = {};
             const endDate = moment(query[key]).endOf("day").toDate();
-            if (field === "followUpDate") {
+            if (defaultColumns?.includes(field)) {
                 where[field].$lte = endDate
             } else {
                 where[`data.${field}`].$lte = endDate
@@ -68,12 +75,13 @@ export default function leadQueryParser(req, res, next) {
 
         else if (key === "assignedTo") {
             const hasMultiOption = query[key]?.includes(",")
-            where[key] = hasMultiOption ? {$in:query[key]?.split(",")?.map(id=>new Types.ObjectId(id))} : new Types.ObjectId(query[key]) 
+            where[key] = hasMultiOption ? { $in: query[key]?.split(",")?.map(id => new Types.ObjectId(id)) } : new Types.ObjectId(query[key])
         }
         // 🔹 Normal Filter
         else {
             const hasMultiOption = query[key]?.includes(",")
-            where[`data.${key}`] = hasMultiOption ? {$in:query[key]?.split(",")} : { $regex: query[key], $options: "i" };
+            let filterKey = defaultColumns?.includes(key) ? key : "data." + key
+            where[filterKey] = hasMultiOption ? { $in: query[key]?.split(",") } : { $regex: query[key], $options: "i" };
         }
     });
 

@@ -1,9 +1,9 @@
 export const Messages = {
-    un_auth_token:"Un-auth token",
-    access_denied:"Access denied",
-    account_not_found:"Account not found",
-    account_not_active:"Employee account is not active",
-    auth_token_verified: "Auth token verified"
+  un_auth_token: "Un-auth token",
+  access_denied: "Access denied",
+  account_not_found: "Account not found",
+  account_not_active: "Employee account is not active",
+  auth_token_verified: "Auth token verified"
 }
 
 export const allowedEmailDomains = [
@@ -22,3 +22,5 @@ export const allowedEmailDomains = [
   "@tutanota.com",
   "@hushmail.com"
 ];
+
+export const defaultColumns = ["mobileNo", "name", "alternativeNo", "email", "city", "state", "claimAmount", "claimStatus", "insuranceCompany", "leadSource", "leadStatus", "policyType", "status", "followUpDate", "assignedTo"]
