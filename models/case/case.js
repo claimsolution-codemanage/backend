@@ -45,7 +45,7 @@ const caseSchema = new mongoose.Schema({
    problemStatement: { type: String },
    isActive: { type: Boolean, required: true, default: true },
    fileNo: { type: String, required: true },
-   currentStatus: { type: String, required: true, default: "pending" },
+   currentStatus: { type: String, required: true, default: "Pending" },
    addEmployee: { type: Array, default: [] },
    branchId: { type: String, default: "", },
    nextFollowUp: { type: Date, default: null },
