@@ -877,7 +877,7 @@ export const updateCaseStatus = async (req, res) => {
          sendMail({
             to: updateCase?.clientObjId?.profile?.primaryEmail,
             subject,
-            html: caseUpdateStatusTemplate({ type: "Client", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/client/view case/${req.body._id}` }),
+            html: caseUpdateStatusTemplate({ type: "Client", name: updateCase?.clientObjId?.profile?.consultantName, caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/client/view case/${req.body._id}` }),
             ...(formattedAttachments?.length > 0 && { attachments: formattedAttachments })
          })
       }
@@ -886,7 +886,7 @@ export const updateCaseStatus = async (req, res) => {
          sendMail({
             to: updateCase?.partnerObjId?.profile?.primaryEmail,
             subject,
-            html: caseUpdateStatusTemplate({ type: "Partner", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/partner/view case/${req.body._id}` }),
+            html: caseUpdateStatusTemplate({ type: "Partner", name: updateCase?.partnerObjId?.profile?.consultantName, caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/partner/view case/${req.body._id}` }),
             ...(formattedAttachments?.length > 0 && { attachments: formattedAttachments })
          })
       }

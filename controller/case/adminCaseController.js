@@ -269,13 +269,16 @@ export const changeStatusAdminCase = async (req, res) => {
             }
         }
 
+        // send notification through email and db notification
+        const caseNumber = updateCase.fileNo
+
         const subject = "Update on Your Case – Status Changed"
         // client
         if (updateCase?.clientObjId?.profile?.primaryEmail && (["client", "both"]?.includes(notify?.toLowerCase()))) {
             sendMail({
                 to: updateCase?.clientObjId?.profile?.primaryEmail,
                 subject,
-                html: caseUpdateStatusTemplate({ type: "Client", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/client/view case/${req.body._id}` }),
+                html: caseUpdateStatusTemplate({ type: "Client", name: updateCase?.clientObjId?.profile?.consultantName, caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/client/view case/${req.body._id}` }),
                 ...(formattedAttachments?.length > 0 && { attachments: formattedAttachments })
             })
         }
@@ -284,7 +287,7 @@ export const changeStatusAdminCase = async (req, res) => {
             sendMail({
                 to: updateCase?.partnerObjId?.profile?.primaryEmail,
                 subject,
-                html: caseUpdateStatusTemplate({ type: "Partner", caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/partner/view case/${req.body._id}` }),
+                html: caseUpdateStatusTemplate({ type: "Partner", name: updateCase?.partnerObjId?.profile?.consultantName, caseNumber, statusRemark, caseStatus, caseUrl: process.env.PANEL_FRONTEND_URL + `/partner/view case/${req.body._id}` }),
                 ...(formattedAttachments?.length > 0 && { attachments: formattedAttachments })
             })
         }
@@ -581,7 +584,6 @@ export const adminEditCaseStatus = async (req, res) => {
         const { admin } = req
 
         const { error } = validateEditAdminCaseStatus(req.body)
-        console.log("error in adminEditCaseStatus", error);
         if (error) return res.status(400).json({ success: false, message: error.details[0].message })
 
         if (!validMongooseId(req.body.caseId) || !validMongooseId(req.body.processId)) return res.status(400).json({ success: false, message: "Not a valid processId or caseId" })

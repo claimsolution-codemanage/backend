@@ -1,5 +1,5 @@
 
-export function caseUpdateStatusTemplate({ type, caseNumber, statusRemark, caseStatus, caseUrl }) {
+export function caseUpdateStatusTemplate({ type, name, caseNumber, statusRemark, caseStatus, caseUrl }) {
   return `
   
     <!DOCTYPE html>
@@ -117,34 +117,18 @@ export function caseUpdateStatusTemplate({ type, caseNumber, statusRemark, caseS
           </div>
           <div class="">
       <div class="email-body">
-        <p>Dear ${type},</p>
-        <p>
-            We would like to inform you that there has been an update on your case.
-            </p>
-
-            <p>
-            <strong>Case Number:</strong> ${caseNumber}<br/>
-            <strong>Current Status:</strong> ${caseStatus}
-            </p>
-
-            <p>
-            <strong>Remarks:</strong><br/>
-            ${statusRemark || "No additional remarks at this time."}
-            </p>
-
-            <p>
-            Our team is actively working on your case. If any further action is required from your side, we will notify you.
-            </p>
-
+        <p>Dear ${name || type},</p>
+        <p>We would like to inform you that there has been an update on your case.</p>
+        <p><strong>Case Number:</strong> ${caseNumber}<br/><strong>Current Status:</strong> ${caseStatus}</p>
+        <p><strong>Remarks:</strong><br/>${statusRemark || "No additional remarks at this time."}</p>
+        <p>If any further action is required from your side, we will notify you.</p>
         <p>Click the button below to view the full details</p>
         <a href="${caseUrl}" class="btn">View Case</a>
-		<br/>
+        <br/>
         <p>Best regards, <br> The Claimsolution Team</p>
       </div>
-
           </div>
           <div class="footer">
-            <p>If you didn’t request this, you can safely ignore this email.</p>
             <p>&copy; ${new Date().getFullYear()} <a href="https://www.claimsolution.in">claimsolution.in</a>. All rights reserved.</p>
           </div>
         </div>
