@@ -113,7 +113,7 @@ const getRecipientEmailsByGroup = async (group) => {
             return employees.map((item) => item.email);
         }
 
-        case "stm":
+        case "Sathi Team":
         case "surveyor":
         case "advocate": {
             const employees = await Employee.find(
